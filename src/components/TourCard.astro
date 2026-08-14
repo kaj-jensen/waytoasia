@@ -1,0 +1,6 @@
+---
+import type {Tour} from '../content/data';import type {Locale} from '../i18n';import {localizedPath,t} from '../i18n';import {formatPrice} from '../lib/format';
+const {tour,locale}=Astro.props as {tour:Tour;locale:Locale};
+---
+<a class="card" href={localizedPath(locale,`/${tour.country}/tours/${tour.slug}`)}><div class="card-media"><img src={tour.image} alt={`${tour.name} journey`} loading="lazy" width="900" height="675"></div><div class="card-body"><div class="meta"><span>{tour.country} · {tour.duration} {t(locale,'days')}</span><span class="price">{t(locale,'from')} {formatPrice(locale,tour.prices)}</span></div><h3>{tour.name}</h3><p>{tour.teaser}</p><span class="link">View itinerary ↗</span></div></a>
+<style>h3{margin:.8rem 0 .55rem}.card-body p{color:#63706b;font-size:.88rem;min-height:3.1rem}.link{display:block;margin-top:1.25rem;font:500 .67rem var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--vermilion)}</style>

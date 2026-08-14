@@ -1,0 +1,6 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';import TourFilter from '../../../components/TourFilter';import {tours} from '../../../content/data';import {formatPrice} from '../../../lib/format';import {locales,localizedPath,type Locale} from '../../../i18n';
+export function getStaticPaths(){return locales.map(locale=>({params:{locale},props:{locale}}))}const {locale}=Astro.props as {locale:Locale};const items=tours.map(x=>({...x,price:formatPrice(locale,x.prices),href:localizedPath(locale,`/${x.country}/tours/${x.slug}`)}));
+---
+<BaseLayout title="Journeys across Asia — Way to Asia" description="Private and small-group journeys across China, Japan, Thailand, Vietnam and Indonesia." {locale} path="/tours"><section class="mast"><div class="shell"><span class="eyebrow">The journey collection</span><h1>Routes with room<br>to wander.</h1><p>Use these journeys as a beginning. Every private route can be reshaped around your interests, pace and people.</p></div></section><section class="section section-paper"><div class="shell"><TourFilter client:load {items}/></div></section></BaseLayout>
+<style>.mast{background:var(--ink);color:var(--cream);padding:13rem 0 7rem}.mast h1{font-size:clamp(4rem,9vw,8rem);margin:.8rem 0 1.4rem}.mast p{max-width:520px;color:rgba(243,238,223,.72)}</style>

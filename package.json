@@ -1,0 +1,38 @@
+{
+  "name": "waytoasia",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro check && astro build",
+    "preview": "astro preview",
+    "lint": "eslint .",
+    "typecheck": "astro check",
+    "test": "npm run build && playwright test",
+    "test:smoke": "playwright test",
+    "cf:deploy": "wrangler pages deploy dist --project-name waytoasia"
+  },
+  "dependencies": {
+    "@astrojs/react": "latest",
+    "@sanity/client": "latest",
+    "astro": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@astrojs/check": "latest",
+    "@eslint/js": "latest",
+    "@lhci/cli": "latest",
+    "@playwright/test": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "eslint": "latest",
+    "eslint-plugin-astro": "latest",
+    "globals": "latest",
+    "typescript": "latest",
+    "typescript-eslint": "latest",
+    "wrangler": "latest"
+  }
+}

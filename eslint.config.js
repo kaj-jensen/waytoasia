@@ -1,0 +1,2 @@
+import js from '@eslint/js';import globals from 'globals';import tseslint from 'typescript-eslint';import eslintPluginAstro from 'eslint-plugin-astro';
+export default [js.configs.recommended,...tseslint.configs.recommended,...eslintPluginAstro.configs['flat/recommended'],{languageOptions:{globals:{...globals.browser,...globals.node}},rules:{'@typescript-eslint/no-unused-vars':['error',{argsIgnorePattern:'^_'}] }},{ignores:['dist/**','.astro/**','sanity.config.ts','sanity.cli.ts']}];

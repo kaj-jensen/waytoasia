@@ -1,0 +1,6 @@
+---
+const {active=''}=Astro.props;
+const stops=[['PEK','China'],['NRT','Japan'],['BKK','Thailand'],['SGN','Vietnam'],['DPS','Indonesia']];
+---
+<div class="route" aria-label="Way to Asia route through five countries"><div class="line"><span></span></div>{stops.map(([code,name],i)=><a href={`#${name.toLowerCase()}`} class:list={{active:active===name.toLowerCase()}} style={`--i:${i}`}><b>{code}</b><small>{name}</small></a>)}</div>
+<style>.route{position:relative;display:grid;grid-template-columns:repeat(5,1fr);gap:1rem;align-items:start;padding-top:1rem}.line{position:absolute;left:1.5%;right:1.5%;top:20px;height:1px;background:rgba(243,238,223,.25)}.line span{display:block;height:1px;background:var(--gold);transform-origin:left;animation:draw 1.8s .4s both cubic-bezier(.2,.8,.2,1)}a{position:relative;display:flex;flex-direction:column;gap:.25rem;padding-top:1.5rem;color:rgba(243,238,223,.66)}a:before{content:'';position:absolute;width:7px;height:7px;border:1px solid var(--gold);background:var(--ink);border-radius:50%;top:6px;left:0}a.active:before{background:var(--gold)}b{font:500 .7rem var(--mono);letter-spacing:.12em;color:var(--cream)}small{font-size:.67rem}@keyframes draw{from{transform:scaleX(0)}to{transform:scaleX(1)}}@media(max-width:650px){small{display:none}.route{gap:.3rem}}</style>
