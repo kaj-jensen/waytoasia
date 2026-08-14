@@ -50,7 +50,7 @@ In Cloudflare Pages, set the production branch to `main`, output directory to `d
 
 ### Manual domain step
 
-Once `waytoasia.com` DNS is delegated to Cloudflare, open **Workers & Pages → waytoasia → Custom domains** and attach `waytoasia.com`. Attach `www.waytoasia.com` as well; `public/_redirects` sends it permanently to the apex domain. Registrar access and nameserver changes are intentionally manual.
+Once `waytoasia.com` DNS is delegated to Cloudflare, open **Workers & Pages → waytoasia → Custom domains** and attach `waytoasia.com` and `www.waytoasia.com`. Then add a zone-level **Redirect Rule** that permanently redirects `www.waytoasia.com/*` to `https://waytoasia.com/${1}` while preserving the path and query string. Pages `_redirects` only accepts relative source paths, so host canonicalization belongs at zone level. Registrar access and nameserver changes are intentionally manual.
 
 ### Rollback
 
