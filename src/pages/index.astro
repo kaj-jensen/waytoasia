@@ -1,3 +1,9 @@
 ---
-return Astro.redirect('/en/',302);
+// First-visit locale negotiation happens in the browser; all content routes remain static.
 ---
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="robots" content="noindex"><title>Way to Asia</title><noscript><meta http-equiv="refresh" content="0;url=/en/"></noscript></head><body><p>Choosing your language… <a href="/en/">Continue in English</a></p><script is:inline>
+const supported=['en','es','it','fr','nl','hu','sv','da','no'];
+const saved=localStorage.getItem('waytoasia-locale');
+const browser=navigator.languages?.map(x=>x.toLowerCase().split('-')[0]).find(x=>supported.includes(x));
+location.replace(`/${saved&&supported.includes(saved)?saved:browser||'en'}/`);
+</script></body></html>

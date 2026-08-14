@@ -41,10 +41,7 @@ Launch imagery uses curated Unsplash URLs with responsive CDN parameters. Every 
 
 ## Deployment
 
-The GitHub workflow runs lint, typecheck, build, Playwright smoke tests and Lighthouse CI. It deploys `main` to production and each PR branch to a unique Cloudflare Pages preview URL. Add these GitHub repository secrets:
-
-- `CLOUDFLARE_API_TOKEN` — scoped to Pages deployments for this account.
-- `CLOUDFLARE_ACCOUNT_ID`.
+The GitHub workflow runs lint, typecheck, build, Playwright smoke tests and Lighthouse CI. The Cloudflare Pages Git integration is the deployment authority: every push to `main` deploys production and pull requests receive unique preview URLs. This avoids a second deploy from GitHub Actions and requires no long-lived Cloudflare API token in GitHub.
 
 In Cloudflare Pages, set the production branch to `main`, output directory to `dist`, and add the same environment variables used locally.
 
