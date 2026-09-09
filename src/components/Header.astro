@@ -8,6 +8,7 @@ const {locale,path=''}=Astro.props as {locale:Locale;path?:string};
  <nav aria-label="Primary">
   <div class="nav-group"><button type="button" aria-expanded="false" data-nav-toggle>{t(locale,'navDestinations')} <span>⌄</span></button><div class="mega"><div><small>Explore by country</small>{countries.map(c=><a href={localizedPath(locale,`/${c.slug}`)}><b>{c.code}</b><span>{c.name}<em>{c.nativeName}</em></span></a>)}</div><div><small>Find your way</small>{journeyStyles.map(s=><a href={localizedPath(locale,`/tours#${s.slug}`)}><span>{s.label}<em>{s.eyebrow}</em></span></a>)}<a class="mega-all" href={localizedPath(locale,'/tours')}>View all journeys ↗</a></div></div></div>
   <a href={localizedPath(locale,'/tours')}>{t(locale,'navTours')}</a>
+  <a href={localizedPath(locale,'/inspiration')}>Inspiration</a>
   <a href={localizedPath(locale,'/about')}>{t(locale,'navAbout')}</a>
  </nav>
  <div class="actions"><label class="lang"><span class="sr">Language</span><select aria-label="Language" data-language>{locales.map(l=><option value={localizedPath(l,path)} selected={l===locale}>{localeNames[l]}</option>)}</select></label><a class="plan" href={localizedPath(locale,'/contact')}>{t(locale,'navContact')} <span>↗</span></a></div>

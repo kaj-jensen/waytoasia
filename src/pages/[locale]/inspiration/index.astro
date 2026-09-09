@@ -1,0 +1,12 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import {articles,countries} from '../../../content/data';
+import {locales,localizedPath,type Locale} from '../../../i18n';
+export function getStaticPaths(){return locales.map(locale=>({params:{locale},props:{locale}}))}
+const {locale}=Astro.props as {locale:Locale};
+---
+<BaseLayout title="Travel stories and practical insight — Way to Asia" description="Seasonal guidance, cultural context and considered routes across Asia." {locale} path="/inspiration">
+ <section class="mast"><div class="shell"><span class="eyebrow">The field journal</span><h1>Look closer.<br>Travel better.</h1><p>Ideas, practical knowledge and cultural context from the people who shape our journeys.</p></div></section>
+ <section class="section section-paper"><div class="shell"><div class="topics" aria-label="Story topics"><span>Explore:</span><a href="#all">All stories</a>{countries.map(c=><a href={`#${c.slug}`}>{c.name}</a>)}</div><div id="all" class="stories">{articles.map((article,i)=><a class:list={['story',i===0&&'lead']} href={localizedPath(locale,`/inspiration/${article.slug}`)}><div class="media"><img src={article.image} alt="" loading={i===0?'eager':'lazy'} decoding="async"></div><div class="body"><span>{article.category} · {article.readTime}</span><h2>{article.title}</h2><p>{article.standfirst}</p><b>Read the story ↗</b></div></a>)}</div></div></section>
+</BaseLayout>
+<style>.mast{background:var(--ink);color:var(--cream);padding:14rem 0 7rem}.mast h1{margin:.7rem 0 1.2rem}.mast p{max-width:520px;color:rgba(243,238,223,.65)}.topics{display:flex;gap:1.5rem;flex-wrap:wrap;padding-bottom:2rem;border-bottom:1px solid #b8b1a2;font:.66rem var(--mono);letter-spacing:.08em;text-transform:uppercase}.topics span{color:var(--vermilion)}.stories{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#b8b1a2}.story{background:var(--paper)}.story.lead{grid-column:1/-1;display:grid;grid-template-columns:1.25fr 1fr}.media{overflow:hidden;aspect-ratio:16/10}.media img{width:100%;height:100%;transition:transform .6s}.story:hover img{transform:scale(1.035)}.body{padding:clamp(1.5rem,4vw,3.5rem)}.body>span,.body b{font:.62rem var(--mono);letter-spacing:.1em;text-transform:uppercase}.body>span{color:var(--vermilion)}.body h2{font-size:clamp(2rem,4vw,3.8rem);margin:.7rem 0 1rem}.body p{color:#65706b}.body b{display:block;margin-top:2rem;color:var(--vermilion)}@media(max-width:750px){.stories,.story.lead{display:grid;grid-template-columns:1fr}.story.lead{grid-column:auto}}</style>

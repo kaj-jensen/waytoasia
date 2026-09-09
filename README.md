@@ -22,6 +22,10 @@ The current increment adds:
 - Editorial collections for first journeys, food and culture, nature, and private celebrations.
 - A four-stage consultation and trip-design explanation.
 - Sanity document types for journey styles and travel stories, plus structured tour departures, galleries, inclusions and exclusions.
+- An editorial inspiration hub and reusable story-detail routes in every locale.
+- Query-aware catalogue filtering, so homepage discovery selections carry into the journey collection.
+
+Collaboration sources and future import controls are documented in [`CONTENT_SOURCES.md`](./CONTENT_SOURCES.md).
 
 The next increments will connect published Sanity content to the front end, add editorial story routes and introduce a Worker-backed proposal workflow. D1, R2 and Queues stay intentionally deferred until the product needs persistent enquiries, owned media storage or asynchronous supplier integrations.
 
