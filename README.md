@@ -9,6 +9,21 @@ Premium multilingual travel website for tailor-made and small-group journeys acr
 - Sanity is the editorial source. The typed local dataset in `src/content/data.ts` keeps preview builds deterministic until the Sanity project ID is configured.
 - Nine locale-prefixed routes with English as source language. Non-English travel-specific copy should be reviewed by a human translator before launch.
 - Prices are explicitly managed in USD, EUR, DKK, SEK, NOK and HUF for each tour. There is no automatic exchange-rate conversion.
+- The discovery layer models destinations, journey styles, editorial stories and departures separately, allowing the catalogue to grow without duplicating page components.
+
+## Product direction
+
+The website is evolving as a real travel platform rather than a brochure-site clone. Its structure follows the strongest specialist-tour-operator patterns: destination-led navigation, intent-based journey collections, guided discovery, substantial country hubs, transparent itinerary detail and a conversational planning funnel. Text and photography remain original or appropriately licensed so the private demonstration can later become a public product without a content migration.
+
+The current increment adds:
+
+- A keyboard-accessible destination and journey-style mega-navigation.
+- A guided journey finder based on country, duration and travel style.
+- Editorial collections for first journeys, food and culture, nature, and private celebrations.
+- A four-stage consultation and trip-design explanation.
+- Sanity document types for journey styles and travel stories, plus structured tour departures, galleries, inclusions and exclusions.
+
+The next increments will connect published Sanity content to the front end, add editorial story routes and introduce a Worker-backed proposal workflow. D1, R2 and Queues stay intentionally deferred until the product needs persistent enquiries, owned media storage or asynchronous supplier integrations.
 
 ## Local development
 
