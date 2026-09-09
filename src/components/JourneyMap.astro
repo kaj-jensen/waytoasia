@@ -1,0 +1,21 @@
+---
+const {route=[]}=Astro.props as {route:string[]};
+const points:Record<string,[number,number]>= {Tokyo:[430,112],Hakone:[374,169],Kyoto:[228,238],Naoshima:[139,264],Teshima:[158,249],Osaka:[211,270]};
+const selected=route.map(name=>({name,point:points[name]})).filter(stop=>stop.point);
+const line=selected.map(stop=>stop.point.join(',')).join(' ');
+---
+<figure class="journey-map">
+  <svg viewBox="0 0 560 360" role="img" aria-labelledby="map-title map-desc">
+    <title id="map-title">Journey route through Japan</title>
+    <desc id="map-desc">A schematic map showing the route from {route.join(' to ')}</desc>
+    <defs><filter id="shadow"><feDropShadow dx="0" dy="6" stdDeviation="8" flood-opacity=".15"/></filter></defs>
+    <path class="land" d="M497 42c-17 22-33 39-47 58-13 18-19 34-32 47-12 12-31 22-38 38-6 14 1 28-8 41-11 16-35 21-54 31-25 13-49 30-77 44-25 13-54 18-78 11-18-5-34-17-48-27l15-15c18 8 34 8 51 2 23-8 38-27 57-39 22-14 48-21 68-38 18-15 28-35 45-50 18-17 40-24 56-43 14-17 20-39 33-57 11-14 24-25 38-35z"/>
+    <path class="island" d="M122 260c12-8 25-7 35-1l-7 14-25 2zM170 279c11-5 22-2 29 5l-10 10-20-3z"/>
+    <polyline class="route-path halo" points={line}/><polyline class="route-path" points={line}/>
+    {selected.map((stop,index)=><g class="stop" transform={`translate(${stop.point[0]} ${stop.point[1]})`}><circle r="12"/><circle class="core" r="4"/><text class="number" x="0" y="-20">{String(index+1).padStart(2,'0')}</text><text class="label" x={stop.name==='Tokyo'||stop.name==='Hakone'?'18':'-18'} y="5" text-anchor={stop.name==='Tokyo'||stop.name==='Hakone'?'start':'end'}>{stop.name}</text></g>)}
+  </svg>
+  <figcaption><span>Route overview</span><small>Schematic map · not to scale</small></figcaption>
+</figure>
+<style>
+.journey-map{margin:0;background:#e6dfcf;padding:clamp(1.2rem,3vw,2.5rem);box-shadow:0 20px 55px rgba(15,33,28,.12)}svg{display:block;width:100%;height:auto}.land,.island{fill:#f8f4ea;stroke:#b9af9d;stroke-width:1.2;filter:url(#shadow)}.route-path{fill:none;stroke:var(--vermilion);stroke-width:3;stroke-dasharray:7 7}.halo{stroke:white;stroke-width:8;stroke-dasharray:none;opacity:.8}.stop circle{fill:#f8f4ea;stroke:var(--vermilion);stroke-width:2}.stop .core{fill:var(--vermilion);stroke:none}.stop text{font-family:var(--mono);font-weight:500}.number{font-size:9px;fill:var(--vermilion);text-anchor:middle}.label{font-size:12px;fill:var(--ink)}figcaption{display:flex;justify-content:space-between;gap:1rem;margin-top:1rem;padding-top:.8rem;border-top:1px solid #c7bdad;font:500 .65rem var(--mono);letter-spacing:.08em;text-transform:uppercase}figcaption small{color:#6a736f}
+</style>
