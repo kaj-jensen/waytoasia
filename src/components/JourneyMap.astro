@@ -22,7 +22,10 @@ Object.assign(maps.vietnam.points,{'Ninh Binh':{x:316,y:115,dx:-16},'Ha Long':{x
 Object.assign(maps.indonesia.points,{Jakarta:{x:214,y:219,dx:-16},Bromo:{x:316,y:234,dx:18},Ijen:{x:350,y:244,dx:18},Ubud:{x:378,y:238,dx:-16},Sidemen:{x:405,y:252,dx:18},Munduk:{x:360,y:214,dx:-16},Sanur:{x:420,y:263,dx:18},'Labuan Bajo':{x:443,y:255,dx:-16},Flores:{x:505,y:257,dx:18}});
 const map=maps[country]??maps.japan;
 const flagX=country==='thailand'?492:country==='indonesia'?530:505;
-const selected=route.map(name=>({name,...map.points[name]})).filter(stop=>Number.isFinite(stop.x));
+const plotScaleX=country==='thailand'?1.72:country==='vietnam'?1.58:1;
+const plotCentreX=310;
+const plotTransform=`translate(${plotCentreX*(1-plotScaleX)} 0) scale(${plotScaleX} 1)`;
+const selected=route.map(name=>{const point=map.points[name];return{name,...point,x:plotCentreX+(point.x-plotCentreX)*plotScaleX}}).filter(stop=>Number.isFinite(stop.x));
 const modeCopy:Record<Locale,Record<Mode,string>>={
   en:{rail:'Rail',flight:'Flight',road:'Private road',boat:'Boat'},es:{rail:'Tren',flight:'Vuelo',road:'Vehículo privado',boat:'Barco'},it:{rail:'Treno',flight:'Volo',road:'Veicolo privato',boat:'Barca'},fr:{rail:'Train',flight:'Vol',road:'Véhicule privé',boat:'Bateau'},nl:{rail:'Trein',flight:'Vlucht',road:'Privévervoer',boat:'Boot'},hu:{rail:'Vonat',flight:'Repülő',road:'Privát autó',boat:'Hajó'},sv:{rail:'Tåg',flight:'Flyg',road:'Privat bil',boat:'Båt'},da:{rail:'Tog',flight:'Fly',road:'Privat bil',boat:'Båd'},no:{rail:'Tog',flight:'Fly',road:'Privat bil',boat:'Båt'}
 };
@@ -43,9 +46,7 @@ const stageForStop=(index:number)=>stages.find(stage=>stage.title.toLocaleLowerC
   <clipPath id={`flag-${country}`}><circle cx={flagX} cy="58" r="32"/></clipPath>
 </defs>
 <rect class="sea" width="600" height="390"/><rect class="wave-field" width="600" height="390" fill={`url(#waves-${country})`}/>
-<path class="land-shadow" d={map.land}/><path class="land" d={map.land} filter={`url(#shadow-${country})`}/>{map.islands&&<path class="islands" d={map.islands}/>}<path class="terrain" d={map.detail}/>
-{country==='vietnam'&&<path class="feature" d="M326 91c-25 49 27 75-8 117s13 67-50 106"/>}
-{country==='thailand'&&<path class="feature" d="M275 278q28 15 56 0t52 0"/>}
+<g class="map-plot" transform={plotTransform}><path class="land-shadow" d={map.land}/><path class="land" d={map.land} filter={`url(#shadow-${country})`}/>{map.islands&&<path class="islands" d={map.islands}/>}<path class="terrain" d={map.detail}/>{country==='vietnam'&&<path class="feature" d="M326 91c-25 49 27 75-8 117s13 67-50 106"/>}{country==='thailand'&&<path class="feature" d="M275 278q28 15 56 0t52 0"/>}</g>
 {segments.map(segment=><g class:list={['segment',`mode-${segment.primary}`]}><line class="route-halo" x1={segment.from.x} y1={segment.from.y} x2={segment.to.x} y2={segment.to.y}/><line class="route-line" x1={segment.from.x} y1={segment.from.y} x2={segment.to.x} y2={segment.to.y}/><g class="mode-pin" transform={`translate(${segment.midX} ${segment.midY})`}><circle r="14"/><g class="transport-icon" transform="translate(-10 -10)">{segment.primary==='rail'&&<g fill="none" stroke="#fff" stroke-width="2"><rect x="5" y="2" width="10" height="14" rx="2"/><path d="M7 5h6v4H7m0 10 2-3m4 3-2-3M6 19h8"/><circle cx="8" cy="12.5" r=".8"/><circle cx="12" cy="12.5" r=".8"/></g>}{segment.primary==='flight'&&<path fill="#fff" d="M19 14v-2l-7-4V3.5a1.5 1.5 0 00-3 0V8l-7 4v2l7-2v3.5L7 17v1.5l3.5-1 3.5 1V17l-2-1.5V12z"/>}{segment.primary==='road'&&<g fill="none" stroke="#fff" stroke-width="2"><path d="M3 10l2-5h10l2 5 2 2v5H1v-5zM5 10h10"/><circle cx="5" cy="14" r="1"/><circle cx="15" cy="14" r="1"/></g>}{segment.primary==='boat'&&<g fill="none" stroke="#fff" stroke-width="2"><path d="M2 11h16l-3 6H5zm5-2V3h6v6M1 19c2 1 4 1 6 0 2 1 4 1 6 0 2 1 4 1 6 0"/></g>}</g></g></g>)}
 {selected.map((stop,index)=>{const major=index===0||index===selected.length-1;return <g class:list={['stop',{major}]} transform={`translate(${stop.x} ${stop.y})`}><circle class="outer" r={major?13:9}/><circle class="core" r={major?5:3.5}/><text class="number" y={major?-20:-15}>{String(index+1).padStart(2,'0')}</text></g>})}
 {labelStops.map(stop=><g class="place-label"><line x1={stop.x} y1={stop.y} x2={stop.x+(stop.right?14:-14)} y2={stop.y+stop.dy*.58}/><text x={stop.x+(stop.right?18:-18)} y={stop.y+stop.dy} text-anchor={stop.right?'start':'end'}>{stop.name}</text></g>)}
