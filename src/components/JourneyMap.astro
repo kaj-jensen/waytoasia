@@ -16,6 +16,7 @@ Object.assign(maps.thailand.points,{Ayutthaya:{x:308,y:210,dx:18},Sukhothai:{x:2
 Object.assign(maps.vietnam.points,{'Ninh Binh':{x:316,y:115,dx:-16},'Ha Long':{x:359,y:100,dx:18},'Quy Nhon':{x:314,y:251,dx:18},'Nha Trang':{x:298,y:278,dx:18},'Can Tho':{x:226,y:339,dx:-16},'Chau Doc':{x:188,y:318,dx:-16}});
 Object.assign(maps.indonesia.points,{Jakarta:{x:214,y:219,dx:-16},Bromo:{x:316,y:234,dx:18},Ijen:{x:350,y:244,dx:18},Ubud:{x:378,y:238,dx:-16},Sidemen:{x:405,y:252,dx:18},Munduk:{x:360,y:214,dx:-16},Sanur:{x:420,y:263,dx:18},'Labuan Bajo':{x:443,y:255,dx:-16},Flores:{x:505,y:257,dx:18}});
 const map=maps[country]??maps.japan;
+const flagX=country==='thailand'?492:country==='indonesia'?530:505;
 const selected=route.map(name=>({name,...map.points[name]})).filter(stop=>Number.isFinite(stop.x));
 const line=selected.map((stop,index)=>`${index?'L':'M'}${stop.x} ${stop.y}`).join(' ');
 const transport=country==='indonesia'?'Flight · private boat':country==='thailand'?'Flight · road · boat':country==='china'?'Rail · flight · private road':country==='vietnam'?'Rail · flight · river boat':'Rail · ferry';
@@ -28,9 +29,16 @@ const transport=country==='indonesia'?'Flight · private boat':country==='thaila
   <pattern id={`waves-${country}`} width="34" height="18" patternUnits="userSpaceOnUse"><path d="M0 9c5-5 11-5 17 0s12 5 17 0" fill="none" stroke="currentColor" stroke-width="1"/></pattern>
   <filter id={`shadow-${country}`}><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#12302a" flood-opacity=".18"/></filter>
   <marker id={`arrow-${country}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0l8 4-8 4z" fill="#a93627"/></marker>
+  <clipPath id={`flag-${country}`}><circle cx={flagX} cy="58" r="32"/></clipPath>
 </defs>
 <rect class="sea" width="600" height="390"/><rect class="wave-field" width="600" height="390" fill={`url(#waves-${country})`}/>
-<circle class="sun" cx={country==='thailand'?492:country==='indonesia'?530:505} cy="58" r="36"/><circle class="sun-ring" cx={country==='thailand'?492:country==='indonesia'?530:505} cy="58" r="47"/>
+<g class="country-emblem" data-country={country} aria-hidden="true"><circle class="emblem-shadow" cx={flagX} cy="61" r="35"/><g clip-path={`url(#flag-${country})`}>
+{country==='japan'&&<><rect x={flagX-34} y="24" width="68" height="68" fill="#fff"/><circle cx={flagX} cy="58" r="13" fill="#bc002d"/></>}
+{country==='china'&&<><rect x={flagX-34} y="24" width="68" height="68" fill="#de2910"/><path d="M0-11l2.6 8h8.4L4.2 2l2.6 8L0 5.1-6.8 10l2.6-8-6.8-5h8.4z" fill="#ffde00" transform={`translate(${flagX-11} 48) scale(.72)`}/></>}
+{country==='thailand'&&<><rect x={flagX-34} y="24" width="68" height="68" fill="#a51931"/><rect x={flagX-34} y="36" width="68" height="44" fill="#f4f5f8"/><rect x={flagX-34} y="44" width="68" height="28" fill="#2d2a4a"/></>}
+{country==='vietnam'&&<><rect x={flagX-34} y="24" width="68" height="68" fill="#da251d"/><path d="M0-13l3 9.5h10L5 2.2l3 9.5L0 5.9l-8 5.8 3-9.5-8-5.7h10z" fill="#ffdf00" transform={`translate(${flagX} 58)`}/></>}
+{country==='indonesia'&&<><rect x={flagX-34} y="24" width="68" height="34" fill="#ce1126"/><rect x={flagX-34} y="58" width="68" height="34" fill="#fff"/></>}
+</g><circle class="emblem-border" cx={flagX} cy="58" r="34"/></g>
 <path class="land-shadow" d={map.land}/><path class="land" d={map.land} filter={`url(#shadow-${country})`}/>{map.islands&&<path class="islands" d={map.islands}/>}<path class="terrain" d={map.detail}/>
 {country==='vietnam'&&<path class="feature" d="M326 91c-25 49 27 75-8 117s13 67-50 106"/>}
 {country==='thailand'&&<path class="feature" d="M275 278q28 15 56 0t52 0"/>}
@@ -43,4 +51,5 @@ const transport=country==='indonesia'?'Flight · private boat':country==='thaila
 </figure>
 <style>
 .journey-map{--sea:#d7e5e3;--wave:#477f83;--land:#f5eedf;--ink:#17382f;--route:#a93627;margin:0;background:var(--sea);padding:clamp(1rem,2.5vw,2rem);box-shadow:0 22px 60px rgba(15,33,28,.16);border:1px solid rgba(15,33,28,.13);overflow:hidden}.map-china{--sea:#d9e1dc;--wave:#738f86;--land:#f3e6ce;--route:#9f2e22}.map-thailand{--sea:#cfe5e1;--wave:#3f8684;--land:#f4e5c9;--route:#a93627}.map-vietnam{--sea:#d7e4dd;--wave:#568679;--land:#f2e8d3;--route:#a63b2c}.map-indonesia{--sea:#c8e0df;--wave:#287a80;--land:#f3dfbd;--route:#a73a2b}svg{display:block;width:100%;height:auto;background:var(--sea);color:var(--wave)}.sea{fill:var(--sea)}.wave-field{opacity:.24}.sun{fill:#d4543f;opacity:.86}.sun-ring{fill:none;stroke:#fff8e9;stroke-width:2;stroke-dasharray:2 5}.land-shadow{fill:#17392f;opacity:.14;transform:translate(5px,7px)}.land,.islands{fill:var(--land);stroke:var(--ink);stroke-width:1.5}.terrain{fill:none;stroke:#718f83;stroke-width:1.25;opacity:.55}.feature{fill:none;stroke:#4b8782;stroke-width:2;stroke-dasharray:3 5;opacity:.65}.route-halo,.route-line{fill:none;stroke-linecap:round;stroke-linejoin:round}.route-halo{stroke:#fff8e9;stroke-width:10}.route-line{stroke:var(--route);stroke-width:3.5;stroke-dasharray:5 6}.stop .outer{fill:var(--land);stroke:var(--route);stroke-width:2}.stop .core{fill:var(--ink)}.stop.major .outer{fill:var(--route);stroke:var(--land);stroke-width:4}.stop.major .core{fill:var(--land)}.stop text,.country,.compass text{font-family:var(--mono);font-weight:600}.number{font-size:8px;fill:#872a20;text-anchor:middle}.label{font-size:11px;fill:#102a22}.role{font-size:6px;letter-spacing:.14em;fill:#872a20}.country{font-size:9px;letter-spacing:.24em;fill:#315f56}.compass circle{fill:#f8f1e2dd;stroke:var(--ink)}.compass path{fill:var(--route)}.compass text{text-anchor:middle;font-size:8px;fill:var(--ink)}figcaption{display:flex;justify-content:space-between;gap:1rem;margin-top:1rem;padding-top:.9rem;border-top:1px solid #91aaa5;font:600 .62rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#21483f}figcaption i{display:inline-block;width:20px;height:2px;margin:0 .45rem 3px 0;background:var(--route)}@media(max-width:650px){.label{font-size:13px}.country{display:none}figcaption{flex-direction:column}}
+.emblem-shadow{fill:#17392f;opacity:.16}.emblem-border{fill:none;stroke:#fff8e9;stroke-width:4}
 </style>
