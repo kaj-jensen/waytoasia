@@ -1,41 +1,41 @@
 ---
-const {route=[]}=Astro.props as {route:string[]};
-const points:Record<string,[number,number]>= {Tokyo:[456,112],Hakone:[405,161],Kyoto:[273,226],Naoshima:[157,255],Teshima:[180,239],Osaka:[246,269]};
-const selected=route.map(name=>({name,point:points[name]})).filter(stop=>stop.point);
-const fallback=selected.map(stop=>stop.point.join(',')).join(' ');
-const japanRoute=route.includes('Tokyo')&&route.includes('Osaka');
+type CountryKey='china'|'japan'|'thailand'|'vietnam'|'indonesia';
+type Point={x:number;y:number;dx?:number;dy?:number};
+type MapConfig={label:string;native:string;land:string;islands?:string;detail:string;points:Record<string,Point>};
+const {route=[],country='japan'}=Astro.props as {route:string[];country?:CountryKey};
+const maps:Record<CountryKey,MapConfig>={
+  japan:{label:'JAPAN',native:'日本',land:'M526 3c-14 31-28 53-48 72-22 20-22 45-39 66-17 22-39 33-50 57-9 19-3 35-20 48-22 17-52 21-80 38-24 15-42 41-73 50-28 8-56 3-80-7-19-8-33-22-50-29l18-22c18 7 33 8 47 3 23-8 39-27 59-39 22-13 49-18 68-34 18-15 24-39 43-54 19-15 41-20 58-39 17-19 22-44 40-61 19-18 45-28 60-50 12-18 16-39 24-57z',islands:'M120 266c13-8 27-7 39-1l-7 15-27 3zM166 289c12-5 23-2 31 5l-10 11-22-3zM191 248l12-7 10 8-8 9z',detail:'M421 135l17-29 14 20 12-13 18 29M345 199l15-28 13 18 9-9 14 24M259 258l14-25 13 18 10-9 13 22',points:{Tokyo:{x:456,y:112,dx:18},Hakone:{x:405,y:161,dx:18},Kyoto:{x:273,y:226,dx:-16},Naoshima:{x:157,y:255,dx:-16},Teshima:{x:180,y:239,dx:-16,dy:-8},Osaka:{x:246,y:269,dx:18}}},
+  china:{label:'CHINA',native:'中国',land:'M75 84l47-35 78 10 45-25 69 23 61-9 41 29 70 5 39 54-15 52 25 43-31 54-56 2-30 38-73-15-38 24-53-11-42 18-47-34-61-6-22-47 22-39-18-46 28-33-5-39 34-25 19-51z',islands:'M493 287l14-3 5 12-9 13-10-8zM459 321l8-2 3 8-8 7z',detail:'M100 115c53 15 92-22 142-4s82-10 128 8M113 262c52-30 102-34 146-5s91 26 141-4M181 84l18 22 17-17 25 27M330 222l19-30 16 22 13-15 20 28',points:{Beijing:{x:420,y:113,dx:18},'Great Wall':{x:373,y:83,dx:-16},Dali:{x:215,y:265,dx:-16},Shaxi:{x:190,y:232,dx:-16},Yunnan:{x:164,y:286,dx:-16}}},
+  thailand:{label:'THAILAND',native:'ประเทศไทย',land:'M274 28l58 22 37 47-10 50 30 34-9 41-30 25-3 45-25 29-3 48-25 8-20-36 5-58-26-44 17-54-10-47 23-48-12-44 20-35z',islands:'M294 340l11 14-8 23-12-8zM335 324l12 9-4 16-13-2zM262 360l7 8-5 14-8-6z',detail:'M295 73l13 20 12-15 18 22M284 167c25 15 42 16 65 4M304 245c-13 22-15 45-5 67',points:{Bangkok:{x:313,y:238,dx:18},'Chiang Mai':{x:291,y:100,dx:-16},'Southern islands':{x:300,y:347,dx:-18,dy:-5}}},
+  vietnam:{label:'VIETNAM',native:'Việt Nam',land:'M311 26l47 25-5 45-27 37 14 40-17 36 20 44-7 45-31 38-12 43-43 24-42-8 29-27 41-16 25-35 6-38-21-36 18-42-16-42 19-42 10-50z',islands:'M355 331l13 5-4 14-12-2zM391 294l8 3-2 10-8 1z',detail:'M320 68l12 17 12-13 15 21M300 145c22 7 31 21 32 41M278 272c-18 15-35 26-56 32M243 326c37-14 70-12 101 5',points:{Hanoi:{x:329,y:82,dx:18},Hue:{x:306,y:191,dx:18},'Hoi An':{x:318,y:222,dx:18},Saigon:{x:253,y:314,dx:-16},Mekong:{x:205,y:337,dx:-16}}},
+  indonesia:{label:'INDONESIA',native:'Nusantara',land:'M66 176l82-9 35 18-22 19-74 2zM207 201l105 13 53 23-31 16-81-6-42-18zM363 145l47-21 54 13 25 30-31 15-62-10zM421 252l66-15 44 13-23 28-68 2z',islands:'M115 137l41-11 31 9-17 15-45 4zM321 176l22-9 14 9-16 12zM519 193l31-9 17 13-26 13zM370 283l24-4 14 14-20 8z',detail:'M108 177l18-27 16 22M257 216l18-34 19 32M425 148l17-31 18 30M447 254c22 8 39 8 63-2',points:{Yogyakarta:{x:270,y:220,dx:-16},Borobudur:{x:248,y:190,dx:-16},Bali:{x:376,y:250,dx:18},Komodo:{x:462,y:266,dx:18}}}
+};
+const map=maps[country]??maps.japan;
+const selected=route.map(name=>({name,...map.points[name]})).filter(stop=>Number.isFinite(stop.x));
+const line=selected.map((stop,index)=>`${index?'L':'M'}${stop.x} ${stop.y}`).join(' ');
+const transport=country==='indonesia'?'Flight · private boat':country==='thailand'?'Flight · road · boat':country==='china'?'Rail · flight · private road':country==='vietnam'?'Rail · flight · river boat':'Rail · ferry';
 ---
-<figure class="journey-map">
-<svg viewBox="0 0 600 390" role="img" aria-labelledby="map-title map-desc">
-<title id="map-title">Illustrated journey route through Japan</title>
-<desc id="map-desc">A stylised map showing the route from {route.join(' to ')}, including rail and ferry connections.</desc>
+<figure class:list={['journey-map',`map-${country}`]}>
+<svg viewBox="0 0 600 390" role="img" aria-labelledby={`map-title-${country} map-desc-${country}`}>
+<title id={`map-title-${country}`}>Illustrated journey route through {map.label}</title>
+<desc id={`map-desc-${country}`}>A stylised, not-to-scale map showing the route from {route.join(' to ')}.</desc>
 <defs>
-  <pattern id="waves" width="34" height="18" patternUnits="userSpaceOnUse"><path d="M0 9c5-5 11-5 17 0s12 5 17 0" fill="none" stroke="#62959a" stroke-width="1"/></pattern>
-  <pattern id="grain" width="7" height="7" patternUnits="userSpaceOnUse"><circle cx="1" cy="2" r=".55" fill="#102820" opacity=".12"/><circle cx="5" cy="6" r=".4" fill="#102820" opacity=".1"/></pattern>
-  <filter id="paper"><feTurbulence baseFrequency=".7" numOctaves="2" seed="8" type="fractalNoise" result="n"/><feBlend in="SourceGraphic" in2="n" mode="soft-light"/></filter>
-  <filter id="shadow"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#12302a" flood-opacity=".18"/></filter>
-  <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0l8 4-8 4z" fill="#b43b2b"/></marker>
+  <pattern id={`waves-${country}`} width="34" height="18" patternUnits="userSpaceOnUse"><path d="M0 9c5-5 11-5 17 0s12 5 17 0" fill="none" stroke="currentColor" stroke-width="1"/></pattern>
+  <filter id={`shadow-${country}`}><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#12302a" flood-opacity=".18"/></filter>
+  <marker id={`arrow-${country}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0l8 4-8 4z" fill="#a93627"/></marker>
 </defs>
-<rect class="sea" x="0" y="0" width="600" height="390"/><rect class="wave-field" x="0" y="0" width="600" height="390"/>
-<circle class="sun" cx="505" cy="58" r="37"/><circle class="sun-ring" cx="505" cy="58" r="47"/>
-<path class="land-shadow" d="M530 8c-14 31-29 55-50 74-20 18-22 43-38 64-18 24-38 33-49 56-9 19-3 35-20 49-21 17-53 21-79 37-25 15-43 42-75 51-29 8-59 2-84-8-19-8-33-23-50-31l18-28c17 7 34 10 49 5 24-8 39-28 60-40 21-12 50-16 69-33 17-15 23-40 42-55 18-14 42-20 58-38 17-19 22-45 41-62 20-18 47-28 61-51 12-18 15-37 23-55z"/>
-<path class="land" d="M526 3c-14 31-28 53-48 72-22 20-22 45-39 66-17 22-39 33-50 57-9 19-3 35-20 48-22 17-52 21-80 38-24 15-42 41-73 50-28 8-56 3-80-7-19-8-33-22-50-29l18-22c18 7 33 8 47 3 23-8 39-27 59-39 22-13 49-18 68-34 18-15 24-39 43-54 19-15 41-20 58-39 17-19 22-44 40-61 19-18 45-28 60-50 12-18 16-39 24-57z"/>
-<path class="mountains" d="M421 135l17-29 14 20 12-13 18 29M345 199l15-28 13 18 9-9 14 24M259 258l14-25 13 18 10-9 13 22" />
-<path class="islands" d="M120 266c13-8 27-7 39-1l-7 15-27 3zM166 289c12-5 23-2 31 5l-10 11-22-3zM191 248l12-7 10 8-8 9z"/>
-<g class="route">
-  {japanRoute?<path class="route-halo" d="M456 112C443 128 424 144 405 161S333 207 273 226C230 240 205 248 180 239C172 243 164 248 157 255C183 266 211 272 246 269"/>:<polyline class="route-halo" points={fallback}/>}
-  {japanRoute?<path class="route-line" marker-end="url(#arrow)" d="M456 112C443 128 424 144 405 161S333 207 273 226C230 240 205 248 180 239C172 243 164 248 157 255C183 266 211 272 246 269"/>:<polyline class="route-line" points={fallback}/>}
-</g>
-<g class="transport-icons" aria-hidden="true">
-  <g transform="translate(346 190)"><rect x="-8" y="-10" width="16" height="20" rx="5"/><path d="M-5 4h10M-4 13l3-4m5 4L1 9M-4-5h8"/></g>
-  <g transform="translate(198 242)"><path d="M-11 2h22l-4 8H-7zM-6 2v-8h9l5 8M-14 14c4-3 8 3 12 0s8 3 12 0"/></g>
-</g>
-{selected.map((stop,index)=>{const right=stop.name==='Tokyo'||stop.name==='Hakone';const major=index===0||index===selected.length-1;return <g class:list={['stop',{major}]} transform={`translate(${stop.point[0]} ${stop.point[1]})`}><circle class="outer" r={major?13:9}/><circle class="core" r={major?5:3.5}/><text class="number" x="0" y={major?-20:-15}>{String(index+1).padStart(2,'0')}</text><text class="label" x={right?'19':'-16'} y="4" text-anchor={right?'start':'end'}>{stop.name}</text>{major&&<text class="role" x={right?'19':'-16'} y="17" text-anchor={right?'start':'end'}>{index===0?'START':'FINISH'}</text>}</g>})}
-<g class="compass" transform="translate(66 65)"><circle r="24"/><path d="M0-16L5 0 0 16-5 0z"/><text x="0" y="-31">N</text></g>
-<text class="country" x="374" y="95">日本 · JAPAN</text>
+<rect class="sea" width="600" height="390"/><rect class="wave-field" width="600" height="390" fill={`url(#waves-${country})`}/>
+<circle class="sun" cx={country==='thailand'?492:country==='indonesia'?530:505} cy="58" r="36"/><circle class="sun-ring" cx={country==='thailand'?492:country==='indonesia'?530:505} cy="58" r="47"/>
+<path class="land-shadow" d={map.land}/><path class="land" d={map.land} filter={`url(#shadow-${country})`}/>{map.islands&&<path class="islands" d={map.islands}/>}<path class="terrain" d={map.detail}/>
+{country==='vietnam'&&<path class="feature" d="M326 91c-25 49 27 75-8 117s13 67-50 106"/>}
+{country==='thailand'&&<path class="feature" d="M275 278q28 15 56 0t52 0"/>}
+<path class="route-halo" d={line}/><path class="route-line" d={line} marker-end={`url(#arrow-${country})`}/>
+{selected.map((stop,index)=>{const major=index===0||index===selected.length-1;const dx=stop.dx??18;const dy=stop.dy??0;return <g class:list={['stop',{major}]} transform={`translate(${stop.x} ${stop.y})`}><circle class="outer" r={major?13:9}/><circle class="core" r={major?5:3.5}/><text class="number" y={major?-20:-15}>{String(index+1).padStart(2,'0')}</text><text class="label" x={dx} y={4+dy} text-anchor={dx<0?'end':'start'}>{stop.name}</text>{major&&<text class="role" x={dx} y={17+dy} text-anchor={dx<0?'end':'start'}>{index===0?'START':'FINISH'}</text>}</g>})}
+<g class="compass" transform="translate(66 65)"><circle r="24"/><path d="M0-16L5 0 0 16-5 0z"/><text y="-31">N</text></g>
+<text class="country" x="430" y="355" text-anchor="end">{map.native} · {map.label}</text>
 </svg>
-<figcaption><span><i></i> Rail journey <i></i> Ferry crossing</span><small>Illustrated route · not to scale</small></figcaption>
+<figcaption><span><i></i>{transport}</span><small>Illustrated route · not to scale</small></figcaption>
 </figure>
 <style>
-.journey-map{margin:0;background:#d7e5e3;padding:clamp(1rem,2.5vw,2rem);box-shadow:0 22px 60px rgba(15,33,28,.16);border:1px solid rgba(15,33,28,.13);overflow:hidden}svg{display:block;width:100%;height:auto;background:#d7e5e3}.sea{fill:#d7e5e3}.wave-field{fill:url(#waves);opacity:.28}.sun{fill:#d4543f;opacity:.88}.sun-ring{fill:none;stroke:#f8f1e2;stroke-width:2;stroke-dasharray:2 5}.land-shadow{fill:#17392f;opacity:.17;transform:translate(5px,7px)}.land{fill:#f5eedf;stroke:#16352c;stroke-width:1.5;filter:url(#paper) url(#shadow)}.islands{fill:#f5eedf;stroke:#16352c;stroke-width:1.2}.mountains{fill:none;stroke:#78958a;stroke-width:1.2;opacity:.48}.route-halo,.route-line{fill:none;stroke-linecap:round;stroke-linejoin:round}.route-halo{stroke:#f8f1e2;stroke-width:10}.route-line{stroke:#b43b2b;stroke-width:3.5;stroke-dasharray:5 6}.transport-icons{fill:#f5eedf;stroke:#17382f;stroke-width:1.4}.stop .outer{fill:#f5eedf;stroke:#b43b2b;stroke-width:2}.stop .core{fill:#17382f}.stop.major .outer{fill:#b43b2b;stroke:#f5eedf;stroke-width:4}.stop.major .core{fill:#f5eedf}.stop text,.country,.compass text{font-family:var(--mono);font-weight:500}.number{font-size:8px;fill:#923125;text-anchor:middle}.label{font-size:11px;fill:#112a22}.role{font-size:6px;letter-spacing:.14em;fill:#923125}.country{font-size:8px;letter-spacing:.28em;fill:#50736b}.compass circle{fill:#f5eedfcc;stroke:#17382f;stroke-width:1}.compass path{fill:#b43b2b}.compass text{text-anchor:middle;font-size:8px;fill:#17382f}figcaption{display:flex;justify-content:space-between;gap:1rem;margin-top:1rem;padding-top:.9rem;border-top:1px solid #9eb7b2;font:500 .62rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#23483f}figcaption i{display:inline-block;width:20px;height:2px;margin:0 .45rem 3px 0;background:#b43b2b}figcaption i+ i{height:8px;width:13px;background:none;border-bottom:2px solid #17382f;margin-left:1rem}@media(max-width:650px){.label{font-size:13px}.country{display:none}figcaption{flex-direction:column}}
+.journey-map{--sea:#d7e5e3;--wave:#477f83;--land:#f5eedf;--ink:#17382f;--route:#a93627;margin:0;background:var(--sea);padding:clamp(1rem,2.5vw,2rem);box-shadow:0 22px 60px rgba(15,33,28,.16);border:1px solid rgba(15,33,28,.13);overflow:hidden}.map-china{--sea:#d9e1dc;--wave:#738f86;--land:#f3e6ce;--route:#9f2e22}.map-thailand{--sea:#cfe5e1;--wave:#3f8684;--land:#f4e5c9;--route:#a93627}.map-vietnam{--sea:#d7e4dd;--wave:#568679;--land:#f2e8d3;--route:#a63b2c}.map-indonesia{--sea:#c8e0df;--wave:#287a80;--land:#f3dfbd;--route:#a73a2b}svg{display:block;width:100%;height:auto;background:var(--sea);color:var(--wave)}.sea{fill:var(--sea)}.wave-field{opacity:.24}.sun{fill:#d4543f;opacity:.86}.sun-ring{fill:none;stroke:#fff8e9;stroke-width:2;stroke-dasharray:2 5}.land-shadow{fill:#17392f;opacity:.14;transform:translate(5px,7px)}.land,.islands{fill:var(--land);stroke:var(--ink);stroke-width:1.5}.terrain{fill:none;stroke:#718f83;stroke-width:1.25;opacity:.55}.feature{fill:none;stroke:#4b8782;stroke-width:2;stroke-dasharray:3 5;opacity:.65}.route-halo,.route-line{fill:none;stroke-linecap:round;stroke-linejoin:round}.route-halo{stroke:#fff8e9;stroke-width:10}.route-line{stroke:var(--route);stroke-width:3.5;stroke-dasharray:5 6}.stop .outer{fill:var(--land);stroke:var(--route);stroke-width:2}.stop .core{fill:var(--ink)}.stop.major .outer{fill:var(--route);stroke:var(--land);stroke-width:4}.stop.major .core{fill:var(--land)}.stop text,.country,.compass text{font-family:var(--mono);font-weight:600}.number{font-size:8px;fill:#872a20;text-anchor:middle}.label{font-size:11px;fill:#102a22}.role{font-size:6px;letter-spacing:.14em;fill:#872a20}.country{font-size:9px;letter-spacing:.24em;fill:#315f56}.compass circle{fill:#f8f1e2dd;stroke:var(--ink)}.compass path{fill:var(--route)}.compass text{text-anchor:middle;font-size:8px;fill:var(--ink)}figcaption{display:flex;justify-content:space-between;gap:1rem;margin-top:1rem;padding-top:.9rem;border-top:1px solid #91aaa5;font:600 .62rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#21483f}figcaption i{display:inline-block;width:20px;height:2px;margin:0 .45rem 3px 0;background:var(--route)}@media(max-width:650px){.label{font-size:13px}.country{display:none}figcaption{flex-direction:column}}
 </style>
