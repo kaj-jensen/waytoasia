@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro check && astro build",
+    "build": "astro check && astro build && node scripts/localize-built-html.mjs",
     "preview": "astro preview",
     "lint": "eslint .",
     "typecheck": "astro check",

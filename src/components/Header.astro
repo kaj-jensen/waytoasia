@@ -1,18 +1,19 @@
 ---
-import {locales,localeNames,localizedPath,t,type Locale} from '../i18n';
+import {locales,localeNames,localizedPath,t,tr,localizeContent,type Locale} from '../i18n';
 import {countries,journeyStyles} from '../content/data';
 const {locale,path=''}=Astro.props as {locale:Locale;path?:string};
+const displayCountries=localizeContent(locale,countries);const displayStyles=localizeContent(locale,journeyStyles);
 ---
 <header class="header">
- <a class="brand" href={localizedPath(locale)} aria-label="Way to Asia home"><span>WAY</span><i>to</i><span>ASIA</span></a>
- <nav aria-label="Primary">
-  <div class="nav-group"><button type="button" aria-expanded="false" data-nav-toggle>{t(locale,'navDestinations')} <span>⌄</span></button><div class="mega"><div><small>Explore by country</small>{countries.map(c=><a href={localizedPath(locale,`/${c.slug}`)}><b>{c.code}</b><span>{c.name}<em>{c.nativeName}</em></span></a>)}</div><div><small>Find your way</small>{journeyStyles.map(s=><a href={localizedPath(locale,`/tours#${s.slug}`)}><span>{s.label}<em>{s.eyebrow}</em></span></a>)}<a class="mega-all" href={localizedPath(locale,'/tours')}>View all journeys ↗</a></div></div></div>
+ <a class="brand" href={localizedPath(locale)} aria-label={tr(locale,'Way to Asia home')}><span>WAY</span><i>to</i><span>ASIA</span></a>
+ <nav aria-label={tr(locale,'Primary')}>
+  <div class="nav-group"><button type="button" aria-expanded="false" data-nav-toggle>{t(locale,'navDestinations')} <span>⌄</span></button><div class="mega"><div><small>{tr(locale,'Explore by country')}</small>{displayCountries.map(c=><a href={localizedPath(locale,`/${c.slug}`)}><b>{c.code}</b><span>{c.name}<em>{c.nativeName}</em></span></a>)}</div><div><small>{tr(locale,'Find your way')}</small>{displayStyles.map(s=><a href={localizedPath(locale,`/tours#${s.slug}`)}><span>{s.label}<em>{s.eyebrow}</em></span></a>)}<a class="mega-all" href={localizedPath(locale,'/tours')}>{tr(locale,'View all journeys')} ↗</a></div></div></div>
   <a href={localizedPath(locale,'/tours')}>{t(locale,'navTours')}</a>
-  <a href={localizedPath(locale,'/inspiration')}>Inspiration</a>
+  <a href={localizedPath(locale,'/inspiration')}>{tr(locale,'Inspiration')}</a>
   <a href={localizedPath(locale,'/about')}>{t(locale,'navAbout')}</a>
  </nav>
- <div class="actions"><label class="lang"><span class="sr">Language</span><select aria-label="Language" data-language>{locales.map(l=><option value={localizedPath(l,path)} selected={l===locale}>{localeNames[l]}</option>)}</select></label><a class="plan" href={localizedPath(locale,'/contact')}>{t(locale,'navContact')} <span>↗</span></a></div>
- <button class="menu" aria-label="Open menu" aria-expanded="false">Menu</button>
+ <div class="actions"><label class="lang"><span class="sr">{tr(locale,'Language')}</span><select aria-label={tr(locale,'Language')} data-language>{locales.map(l=><option value={localizedPath(l,path)} selected={l===locale}>{localeNames[l]}</option>)}</select></label><a class="plan" href={localizedPath(locale,'/contact')}>{t(locale,'navContact')} <span>↗</span></a></div>
+ <button class="menu" aria-label={tr(locale,'Open menu')} aria-expanded="false">{tr(locale,'Menu')}</button>
 </header>
 <script>document.querySelectorAll<HTMLSelectElement>('[data-language]').forEach(el=>el.addEventListener('change',()=>{const locale=el.value.split('/')[1];localStorage.setItem('waytoasia-locale',locale);location.href=el.value}));document.querySelectorAll<HTMLButtonElement>('.menu').forEach(btn=>btn.addEventListener('click',()=>{const h=btn.closest('header');const open=h?.classList.toggle('open');btn.setAttribute('aria-expanded',String(Boolean(open)))}));document.querySelectorAll<HTMLButtonElement>('[data-nav-toggle]').forEach(btn=>btn.addEventListener('click',()=>btn.setAttribute('aria-expanded',String(btn.getAttribute('aria-expanded')!=='true'))));</script>
 <style>
