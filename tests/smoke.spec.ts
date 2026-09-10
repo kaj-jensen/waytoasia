@@ -1,5 +1,7 @@
 import {test,expect} from '@playwright/test';
+import {tours} from '../src/content/data';
 const locales=['en','es','it','fr','nl','hu','sv','da','no'];
+test('catalogue contains four distinct tours per country',()=>{for(const country of ['china','japan','thailand','vietnam','indonesia']){const countryTours=tours.filter(tour=>tour.country===country);expect(countryTours).toHaveLength(4);expect(new Set(countryTours.map(tour=>tour.slug)).size).toBe(4);expect(countryTours.every(tour=>tour.route&&tour.route.length>=3)).toBeTruthy()}});
 for(const locale of locales)test(`${locale} homepage`,async({page})=>{const response=await page.goto(`/${locale}/`);expect(response?.ok()).toBeTruthy();await expect(page.locator('h1')).toBeVisible();await expect(page.locator('html')).toHaveAttribute('lang',locale)});
 test('country and tour routes resolve',async({page})=>{for(const path of ['/en/japan','/da/thailand','/fr/vietnam/tours','/en/japan/tours/japan-in-stillness']){const response=await page.goto(path);expect(response?.status(),path).toBe(200);await expect(page.locator('h1')).toBeVisible()}});
 test('language switcher preserves route',async({page})=>{await page.goto('/en/japan');await page.locator('[data-language]').selectOption('/fr/japan');await expect(page).toHaveURL(/\/fr\/japan\/?$/)});
