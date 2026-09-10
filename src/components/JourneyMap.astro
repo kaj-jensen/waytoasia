@@ -1,4 +1,5 @@
 ---
+import {getRouteModes,type RouteMode as Mode} from '../content/routeTransport';
 type CountryKey='china'|'japan'|'thailand'|'vietnam'|'indonesia';
 type Point={x:number;y:number;dx?:number;dy?:number};
 type MapConfig={label:string;native:string;land:string;islands?:string;detail:string;points:Record<string,Point>};
@@ -22,21 +23,14 @@ Object.assign(maps.indonesia.points,{Jakarta:{x:214,y:219,dx:-16},Bromo:{x:316,y
 const map=maps[country]??maps.japan;
 const flagX=country==='thailand'?492:country==='indonesia'?530:505;
 const selected=route.map(name=>({name,...map.points[name]})).filter(stop=>Number.isFinite(stop.x));
-type Mode='rail'|'flight'|'road'|'boat';
 const modeCopy:Record<Locale,Record<Mode,string>>={
   en:{rail:'Rail',flight:'Flight',road:'Private road',boat:'Boat'},es:{rail:'Tren',flight:'Vuelo',road:'Vehículo privado',boat:'Barco'},it:{rail:'Treno',flight:'Volo',road:'Veicolo privato',boat:'Barca'},fr:{rail:'Train',flight:'Vol',road:'Véhicule privé',boat:'Bateau'},nl:{rail:'Trein',flight:'Vlucht',road:'Privévervoer',boat:'Boot'},hu:{rail:'Vonat',flight:'Repülő',road:'Privát autó',boat:'Hajó'},sv:{rail:'Tåg',flight:'Flyg',road:'Privat bil',boat:'Båt'},da:{rail:'Tog',flight:'Fly',road:'Privat bil',boat:'Båd'},no:{rail:'Tog',flight:'Fly',road:'Privat bil',boat:'Båt'}
 };
 const modeIcon:Record<Mode,string>={rail:'▰',flight:'✈',road:'●',boat:'≈'};
 const daysCopy:Record<Locale,string>={en:'Days',es:'Días',it:'Giorni',fr:'Jours',nl:'Dagen',hu:'Nap',sv:'Dagar',da:'Dage',no:'Dager'};
-const pairModes:Record<string,Mode[]>={
-  'Beijing|Great Wall':['road'],'Great Wall|Dali':['flight'],'Dali|Shaxi':['road'],'Shaxi|Yunnan':['road'],'Shanghai|Hangzhou':['rail'],'Hangzhou|Huangshan':['rail'],'Xi’an|Chengdu':['rail'],'Chengdu|Lijiang':['flight'],'Guilin|Yangshuo':['road'],'Yangshuo|Longji':['road'],
-  'Tokyo|Hakone':['rail'],'Hakone|Kyoto':['rail'],'Kyoto|Naoshima':['rail','boat'],'Naoshima|Teshima':['boat'],'Teshima|Osaka':['boat','rail'],'Sapporo|Biei':['rail'],'Biei|Furano':['road'],'Furano|Shiretoko':['road'],'Fukuoka|Aso':['rail'],'Aso|Kurokawa':['road'],'Kurokawa|Kagoshima':['road','rail'],'Kyoto|Koyasan':['rail'],'Koyasan|Kumano':['road'],'Kumano|Ise':['road'],
-  'Bangkok|Chiang Mai':['flight'],'Chiang Mai|Southern islands':['flight','boat'],'Bangkok|Ayutthaya':['rail'],'Ayutthaya|Sukhothai':['road'],'Sukhothai|Chiang Mai':['road'],'Bangkok|Khao Sok':['flight','road'],'Khao Sok|Koh Yao Noi':['road','boat'],'Chiang Rai|Golden Triangle':['road'],'Golden Triangle|Chiang Mai':['road'],
-  'Hanoi|Hue':['flight'],'Hue|Hoi An':['road'],'Hoi An|Saigon':['flight'],'Saigon|Mekong':['road','boat'],'Hanoi|Ninh Binh':['road'],'Ninh Binh|Ha Long':['road'],'Hue|Quy Nhon':['rail'],'Quy Nhon|Nha Trang':['rail'],'Saigon|Can Tho':['road'],'Can Tho|Chau Doc':['boat'],
-  'Yogyakarta|Borobudur':['road'],'Borobudur|Bali':['flight'],'Bali|Komodo':['flight','boat'],'Jakarta|Yogyakarta':['rail'],'Yogyakarta|Bromo':['rail','road'],'Bromo|Ijen':['road'],'Ubud|Sidemen':['road'],'Sidemen|Munduk':['road'],'Munduk|Sanur':['road'],'Labuan Bajo|Komodo':['boat'],'Komodo|Flores':['boat','road']
-};
-const segments=selected.slice(0,-1).map((from,index)=>{const to=selected[index+1];const modes=pairModes[`${from.name}|${to.name}`]??['road'];return{from,to,modes,primary:modes[0],midX:(from.x+to.x)/2,midY:(from.y+to.y)/2}});
+const segments=selected.slice(0,-1).map((from,index)=>{const to=selected[index+1];const modes=getRouteModes(from.name,to.name);return{from,to,modes,primary:modes[0],midX:(from.x+to.x)/2,midY:(from.y+to.y)/2}});
 const labelStops=selected.map((stop,index)=>{const right=stop.dx===undefined?stop.x<300:stop.dx>0;const dy=stop.dy??(index%2?25:-21);return{...stop,index,right,dy}});
+const stageForStop=(index:number)=>stages[Math.min(stages.length-1,Math.floor(index*stages.length/selected.length))];
 ---
 <figure class:list={['journey-map',`map-${country}`]}>
 <button class="map-toggle" type="button" aria-expanded="false" aria-label={controls[locale].open} data-open-label={controls[locale].open} data-close-label={controls[locale].close}><span aria-hidden="true">↗</span><b>{controls[locale].open}</b></button>
@@ -65,7 +59,7 @@ const labelStops=selected.map((stop,index)=>{const right=stop.dx===undefined?sto
 <g class="compass" transform="translate(66 65)"><circle r="24"/><path d="M0-16L5 0 0 16-5 0z"/><text y="-31">N</text></g>
 <text class="country" x="430" y="355" text-anchor="end">{map.native} · {map.label}</text>
 </svg>
-<ol class="stop-index" aria-label={`Route: ${route.join(' to ')}`}>{selected.map((stop,index)=><li><b>{String(index+1).padStart(2,'0')}</b><span><strong>{stop.name}</strong>{stages[index]&&<small>{daysCopy[locale]} {stages[index].day}</small>}</span></li>)}</ol>
+<ol class="stop-index" aria-label={`Route: ${route.join(' to ')}`}>{selected.map((stop,index)=>{const stage=stageForStop(index);return <li><b>{String(index+1).padStart(2,'0')}</b><span><strong>{stop.name}</strong>{stage&&<small>{daysCopy[locale]} {stage.day}</small>}</span></li>})}</ol>
 <ol class="route-overview">{segments.map((segment,index)=><li><span class="leg-number">{String(index+1).padStart(2,'0')}</span><div class="places"><strong>{segment.from.name}</strong><i>→</i><strong>{segment.to.name}</strong></div><div class="modes">{segment.modes.map(mode=><span class={`mode-${mode}`}><i>{modeIcon[mode]}</i>{modeCopy[locale][mode]}</span>)}</div></li>)}</ol>
 <figcaption><div class="legend">{(['rail','flight','road','boat'] as Mode[]).map(mode=><span class={`mode-${mode}`}><i></i>{modeCopy[locale][mode]}</span>)}</div><small>Illustrated route · not to scale</small></figcaption>
 </figure>
