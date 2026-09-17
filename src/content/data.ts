@@ -47,8 +47,8 @@ export const countries:Country[]=[
     "name": "South Korea",
     "nativeName": "대한민국",
     "code": "ICN",
-    "hero": "https://images.unsplash.com/photo-1669764372822-3cb8476d4f47?auto=format&fit=crop&w=2200&q=84",
-    "tile": "https://images.unsplash.com/photo-1669764372822-3cb8476d4f47?auto=format&fit=crop&w=2200&q=84",
+    "hero": "/images/destinations/south-korea-hero-1600.webp",
+    "tile": "/images/destinations/south-korea-hero-1600.webp",
     "alt": "Traditional palace pavilions reflected in Wolji Pond, Gyeongju",
     "intro": "South Korea brings royal palaces and contemporary neighbourhoods into the same day. Follow regional food traditions, discover ancient capitals and leave time for forested mountains or the volcanic shores of Jeju.",
     "regions": [
