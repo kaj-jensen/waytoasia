@@ -71,3 +71,6 @@
 .tour-product .overview-practical .stay-list{padding-left:0}
 @media(max-width:850px){.tour-product .overview-practical{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.tour-product .overview-practical{grid-template-columns:1fr;gap:0;margin-top:14px}}
+
+/* Legible itinerary map, paired equally with the day descriptions. */
+.tour-product .itinerary-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px}.tour-product .map-stage{height:430px}.map-legend{display:flex;flex-wrap:wrap;gap:10px 18px;padding:10px 16px;background:#243830;color:white;font-size:11px}.map-legend>span{display:flex;align-items:center;gap:7px}.map-legend i{width:26px;border-top:3px dashed}.map-legend .rail{border-color:#dbc54a}.map-legend .road{border-color:#bfc5be}.map-legend .flight{border-color:#86c7e5}.map-legend .boat{border-color:#55c6d1}.tour-product .map-card:fullscreen .map-stage,.tour-product .map-card.expanded .map-stage{height:auto;flex:1}@media(max-width:620px){.tour-product .map-stage{height:330px}.map-legend{padding:8px 12px;gap:8px 14px}}

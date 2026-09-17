@@ -1,29 +1,43 @@
 import 'maplibre-gl/dist/maplibre-gl.css';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
-import type {Map as LibreMap, GeoJSONSource} from 'maplibre-gl';
+import type {Map as LibreMap, GeoJSONSource, Marker as LibreMarker} from 'maplibre-gl';
 
 type Point=[number,number];
 const root=document.querySelector<HTMLElement>('.tour-product');
 if(root){
- const config=JSON.parse(root.dataset.mapConfig!) as {paths:Point[][];points:Point[];stops:{name:string;point:Point;day:number;note:string}[];labels:string[];whole:string;expand:string;collapse:string;open:string;close:string;error:string;show:string};
+ const config=JSON.parse(root.dataset.mapConfig!) as {legs:{points:Point[];modes:string[]}[];paths:Point[][];points:Point[];stops:{name:string;point:Point;day:number;note:string}[];labels:string[];whole:string;expand:string;collapse:string;open:string;close:string;error:string;show:string};
  const {paths,stops}=config;
+ const colors:Record<string,string>={rail:'#977b0a',road:'#626963',flight:'#397b9b',boat:'#087e8b'};
+ const routeFeatures=config.legs.flatMap(leg=>leg.modes.map((mode,i)=>{const [a,b]=leg.points;const at=(t:number):Point=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];return {type:'Feature' as const,properties:{mode},geometry:{type:'LineString' as const,coordinates:[at(i/leg.modes.length),at((i+1)/leg.modes.length)]}};}));
  const card=root.querySelector<HTMLElement>('.map-card')!;
  const status=root.querySelector<HTMLElement>('.map-status')!;
  const title=root.querySelector<HTMLElement>('[data-map-title]')!;
  const days=[...root.querySelectorAll<HTMLDetailsElement>('.day')];
  let map:LibreMap|undefined,active=0,loading=false;
  let markers:HTMLElement[]=[];
+ const mapMarkers:LibreMarker[]=[];
  const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
  const line=(points:Point[])=>({type:'Feature' as const,properties:{},geometry:{type:'LineString' as const,coordinates:points}});
- function focusMap(){
+ function separateMarkers(){
+  if(!map?.getSource('marker-leaders'))return;
+  const used:{x:number;y:number}[]=[];const leaders:ReturnType<typeof line>[]=[];
+  mapMarkers.forEach((marker,i)=>{
+   const p=map!.project(stops[i].point);let offset:Point=[0,0];
+   for(const candidate of [[0,0],[32,0],[-32,0],[0,-32],[0,32],[32,-32],[-32,32],[48,0],[-48,0]] as Point[]){if(used.every(q=>Math.hypot(q.x-p.x-candidate[0],q.y-p.y-candidate[1])>=31)){offset=candidate;break;}}
+   used.push({x:p.x+offset[0],y:p.y+offset[1]});marker.setOffset(offset);
+   if(offset[0]||offset[1]){const end=map!.unproject([p.x+offset[0],p.y+offset[1]]);leaders.push(line([stops[i].point,[end.lng,end.lat]]));}
+  });
+  (map.getSource('marker-leaders') as GeoJSONSource).setData({type:'FeatureCollection',features:leaders});
+ }
+ function focusMap(animate=true){
   if(!map?.getSource('active-route'))return;
   const points=active?paths[active-1]:config.points;
-  (map.getSource('active-route') as GeoJSONSource)?.setData({type:'FeatureCollection',features:points.length>1?[line(points)]:[]});
+  (map.getSource('active-route') as GeoJSONSource)?.setData({type:'FeatureCollection',features:active&&points.length>1?[line(points)]:[]});
   markers.forEach((el,i)=>el.classList.toggle('active',active>0&&paths[active-1].some(p=>p[0]===stops[i].point[0]&&p[1]===stops[i].point[1])));
-  if(points.length===1)map.flyTo({center:points[0],zoom:active===11?12:11,duration:reduced?0:1000});
+  if(points.length===1)map.flyTo({center:points[0],zoom:10,duration:reduced||!animate?0:1000});
   else {
    const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);
-   map.fitBounds([[Math.min(...xs),Math.min(...ys)],[Math.max(...xs),Math.max(...ys)]],{padding:55,maxZoom:12,duration:reduced?0:1000});
+   map.fitBounds([[Math.min(...xs),Math.min(...ys)],[Math.max(...xs),Math.max(...ys)]],{padding:{top:65,bottom:85,left:65,right:65},maxZoom:10,duration:reduced||!animate?0:1000});
   }
  }
  function selectDay(n:number,open=true){
@@ -59,18 +73,26 @@ if(root){
    map=new Map({container:'journey-live-map',style:'https://tiles.openfreemap.org/styles/liberty',center:config.points[0],zoom:5,attributionControl:{compact:true},scrollZoom:false});
    map.addControl(new NavigationControl({showCompass:false}),'top-right');
    map.on('error',()=>{if(!card.dataset.ready)status.textContent=config.error;});
+   new ResizeObserver(()=>{map?.resize();focusMap(false);}).observe(card);
+   map.on('moveend',()=>{card.dataset.zoom=String(map!.getZoom());});
+   map.on('move',separateMarkers);
    map.on('style.load',()=>{
-    card.dataset.ready='true';
     for(const layer of map!.getStyle().layers){
-     if(layer.type==='fill'&&'source-layer' in layer&&layer['source-layer']==='water')map!.setPaintProperty(layer.id,'fill-color','#ccdfdc');
+     if(layer.type==='fill'&&'source-layer' in layer&&layer['source-layer']==='water')map!.setPaintProperty(layer.id,'fill-color','#a9cfe2');
      if(layer.type==='line'&&'source-layer' in layer&&layer['source-layer']==='transportation')map!.setPaintProperty(layer.id,'line-color','#c9bea9');
     }
-    map!.addSource('whole-route',{type:'geojson',data:{type:'FeatureCollection',features:[line(config.points)]}});
-    map!.addLayer({id:'whole-route',type:'line',source:'whole-route',paint:{'line-color':'#647c6f','line-width':2,'line-dasharray':[2,2],'line-opacity':.7}});
+    map!.addSource('whole-route',{type:'geojson',data:{type:'FeatureCollection',features:routeFeatures}});
+    map!.addLayer({id:'route-casing',type:'line',source:'whole-route',paint:{'line-color':'#fffdf2','line-width':6,'line-opacity':.85}});
+    for(const [mode,color] of Object.entries(colors))map!.addLayer({id:`route-${mode}`,type:'line',source:'whole-route',filter:['==',['get','mode'],mode],paint:{'line-color':color,'line-width':3,'line-dasharray':mode==='flight'?[1,2]:[3,2]}});
+    map!.addSource('stop-labels',{type:'geojson',data:{type:'FeatureCollection',features:stops.map(stop=>({type:'Feature',properties:{name:stop.name},geometry:{type:'Point',coordinates:stop.point}}))}});
+    map!.addLayer({id:'stop-labels',type:'symbol',source:'stop-labels',layout:{'text-field':['get','name'],'text-font':['Noto Sans Regular'],'text-size':12,'text-anchor':'top','text-offset':[0,1.5]},paint:{'text-color':'#18382d','text-halo-color':'#fffdf2','text-halo-width':2}});
     map!.addSource('active-route',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
     map!.addLayer({id:'active-route',type:'line',source:'active-route',paint:{'line-color':'#b74430','line-width':3,'line-dasharray':[2,1.5]}});
-    markers=stops.map((stop,i)=>{const el=document.createElement('button');el.type='button';el.className='itinerary-marker';el.textContent=String(i+1);el.setAttribute('aria-label',`${stop.name}: ${config.show}`);el.title=stop.name+(stop.note?` · ${stop.note}`:'');el.addEventListener('click',()=>selectDay(stop.day));new Marker({element:el}).setLngLat(stop.point).addTo(map!);return el;});
+    map!.addSource('marker-leaders',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+    map!.addLayer({id:'marker-leaders',type:'line',source:'marker-leaders',paint:{'line-color':'#18382d','line-width':1.5}});
+    markers=stops.map((stop,i)=>{const el=document.createElement('button');el.type='button';el.className='itinerary-marker';el.textContent=String(i+1);el.setAttribute('aria-label',`${stop.name}: ${config.show}`);el.title=stop.name+(stop.note?` · ${stop.note}`:'');el.addEventListener('click',()=>selectDay(stop.day));mapMarkers.push(new Marker({element:el}).setLngLat(stop.point).addTo(map!));return el;});
     focusMap();
+    map!.once('idle',()=>{card.dataset.ready='true';status.textContent='';});
    });
   }catch{status.textContent=config.error;}
  }

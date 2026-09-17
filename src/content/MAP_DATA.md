@@ -1,6 +1,6 @@
 # Journey map data
 
-The map uses WGS84 longitude/latitude pairs. No arbitrary x/y locations, horizontal stretching, generated coastlines, geocoding at page load, or live tile service is used.
+The map uses WGS84 longitude/latitude pairs. No arbitrary x/y locations, horizontal stretching, generated coastlines, geocoding at page load, or geocoding at page load is used for the static preview. The interactive tour map loads real OpenFreeMap tiles.
 
 ## Boundaries
 
@@ -34,3 +34,9 @@ All 20 canonical tours in nine locales use `TourProduct.astro`, `tourPresentatio
 The 12-day Seoul & Ancient Kingdoms example has individual daily entries. Transfer days show the preceding base and arrival city; marker selection opens the first day at that base. The three other South Korea examples use multi-day chapters, with explicit stop groups for Sokcho and Seoraksan. Coordinates are representative city or visitor-area centres, not booked hotels or precise paths. Connections are indicative, not verified tracks. Return flights and rail connections are described in the itinerary rather than shown as extra overnight bases.
 
 South Korea's ISO numeric boundary ID is 410. North Korea remains surrounding geographic context only.
+
+## Production map audit — 17 September 2026
+
+The deployed CSP must allow `https://tiles.openfreemap.org` for connections and map images, with same-origin workers and blob images. The map is ready only after the initial real tile frame reaches idle, not merely after the style JSON loads. `tour-map-live.spec.ts` exercises all 20 tours with the production CSP and real tiles, transport legends, every itinerary selection and mobile width checks. Mock-style tests cover control behavior separately.
+
+Transport-coloured lines are indicative connections between known stop coordinates, not surveyed tracks or road routing. Multi-mode connections divide the visual connector between the listed modes without implying a precise interchange. No elevation profile is shown because the sample itineraries do not supply verified tracks. All sections include the incoming transfer when their overnight base changes.

@@ -1,4 +1,5 @@
 import type {Tour} from '../content/data';
+import {getRouteModes} from '../content/routeTransport';
 import {mapPlaces} from '../content/mapCoordinates';
 export type Point=[number,number];
 const groups:Record<string,number[][]>={
@@ -14,6 +15,8 @@ export function tourPresentation(tour:Tour){
   const previous=i?mapPlaces[tour.country][tour.dailyItinerary![i-1].location].coordinates:null;
   if(previous&&previous!==entry.points[0])entry.points=[previous,entry.points[0]];
  });
+ if(!tour.dailyItinerary)entries.forEach((entry,i)=>{if(i){const previous=entries[i-1].points.at(-1)!;if(previous!==entry.points[0])entry.points=[previous,...entry.points];}});
+ const legs=route.slice(1).map((name,i)=>({points:[points[i],points[i+1]],modes:getRouteModes(route[i],name)}));
  const stops=route.map((name,i)=>({name,point:points[i],day:tour.dailyItinerary?tour.dailyItinerary.findIndex(day=>day.location===name)+1:stageGroups.findIndex(group=>group.includes(i))+1,note:mapPlaces[tour.country][name].note??''}));
- return {route,points,entries,stops};
+ return {route,points,entries,stops,legs};
 }
