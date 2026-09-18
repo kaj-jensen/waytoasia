@@ -2,6 +2,10 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import catalog from '../src/content/translations.generated.json' with {type:'json'};
 
+for(const locale of Object.keys(catalog)){
+  try{Object.assign(catalog[locale],JSON.parse(await fs.readFile(new URL(`../src/content/editorial/${locale}.json`,import.meta.url),'utf8')))}catch(error){if(error.code!=='ENOENT')throw error}
+}
+
 const dist=new URL('../dist/',import.meta.url);
 const files=[];
 async function walk(directory){for(const entry of await fs.readdir(directory,{withFileTypes:true})){const target=path.join(directory,entry.name);if(entry.isDirectory())await walk(target);else if(entry.name.endsWith('.html'))files.push(target)}}
@@ -29,6 +33,14 @@ for(const file of files){
     if(!source||source===translation)continue;
     replacements.set(source,translation);
     replacements.set(escapeHtml(source),escapeHtml(translation));
+  }
+  // Server-rendered translated sentences must survive this legacy HTML pass unchanged.
+  // Otherwise English place names inside reviewed copy can be translated a second time.
+  for(const [,translation] of entries){
+    if(translation.length>20){
+      replacements.set(translation,translation);
+      replacements.set(escapeHtml(translation),escapeHtml(translation));
+    }
   }
   // Identity matches prevent individual words within the company name from translating.
   for(const name of ['Way to Asia','WAY to ASIA','WAY TO ASIA'])replacements.set(name,name);

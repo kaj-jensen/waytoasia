@@ -5,13 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro check && astro build && node scripts/localize-built-html.mjs",
+    "build": "npm run check:translations && astro check && astro build && node scripts/localize-built-html.mjs && node scripts/check-rendered-translations.mjs",
     "preview": "astro preview",
     "lint": "eslint .",
     "typecheck": "astro check",
     "test": "npm run build && playwright test",
     "test:smoke": "playwright test",
-    "cf:deploy": "wrangler pages deploy dist --project-name waytoasia"
+    "cf:deploy": "wrangler pages deploy dist --project-name waytoasia",
+    "check:translations": "node scripts/check-translations.mjs"
   },
   "dependencies": {
     "@astrojs/react": "latest",
@@ -43,6 +44,7 @@
     "eslint": "latest",
     "eslint-plugin-astro": "latest",
     "globals": "latest",
+    "parse5": "^7.3.0",
     "typescript": "latest",
     "typescript-eslint": "latest",
     "wrangler": "latest"
