@@ -17,6 +17,7 @@ for(const locale of locales.filter(l=>l!=='en')){
  });
  test(`${locale}: filters and gallery stay translated after hydration`,async({page})=>{
   await page.goto(`/${locale}/tours/`);
+  await expect(page.locator('.skip-link')).toHaveText(tr(locale,'Skip to content'));
   await page.locator('astro-island[component-export="default"]').first().evaluate(async node=>{while(node.hasAttribute('ssr'))await new Promise(resolve=>setTimeout(resolve,25));});
   await page.locator('.filters select').first().selectOption('thailand');
   await expect(page.locator('.tour')).toHaveCount(4);
