@@ -24,7 +24,7 @@ export const messages: Record<Locale, Record<string,string>> = {
  no:{navDestinations:'Reisemål',navTours:'Reiser',navAbout:'Vårt studio',navContact:'Start planlegging',heroEyebrow:'Private reiser · Små grupper',heroTitle:'Asia, komponert rundt deg.',heroBody:'Gjennomtenkte reiser med lokal kunnskap og tid til nysgjerrighet.',explore:'Utforsk reisen'}
 };
 const fallback = messages.en;
-export function t(locale:Locale,key:string){const english=fallback[key]??key;return messages[locale][key] ?? tr(locale,english)}
+export function t(locale:Locale,key:string){const english=fallback[key]??key;return editorial[locale]?.[english] ?? messages[locale][key] ?? tr(locale,english)}
 export function tr(locale:Locale,source:string,variables:Record<string,string|number>={}){const catalog=generated as Record<Locale,Record<string,string>>;const translated=editorial[locale]?.[source]??catalog[locale]?.[source]??source;return Object.entries(variables).reduce((value,[key,replacement])=>value.replaceAll(`{${key}}`,String(replacement)),translated)}
 export function localizeContent<T>(locale:Locale,value:T):T{if(locale==='en')return value;if(typeof value==='string')return tr(locale,value) as T;if(Array.isArray(value))return value.map(item=>localizeContent(locale,item)) as T;if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([key,item])=>[key,localizeContent(locale,item)])) as T;return value}
 export function localizedPath(locale:Locale,path=''){return `/${locale}${path === '/' ? '' : path}`}

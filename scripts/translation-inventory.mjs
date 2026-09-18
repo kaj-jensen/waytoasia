@@ -11,4 +11,14 @@ for(const file of fs.readdirSync('src',{recursive:true}).filter(p=>/\.(astro|tsx
  const source=fs.readFileSync('src/'+file,'utf8');
  for(const m of source.matchAll(/\b(?:copy|tr)\((?:locale,)?\s*(['"])((?:\\.|(?!\1).)*)\1/g))strings.add(m[2].replaceAll("\\'","'"));
 }
+// Include the English values behind t(locale, key), not only literal tr() calls.
+const i18n=ts.createSourceFile('i18n.ts',fs.readFileSync('src/i18n.ts','utf8'),ts.ScriptTarget.Latest,true);
+function visit(node){
+ if(ts.isVariableDeclaration(node)&&node.name.getText(i18n)==='messages'&&node.initializer&&ts.isObjectLiteralExpression(node.initializer)){
+  const english=node.initializer.properties.find(p=>ts.isPropertyAssignment(p)&&p.name.getText(i18n)==='en');
+  if(english&&ts.isPropertyAssignment(english)&&ts.isObjectLiteralExpression(english.initializer))for(const property of english.initializer.properties)if(ts.isPropertyAssignment(property)&&ts.isStringLiteral(property.initializer))strings.add(property.initializer.text);
+ }
+ ts.forEachChild(node,visit);
+}
+visit(i18n);
 export const requiredStrings=[...strings].sort();
