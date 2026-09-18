@@ -13,7 +13,7 @@ const {tour,country,locale}=Astro.props as {tour:Tour;country:Country;locale:Loc
 const copy=(s:string,vars:Record<string,string|number>={})=>tr(locale,s,vars);
 const localized=localizeContent(locale,tour);
 const editorial=tourOverviews[tour.slug];
-const overview=locale==='en'||copy(editorial.summary)!==editorial.summary?localizeContent(locale,editorial):{heading:copy('Tour overview'),summary:localized.teaser,reason:''};
+const overview=localizeContent(locale,editorial);
 const model=tourPresentation(tour);
 const geo=journeyGeography(country.slug,model.route);
 const enquiry=localizedPath(locale,`/contact?tour=${tour.slug}`);
