@@ -31,10 +31,10 @@ const page=meta[locale];
 .traveller-research{padding:clamp(1.3rem,3vw,2.2rem);border-top:1px solid #cfc5b3;background:#f1eadc}
 .traveller-research>p{margin:.25rem 0 1rem;color:#59655f;font-size:.72rem}
 .traveller-research>ul{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem;margin:0;padding:0;list-style:none}
-.traveller-research>ul>li{padding:1rem;background:#fffdf8;border:1px solid #d4cbba}
+.traveller-research>ul>li{min-width:0;padding:1rem;background:#fffdf8;border:1px solid #d4cbba}
 .traveller-research li>span{font-size:.82rem;line-height:1.55}
 .traveller-research li div{display:flex;flex-direction:column;gap:.35rem;margin-top:.7rem}
-.traveller-research a{color:var(--vermilion-dark);font:.58rem var(--mono);text-decoration:underline;text-underline-offset:3px}
+.traveller-research a{max-width:100%;color:var(--vermilion-dark);font:.58rem var(--mono);overflow-wrap:anywhere;text-decoration:underline;text-underline-offset:3px}
 @media(max-width:800px){.traveller-research>ul{grid-template-columns:1fr}}
 </style>
 <style is:global>
