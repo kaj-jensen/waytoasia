@@ -57,7 +57,8 @@ Rules:
 - Do not use generic filler such as "check the weather", "check visa requirements", "research vaccinations", or "ensure documents are in order" unless the traveller's stated circumstances make it specifically relevant.
 - Do not invent hotels, suppliers, live availability, booking status, discounts, exact transport schedules or confirmed prices.
 - Be season-aware without guarantees. If dates are flexible, explain which seasons particularly suit the actual route.
-- Fit the requested duration and pace. Avoid exhausting one-night stops unless clearly justified.
+- Fit the requested duration and pace. Avoid exhausting one-night stops unless clearly justified. When two countries are explicitly requested for a trip of 12 days or more, give each a meaningful section rather than leaving one as a token stop.
+- Prefer direct rail or road connections between mainland cities in the same country. Use a domestic flight only when island or remote geography makes it sensible, and explain that reason.
 - For revisions, preserve the useful parts of the current plan and visibly apply the traveller's latest request. Return the complete revised itinerary, not a commentary about changes.
 - Prices and availability are intentionally handled outside this stage. Do not claim either is confirmed.
 - closing must be one short, specific invitation to adjust pace, swap stops, or add rest days.
@@ -105,10 +106,10 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
       return JSON.parse(cleaned.slice(firstBrace,lastBrace+1));
     };
     let parsed=await runModel(messages);
-    let qualityIssues=assessTripSuggestionQuality(parsed,profile);
+    let qualityIssues=assessTripSuggestionQuality(parsed,profile,travellerResearch);
     if(qualityIssues.length){
       parsed=await runModel([...messages,{role:'assistant',content:JSON.stringify(parsed)},{role:'user',content:`Rewrite the complete itinerary. Preserve its destinations, route logic and useful detail, changing only what is needed to fix every quality failure below:\n- ${qualityIssues.join('\n- ')}\nReturn only the full JSON structure.`}],true);
-      qualityIssues=assessTripSuggestionQuality(parsed,profile);
+      qualityIssues=assessTripSuggestionQuality(parsed,profile,travellerResearch);
     }
     if(qualityIssues.length)throw new Error(`Model response failed quality control: ${qualityIssues.join(' ')}`);
     const suggestion = normalizeTripSuggestion(parsed,profile.locale,new Date(),profile.durationDays,travellerResearch);

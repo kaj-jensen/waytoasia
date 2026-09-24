@@ -146,7 +146,36 @@ const routeCoversDuration=(route:SuggestedRouteStop[],durationDays:number):boole
   return expectedStart===durationDays+1;
 };
 
-export function assessTripSuggestionQuality(value:unknown,profile:TripPlannerRequest):string[]{
+const routeStopLength=(days:string):number=>{
+  const numbers=days.match(/\d+/g)?.map(Number)??[];
+  if(!numbers.length)return 0;
+  return Math.max(0,(numbers[1]??numbers[0])-numbers[0]+1);
+};
+
+const requestedCountries=(profile:TripPlannerRequest):Array<{name:string;pattern:RegExp}>=>{
+  const brief=`${profile.destinationIdeas} ${profile.destinations.join(' ')}`.toLowerCase();
+  const candidates:Array<{name:string;pattern:RegExp;requestPattern:RegExp}>=[
+    {name:'Japan',pattern:/\bjapan\b/i,requestPattern:/\bjapan\b/i},
+    {name:'South Korea',pattern:/\b(?:south )?korea\b/i,requestPattern:/\b(?:south[ -])?korea\b/i},
+    {name:'Taiwan',pattern:/\btaiwan\b/i,requestPattern:/\btaiwan\b/i},
+    {name:'China',pattern:/\bchina\b/i,requestPattern:/\bchina\b/i},
+    {name:'Thailand',pattern:/\bthailand\b/i,requestPattern:/\bthailand\b/i},
+    {name:'Vietnam',pattern:/\bvietnam\b/i,requestPattern:/\bvietnam\b/i},
+    {name:'Indonesia',pattern:/\bindonesia\b/i,requestPattern:/\bindonesia\b/i},
+    {name:'Laos',pattern:/\blaos\b/i,requestPattern:/\blaos\b/i},
+    {name:'Cambodia',pattern:/\bcambodia\b/i,requestPattern:/\bcambodia\b/i},
+    {name:'Malaysia',pattern:/\bmalaysia\b/i,requestPattern:/\bmalaysia\b/i},
+    {name:'Singapore',pattern:/\bsingapore\b/i,requestPattern:/\bsingapore\b/i},
+    {name:'Philippines',pattern:/\bphilippines\b/i,requestPattern:/\bphilippines\b/i},
+    {name:'India',pattern:/\bindia\b/i,requestPattern:/\bindia\b/i},
+    {name:'Sri Lanka',pattern:/\bsri lanka\b/i,requestPattern:/\bsri lanka\b/i},
+    {name:'Nepal',pattern:/\bnepal\b/i,requestPattern:/\bnepal\b/i},
+    {name:'Bhutan',pattern:/\bbhutan\b/i,requestPattern:/\bbhutan\b/i},
+  ];
+  return candidates.filter(country=>country.requestPattern.test(brief));
+};
+
+export function assessTripSuggestionQuality(value:unknown,profile:TripPlannerRequest,researchSources:TravellerResearchSource[]=[]):string[]{
   if(!value||typeof value!=='object')return ['The response is not an itinerary object.'];
   const draft=value as Record<string,unknown>;
   const route=asRoute(draft.route);
@@ -158,9 +187,35 @@ export function assessTripSuggestionQuality(value:unknown,profile:TripPlannerReq
   const unsupportedTravelTime=/\b(?:about|around|approximately|approx\.?|≈|~)?\s*\d+(?:[.,]\d+)?\s*(?:h|hr|hrs|hour|hours|minute|minutes|min)\b/i;
   if(route.some(stop=>unsupportedTravelTime.test(stop.onwardTravel)))issues.push('Remove unverified journey times; describe the recommended transport and connection without a duration.');
   const practical=textArray(draft.practicalNotes,5,300);
+  const scheduleClaim=/\b(?:daily|every day|several (?:times|services|departures)|multiple (?:times|services|departures)|non-?stop)\b/i;
+  if([...route.map(stop=>stop.onwardTravel),...practical].some(copy=>scheduleClaim.test(copy)))issues.push('Remove flight and ferry frequency or nonstop claims because live schedules are not connected.');
+  const unjustifiedDomesticFlight=route.slice(0,-1).some((stop,index)=>{
+    const next=route[index+1];
+    const country=stop.place.split(':')[0].trim().toLowerCase();
+    const nextCountry=next.place.split(':')[0].trim().toLowerCase();
+    const combined=`${stop.place} ${stop.plan} ${stop.onwardTravel} ${next.place}`;
+    return country===nextCountry&&/\bfl(?:y|ight)\b/i.test(stop.onwardTravel)&&!/\b(?:island|archipelago|remote|jeju|okinawa|hokkaido|bali|borneo|sulawesi|palawan)\b/i.test(combined);
+  });
+  if(unjustifiedDomesticFlight)issues.push('Replace an unjustified domestic flight with the most direct rail or road connection, or explicitly explain the island or remote geography that makes flying sensible.');
+  if(profile.pace!=='active'&&route.some(stop=>routeStopLength(stop.days)===1&&/[&,/]/.test(stop.place.split(':').slice(1).join(':'))))issues.push('Do not combine multiple places into a single day at a balanced or slow pace; keep one base or remove the extra stop.');
+  const countries=requestedCountries(profile);
+  if(countries.length>=2&&profile.durationDays>=12){
+    const minimumDays=Math.max(3,Math.ceil(profile.durationDays*0.28));
+    const underweighted=countries.filter(country=>route.reduce((total,stop)=>total+(country.pattern.test(stop.place)?routeStopLength(stop.days):0),0)<minimumDays);
+    if(underweighted.length)issues.push(`Give each requested country a meaningful share of the trip (at least ${minimumDays} days here); rebalance ${underweighted.map(country=>country.name).join(' and ')}.`);
+  }
   const boilerplate=/check (the )?(weather|visa)|research (any )?vaccinations|ensure (that )?(all )?(necessary )?documents|book(ing)? accommodations? in advance|cost-effective (train|rail) pass/i;
   if(practical.length<3||practical.some(note=>boilerplate.test(note)))issues.push('Replace generic booking, visa, vaccine, weather or pass advice with route-specific transport, season and pace trade-offs.');
   if(practical.some(note=>/\bpass\b/i.test(note)&&!/compare|calculate|current point-to-point|individual fares/i.test(note)))issues.push('Never tell the traveller to buy a rail pass without a current fare comparison; advise comparing it with individual tickets instead.');
+  if(researchSources.length){
+    const validIds=new Set(researchSources.map(source=>source.id));
+    const supportedInsights=(Array.isArray(draft.travellerInsights)?draft.travellerInsights:[]).filter(item=>{
+      if(!item||typeof item!=='object')return false;
+      const insight=item as Record<string,unknown>;
+      return text(insight.insight,360).length>=40&&textArray(insight.sourceIds,3,20).some(id=>validIds.has(id));
+    });
+    if(supportedInsights.length<2)issues.push('Use at least two specific traveller insights supported by the supplied research source IDs.');
+  }
   if(!text(draft.closing,500).endsWith('?'))issues.push('End with one short, specific follow-up question.');
   return issues;
 }
