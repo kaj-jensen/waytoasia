@@ -194,19 +194,19 @@ export const tourPhotos:Record<string,{src:string;source:string;place:string}[]>
   ],
   "rivers-and-rice-terraces": [
     {
-      "src": "https://images.unsplash.com/photo-1691358370468-bde3dfd3ef62?auto=format&fit=crop&w=1400&q=82",
-      "source": "https://unsplash.com/photos/a-large-body-of-water-surrounded-by-mountains-t5z-1lQ33TM",
-      "place": "Guilin"
+      "src": "/images/tours/china-rivers-river-woman-2400.jpg",
+      "source": "User-supplied photograph: China-River-Woman.jpg",
+      "place": "Li River"
     },
     {
-      "src": "https://images.unsplash.com/photo-1701609969597-d2e4aa955790?auto=format&fit=crop&w=1400&q=82",
-      "source": "https://unsplash.com/photos/an-aerial-view-of-a-river-surrounded-by-mountains-4LixEepJBGM",
-      "place": "Guilin"
+      "src": "/images/tours/china-rivers-china-rock-2400.jpg",
+      "source": "User-supplied photograph: China-rock.jpg",
+      "place": "Zhangjiajie"
     },
     {
-      "src": "https://images.unsplash.com/photo-1759322451543-68c2217e9046?auto=format&fit=crop&w=1400&q=82",
-      "source": "https://unsplash.com/pt-br/fotografias/montanhas-carsticas-verdejantes-flanqueiam-um-rio-sinuoso-f_jBvzQIgig",
-      "place": "Guilin"
+      "src": "/images/tours/china-rivers-fields-2400.jpg",
+      "source": "User-supplied photograph: china-fields.jpg",
+      "place": "China countryside"
     },
     {
       "src": "https://images.unsplash.com/photo-1741354563315-d28f7aa63cf5?auto=format&fit=crop&w=1400&q=82",
@@ -551,9 +551,9 @@ export const tourPhotos:Record<string,{src:string;source:string;place:string}[]>
       "place": "Korean food"
     },
     {
-      "src": "https://images.unsplash.com/photo-1746234914546-440bbdee2741?auto=format&fit=crop&w=1400&q=82",
-      "source": "https://unsplash.com/de/fotos/belebte-strasse-in-einer-belebten-asiatischen-stadt-VAhlTZr8rro",
-      "place": "Seoul"
+      "src": "/images/tours/korea-market-2400.jpg",
+      "source": "User-supplied photograph: South-Korea.jpg",
+      "place": "Gwangjang Market, Seoul"
     },
     {
       "src": "https://images.unsplash.com/photo-1548115184-bc6544d06a58?auto=format&fit=crop&w=1400&q=82",

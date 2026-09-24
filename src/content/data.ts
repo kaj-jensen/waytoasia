@@ -14,7 +14,7 @@ export const countries:Country[]=[
     "nativeName": "中国",
     "code": "PEK",
     "hero": "https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=1800&q=84",
-    "tile": "https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=1800&q=84",
+    "tile": "https://images.unsplash.com/photo-1718027808460-7069cf0ca9ae?auto=format&fit=crop&w=1200&q=82",
     "alt": "The Great Wall winding through green mountains",
     "intro": "Ancient dynasties and restless megacities share the same horizon. China rewards time: a tea poured slowly, a courtyard at dawn, a mountain path beyond the crowds.",
     "regions": [
@@ -82,8 +82,8 @@ export const countries:Country[]=[
     "nativeName": "ประเทศไทย",
     "code": "BKK",
     "hero": "https://images.unsplash.com/photo-1528181304800-259b08848526?auto=format&fit=crop&w=1800&q=84",
-    "tile": "https://images.unsplash.com/photo-1528181304800-259b08848526?auto=format&fit=crop&w=1800&q=84",
-    "alt": "Long-tail boats in a limestone bay in Thailand",
+    "tile": "/images/destinations/thailand-temple-2536.jpg",
+    "alt": "Golden Thai temple beneath a dramatic blue sky",
     "intro": "Thailand’s warmth is more than climate. Markets, forest temples and island mornings come together through a culture of welcome and an extraordinary food tradition.",
     "regions": [
       {
@@ -116,8 +116,8 @@ export const countries:Country[]=[
     "nativeName": "Việt Nam",
     "code": "SGN",
     "hero": "https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1800&q=84",
-    "tile": "https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1800&q=84",
-    "alt": "Green limestone landscape and river in Vietnam",
+    "tile": "/images/destinations/vietnam-boat-1200.jpg",
+    "alt": "Travellers crossing a river by boat beneath limestone cliffs in Vietnam",
     "intro": "A long, generous country of layered history, vivid street food and landscapes that change with every latitude. Vietnam is best experienced as a rhythm, not a checklist.",
     "regions": [
       {
@@ -149,7 +149,7 @@ export const countries:Country[]=[
     "name": "Indonesia",
     "nativeName": "Indonesia",
     "code": "DPS",
-    "hero": "https://images.unsplash.com/photo-1533669955142-6a73332af4db?auto=format&fit=crop&w=1800&q=84",
+    "hero": "https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=1800&q=84",
     "tile": "https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=1800&q=84",
     "alt": "Rice terraces glowing in morning light in Indonesia",
     "intro": "Across thousands of islands, Indonesia offers volcanic landscapes, layered spiritual traditions and coastlines that invite a slower sense of time.",

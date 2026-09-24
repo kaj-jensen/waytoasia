@@ -1,0 +1,48 @@
+---
+import type {Locale} from '../i18n';
+
+const {locale}=Astro.props as {locale:Locale};
+const copy:Record<Locale,{text:string;accept:string;decline:string}>={
+  en:{text:'We use optional analytics to understand how visitors use Way to Asia and improve the journeys we present.',accept:'Allow analytics',decline:'No thanks'},
+  es:{text:'Usamos analítica opcional para comprender cómo se utiliza Way to Asia y mejorar los viajes que presentamos.',accept:'Permitir analítica',decline:'No, gracias'},
+  it:{text:'Usiamo strumenti analitici facoltativi per capire come viene usato Way to Asia e migliorare i viaggi presentati.',accept:'Consenti analisi',decline:'No, grazie'},
+  fr:{text:'Nous utilisons des données analytiques facultatives pour comprendre l’usage de Way to Asia et améliorer nos voyages.',accept:'Autoriser les statistiques',decline:'Non merci'},
+  nl:{text:'We gebruiken optionele analytics om te begrijpen hoe Way to Asia wordt gebruikt en onze reizen te verbeteren.',accept:'Analytics toestaan',decline:'Nee, bedankt'},
+  hu:{text:'Opcionális analitikát használunk a Way to Asia használatának megértéséhez és útjaink fejlesztéséhez.',accept:'Analitika engedélyezése',decline:'Köszönöm, nem'},
+  sv:{text:'Vi använder valfri analys för att förstå hur Way to Asia används och förbättra resorna vi presenterar.',accept:'Tillåt analys',decline:'Nej tack'},
+  da:{text:'Vi bruger valgfri statistik til at forstå, hvordan Way to Asia bruges, og forbedre de rejser, vi præsenterer.',accept:'Tillad statistik',decline:'Nej tak'},
+  no:{text:'Vi bruker valgfri analyse for å forstå hvordan Way to Asia brukes og forbedre reisene vi presenterer.',accept:'Tillat analyse',decline:'Nei takk'},
+};
+---
+<aside class="analytics-consent" data-analytics-consent data-measurement-id="G-4B6XP1G9FN" hidden aria-label="Analytics preferences">
+  <p>{copy[locale].text}</p>
+  <div><button class="btn" type="button" data-analytics-accept>{copy[locale].accept}</button><button type="button" data-analytics-decline>{copy[locale].decline}</button></div>
+</aside>
+<script is:inline>
+  (()=>{
+    const panel=document.querySelector('[data-analytics-consent]');
+    if(!(panel instanceof HTMLElement)) return;
+    const measurementId=panel.dataset.measurementId;
+    const load=()=>{
+      if(!measurementId||document.querySelector(`script[data-google-analytics]`)) return;
+      window.dataLayer=window.dataLayer||[];
+      window.gtag=function(){window.dataLayer.push(arguments)};
+      window.gtag('js',new Date());
+      window.gtag('config',measurementId,{anonymize_ip:true});
+      const script=document.createElement('script');
+      script.async=true;
+      script.src=`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`;
+      script.dataset.googleAnalytics='true';
+      document.head.appendChild(script);
+    };
+    const choice=localStorage.getItem('wta-analytics-consent');
+    if(choice==='granted') load();
+    else if(choice!=='denied') panel.hidden=false;
+    panel.querySelector('[data-analytics-accept]')?.addEventListener('click',()=>{localStorage.setItem('wta-analytics-consent','granted');panel.hidden=true;load()});
+    panel.querySelector('[data-analytics-decline]')?.addEventListener('click',()=>{localStorage.setItem('wta-analytics-consent','denied');panel.hidden=true});
+  })();
+</script>
+<style>
+  .analytics-consent{position:fixed;z-index:1000;right:1rem;bottom:1rem;width:min(30rem,calc(100vw - 2rem));padding:1rem 1.1rem;background:var(--paper);color:var(--ink);border:1px solid rgba(15,33,28,.28);box-shadow:0 16px 48px rgba(0,0,0,.24)}
+  .analytics-consent[hidden]{display:none}.analytics-consent p{margin:0 0 .85rem;font-size:.82rem;line-height:1.5}.analytics-consent div{display:flex;align-items:center;gap:.9rem}.analytics-consent button{font:500 .62rem var(--mono);letter-spacing:.06em;text-transform:uppercase}.analytics-consent button:not(.btn){border:0;border-bottom:1px solid currentColor;background:transparent;color:var(--ink);padding:.45rem 0;cursor:pointer}
+</style>

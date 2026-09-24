@@ -1,0 +1,36 @@
+---
+import {Image} from 'astro:assets';
+import china from '../assets/homepage-china.jpg';
+import type {Locale} from '../i18n';
+const {locale} = Astro.props as {locale:Locale};
+const alt = {
+ en:'A traditional boat and waterside pavilion at sunset in China',
+ da:'En traditionel båd og en pavillon ved vandet i solnedgangen i Kina',
+ sv:'En traditionell båt och en paviljong vid vattnet i solnedgången i Kina',
+ no:'En tradisjonell båt og en paviljong ved vannet i solnedgangen i Kina',
+ es:'Una barca tradicional y un pabellón junto al agua al atardecer en China',
+ fr:'Un bateau traditionnel et un pavillon au bord de l’eau au coucher du soleil en Chine',
+ it:'Una barca tradizionale e un padiglione in riva all’acqua al tramonto in Cina',
+ nl:'Een traditionele boot en een paviljoen aan het water bij zonsondergang in China',
+ hu:'Hagyományos csónak és vízparti pavilon naplementekor Kínában',
+}[locale];
+---
+<div class="nature-hero">
+ <Image class="hero-image" src={china} widths={[480,800,1200,1600,2400]} sizes="100vw" format="webp" quality={87} {alt} loading="eager" fetchpriority="high" />
+ <div class="hero-shade" aria-hidden="true"></div>
+ <div class="hero-copy-slot"><slot /></div>
+</div>
+<style>
+ .nature-hero{position:relative;isolation:isolate;min-height:clamp(540px,64vw,700px);display:flex;align-items:flex-end;overflow:hidden;background:#10271f}
+ .hero-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:58% 50%;z-index:-2}
+ .hero-shade{position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(5,22,17,.84) 0%,rgba(5,22,17,.62) 32%,rgba(5,22,17,.13) 66%,rgba(5,22,17,.08) 100%),linear-gradient(0deg,rgba(5,22,17,.42),transparent 48%)}
+ .hero-copy-slot{width:100%;padding:clamp(52px,7vw,92px) 0}
+ .hero-copy-slot :global(.shell){width:var(--page);margin:auto}
+ @media(max-width:800px){
+  .nature-hero{min-height:620px}
+  .hero-image{object-position:56% 50%}
+  .hero-shade{background:linear-gradient(0deg,rgba(5,22,17,.9) 0%,rgba(5,22,17,.64) 45%,rgba(5,22,17,.08) 78%),linear-gradient(90deg,rgba(5,22,17,.18),transparent 70%)}
+  .hero-copy-slot{padding:48px 0}
+ }
+ @media(max-width:560px){.nature-hero{min-height:560px}.hero-image{object-position:57% 50%}.hero-copy-slot{padding:34px 0}}
+</style>
