@@ -88,8 +88,10 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
         {role:'system',content:systemPrompt},
         {role:'user',content:JSON.stringify(userPayload)},
     ];
-    const runModel=async(modelMessages:Array<{role:string;content:string}>)=>{
-      const result=await env.AI!.run('@cf/openai/gpt-oss-120b',{messages:modelMessages,max_tokens:5000,temperature:0.25});
+    const runModel=async(modelMessages:Array<{role:string;content:string}>,structuredRepair=false)=>{
+      const result=structuredRepair
+        ? await env.AI!.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast',{messages:modelMessages,response_format:{type:'json_schema',json_schema:tripSuggestionJsonSchema},max_tokens:3600,temperature:0.2})
+        : await env.AI!.run('@cf/openai/gpt-oss-120b',{messages:modelMessages,max_tokens:5000,temperature:0.25});
       const container=result&&typeof result==='object'?result as Record<string,unknown>:{};
       const choices=Array.isArray(container.choices)?container.choices:[];
       const firstChoice=choices[0]&&typeof choices[0]==='object'?choices[0] as Record<string,unknown>:{};
@@ -105,7 +107,7 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
     let parsed=await runModel(messages);
     let qualityIssues=assessTripSuggestionQuality(parsed,profile);
     if(qualityIssues.length){
-      parsed=await runModel([...messages,{role:'assistant',content:JSON.stringify(parsed)},{role:'user',content:`Rewrite the complete itinerary. Fix every quality failure below while preserving the traveller's brief:\n- ${qualityIssues.join('\n- ')}\nReturn only the full JSON structure.`}]);
+      parsed=await runModel([...messages,{role:'assistant',content:JSON.stringify(parsed)},{role:'user',content:`Rewrite the complete itinerary. Preserve its destinations, route logic and useful detail, changing only what is needed to fix every quality failure below:\n- ${qualityIssues.join('\n- ')}\nReturn only the full JSON structure.`}],true);
       qualityIssues=assessTripSuggestionQuality(parsed,profile);
     }
     if(qualityIssues.length)throw new Error(`Model response failed quality control: ${qualityIssues.join(' ')}`);
