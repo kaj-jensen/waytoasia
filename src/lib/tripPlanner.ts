@@ -13,6 +13,8 @@ export type TripPlannerBudget = typeof tripPlannerBudgets[number];
 export interface TripPlannerRequest {
   locale: string;
   destinations: TripPlannerDestination[];
+  /** Free-form destinations or regions. This deliberately allows Asia beyond the website catalogue. */
+  destinationIdeas: string;
   travelMonth: string;
   durationDays: number;
   adults: number;
@@ -73,6 +75,7 @@ export function parseTripPlannerRequest(value: unknown): TripPlannerRequest | nu
   const input = value as Record<string,unknown>;
   const locale = typeof input.locale === 'string' && localePattern.test(input.locale) ? input.locale : 'en';
   const destinations = uniqueAllowed(input.destinations,tripPlannerDestinations,3);
+  const destinationIdeas = typeof input.destinationIdeas === 'string' ? input.destinationIdeas.trim().slice(0,180) : '';
   const interests = uniqueAllowed(input.interests,tripPlannerInterests,5);
   const travelMonth = typeof input.travelMonth === 'string' && monthPattern.test(input.travelMonth) ? input.travelMonth : 'flexible';
   const durationDays = integerBetween(input.durationDays,5,35,12);
@@ -81,8 +84,8 @@ export function parseTripPlannerRequest(value: unknown): TripPlannerRequest | nu
   const budget = tripPlannerBudgets.includes(input.budget as TripPlannerBudget) ? input.budget as TripPlannerBudget : 'unsure';
   const pace = tripPlannerPaces.includes(input.pace as TripPlannerPace) ? input.pace as TripPlannerPace : 'balanced';
   const notes = typeof input.notes === 'string' ? input.notes.trim().slice(0,1000) : '';
-  if (!interests.length) return null;
-  return {locale,destinations,travelMonth,durationDays,adults,children,budget,interests,pace,notes};
+  if (!interests.length && !destinationIdeas && !notes) return null;
+  return {locale,destinations,destinationIdeas,travelMonth,durationDays,adults,children,budget,interests,pace,notes};
 }
 
 export function tripCatalogForAgent() {
@@ -103,15 +106,15 @@ export function tripCatalogForAgent() {
 
 const text = (value: unknown, max = 500): string => typeof value === 'string' ? value.trim().slice(0,max) : '';
 const textArray = (value: unknown, limit: number, max = 240): string[] => Array.isArray(value) ? value.map(item=>text(item,max)).filter(Boolean).slice(0,limit) : [];
+const asRoute=(value:unknown):SuggestedRouteStop[]=>Array.isArray(value)?value.map(item=>{
+  const stop=item&&typeof item==='object'?item as Record<string,unknown>:{};
+  return {days:text(stop.days,40),place:text(stop.place,100),focus:text(stop.focus,260)};
+}).filter(stop=>stop.days&&stop.place&&stop.focus).slice(0,8):[];
 
 export function normalizeTripSuggestion(value: unknown, locale: string, now = new Date()): TripSuggestion | null {
   if (!value || typeof value !== 'object') return null;
   const draft = value as Record<string,unknown>;
-  const rawRoute = Array.isArray(draft.route) ? draft.route : [];
-  const route = rawRoute.map(item=>{
-    const stop = item && typeof item === 'object' ? item as Record<string,unknown> : {};
-    return {days:text(stop.days,40),place:text(stop.place,100),focus:text(stop.focus,260)};
-  }).filter(stop=>stop.days && stop.place && stop.focus).slice(0,8);
+  const route=asRoute(draft.route);
   const requestedSlugs = textArray(draft.matchedJourneySlugs,4,100);
   const matchedJourneys = requestedSlugs.flatMap(slug=>{
     const tour = tours.find(item=>item.slug===slug);
@@ -132,6 +135,33 @@ export function normalizeTripSuggestion(value: unknown, locale: string, now = ne
     matchedJourneys,
   };
   return suggestion.title && suggestion.summary && suggestion.recommendedDuration && suggestion.route.length >= 2 && suggestion.fitReasons.length >= 2 ? suggestion : null;
+}
+
+export interface TripPlannerRefinement {
+  instruction:string;
+  currentSuggestion:TripSuggestionDraft;
+}
+
+/** Keep only the plan fields the model needs; never echo client-owned links, prices or supplier data. */
+export function parseTripPlannerRefinement(value:unknown):TripPlannerRefinement|null{
+  if(!value||typeof value!=='object')return null;
+  const input=value as Record<string,unknown>;
+  const instruction=text(input.refinement,700);
+  const raw=input.currentSuggestion;
+  if(!instruction||!raw||typeof raw!=='object')return null;
+  const plan=raw as Record<string,unknown>;
+  const route=asRoute(plan.route);
+  const currentSuggestion:TripSuggestionDraft={
+    title:text(plan.title,160),
+    summary:text(plan.summary,900),
+    recommendedDuration:text(plan.recommendedDuration,80),
+    route,
+    fitReasons:textArray(plan.fitReasons,5),
+    practicalNotes:textArray(plan.practicalNotes,5),
+    matchedJourneySlugs:[],
+    closing:text(plan.closing,500),
+  };
+  return currentSuggestion.title&&currentSuggestion.summary&&route.length>=2?{instruction,currentSuggestion}:null;
 }
 
 export const tripSuggestionJsonSchema = {
