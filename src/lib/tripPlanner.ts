@@ -28,6 +28,8 @@ export interface TripPlannerRequest {
 export interface SuggestedRouteStop {
   days: string;
   place: string;
+  plan: string;
+  /** Compatibility alias for the current UI while route prose is generated as plan. */
   focus: string;
   highlights: string[];
   onwardTravel: string;
@@ -115,8 +117,9 @@ const text = (value: unknown, max = 500): string => typeof value === 'string' ? 
 const textArray = (value: unknown, limit: number, max = 240): string[] => Array.isArray(value) ? value.map(item=>text(item,max)).filter(Boolean).slice(0,limit) : [];
 const asRoute=(value:unknown):SuggestedRouteStop[]=>Array.isArray(value)?value.map(item=>{
   const stop=item&&typeof item==='object'?item as Record<string,unknown>:{};
-  return {days:text(stop.days,40),place:text(stop.place,120),focus:text(stop.focus,500),highlights:textArray(stop.highlights,4,180),onwardTravel:text(stop.onwardTravel,300)};
-}).filter(stop=>stop.days&&stop.place&&stop.focus&&stop.highlights.length>=2).slice(0,8):[];
+  const plan=text(stop.plan,700)||text(stop.focus,700);
+  return {days:text(stop.days,40),place:text(stop.place,120),plan,focus:plan,highlights:textArray(stop.highlights,4,180),onwardTravel:text(stop.onwardTravel,300)};
+}).filter(stop=>stop.days&&stop.place&&stop.plan&&stop.highlights.length>=2).slice(0,8):[];
 
 const durationCopy:Record<string,(days:number)=>string>={
   en:days=>`${days} days / ${Math.max(1,days-1)} nights`,
@@ -150,7 +153,7 @@ export function assessTripSuggestionQuality(value:unknown,profile:TripPlannerReq
   const issues:string[]=[];
   if(route.length<(profile.durationDays>=14?5:profile.durationDays>=10?3:2))issues.push('Use enough itinerary chapters for the trip length.');
   if(!routeCoversDuration(route,profile.durationDays))issues.push(`Cover Days 1–${profile.durationDays} exactly once with no gaps or overlaps.`);
-  if(route.some(stop=>stop.focus.length<55||stop.focus.toLowerCase()===stop.place.toLowerCase()))issues.push('Every chapter needs a concrete 1–2 sentence plan, not a repeated place name or fragment.');
+  if(route.some(stop=>stop.plan.length<55||stop.plan.toLowerCase()===stop.place.toLowerCase()))issues.push('Every chapter plan must be a concrete 1–2 sentence narrative about the base, rhythm and purpose, not a label or fragment.');
   if(route.slice(0,-1).some(stop=>!stop.onwardTravel)||route.at(-1)?.onwardTravel)issues.push('Give every non-final chapter a real onward journey and leave the final onwardTravel empty.');
   const practical=textArray(draft.practicalNotes,5,300);
   const boilerplate=/check (the )?(weather|visa)|research (any )?vaccinations|ensure (that )?(all )?(necessary )?documents|book(ing)? accommodations? in advance|cost-effective (train|rail) pass/i;
@@ -235,7 +238,7 @@ export const tripSuggestionJsonSchema = {
     title:{type:'string'},
     summary:{type:'string'},
     recommendedDuration:{type:'string'},
-    route:{type:'array',minItems:2,maxItems:8,items:{type:'object',additionalProperties:false,properties:{days:{type:'string'},place:{type:'string'},focus:{type:'string'},highlights:{type:'array',minItems:2,maxItems:4,items:{type:'string'}},onwardTravel:{type:'string'}},required:['days','place','focus','highlights','onwardTravel']}},
+    route:{type:'array',minItems:2,maxItems:8,items:{type:'object',additionalProperties:false,properties:{days:{type:'string',description:'Exact consecutive day range, for example Days 1–3.'},place:{type:'string',description:'Country and named overnight base or sensible paired places.'},plan:{type:'string',minLength:55,description:'A full 1–2 sentence narrative explaining the base, daily rhythm and why this chapter works. Never repeat only the place name.'},highlights:{type:'array',minItems:2,maxItems:4,items:{type:'string',description:'A named place, neighbourhood, landscape or specific experience.'}},onwardTravel:{type:'string',description:'The real transport leg to the next chapter; empty only for the final chapter.'}},required:['days','place','plan','highlights','onwardTravel']}},
     fitReasons:{type:'array',minItems:2,maxItems:5,items:{type:'string'}},
     practicalNotes:{type:'array',minItems:3,maxItems:5,items:{type:'string'}},
     travellerInsights:{type:'array',maxItems:4,items:{type:'object',additionalProperties:false,properties:{insight:{type:'string'},sourceIds:{type:'array',minItems:1,maxItems:3,items:{type:'string'}}},required:['insight','sourceIds']}},
