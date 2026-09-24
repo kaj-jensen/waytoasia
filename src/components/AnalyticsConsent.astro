@@ -26,7 +26,7 @@ const copy:Record<Locale,{text:string;accept:string;decline:string}>={
     const load=()=>{
       if(!measurementId||document.querySelector(`script[data-google-analytics]`)) return;
       window.dataLayer=window.dataLayer||[];
-      window.gtag=function(){window.dataLayer.push(arguments)};
+      window.gtag=(...args)=>{window.dataLayer.push(args)};
       window.gtag('js',new Date());
       window.gtag('config',measurementId,{anonymize_ip:true});
       const script=document.createElement('script');
