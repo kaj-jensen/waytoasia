@@ -150,7 +150,7 @@ export function assessTripSuggestionQuality(value:unknown,profile:TripPlannerReq
   const issues:string[]=[];
   if(route.length<(profile.durationDays>=14?5:profile.durationDays>=10?3:2))issues.push('Use enough itinerary chapters for the trip length.');
   if(!routeCoversDuration(route,profile.durationDays))issues.push(`Cover Days 1–${profile.durationDays} exactly once with no gaps or overlaps.`);
-  if(route.some(stop=>stop.focus.length<90||stop.focus.toLowerCase()===stop.place.toLowerCase()))issues.push('Every chapter needs a concrete 1–2 sentence plan of at least 90 characters, not a repeated place name.');
+  if(route.some(stop=>stop.focus.length<55||stop.focus.toLowerCase()===stop.place.toLowerCase()))issues.push('Every chapter needs a concrete 1–2 sentence plan, not a repeated place name or fragment.');
   if(route.slice(0,-1).some(stop=>!stop.onwardTravel)||route.at(-1)?.onwardTravel)issues.push('Give every non-final chapter a real onward journey and leave the final onwardTravel empty.');
   const practical=textArray(draft.practicalNotes,5,300);
   const boilerplate=/check (the )?(weather|visa)|research (any )?vaccinations|ensure (that )?(all )?(necessary )?documents|book(ing)? accommodations? in advance|cost-effective (train|rail) pass/i;
