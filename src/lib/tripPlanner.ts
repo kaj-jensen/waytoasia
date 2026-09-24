@@ -42,7 +42,7 @@ export interface TripSuggestionDraft {
   route: SuggestedRouteStop[];
   fitReasons: string[];
   practicalNotes: string[];
-  travellerInsights: Array<{insight:string;sourceIds:string[]}>;
+  travellerInsights: Array<{insight:string;sourceUrls:string[]}>;
   matchedJourneySlugs: string[];
   closing: string;
 }
@@ -208,13 +208,12 @@ export function assessTripSuggestionQuality(value:unknown,profile:TripPlannerReq
   if(practical.length<3||practical.some(note=>boilerplate.test(note)))issues.push('Replace generic booking, visa, vaccine, weather or pass advice with route-specific transport, season and pace trade-offs.');
   if(practical.some(note=>/\bpass\b/i.test(note)&&!/compare|calculate|current point-to-point|individual fares/i.test(note)))issues.push('Never tell the traveller to buy a rail pass without a current fare comparison; advise comparing it with individual tickets instead.');
   if(researchSources.length){
-    const validIds=new Set(researchSources.map(source=>source.id));
     const supportedInsights=(Array.isArray(draft.travellerInsights)?draft.travellerInsights:[]).filter(item=>{
       if(!item||typeof item!=='object')return false;
       const insight=item as Record<string,unknown>;
-      return text(insight.insight,360).length>=40&&textArray(insight.sourceIds,3,20).some(id=>validIds.has(id));
+      return text(insight.insight,360).length>=40&&textArray(insight.sourceUrls,3,1000).some(url=>researchSources.some(source=>source.url===url));
     });
-    if(supportedInsights.length<2)issues.push('Use at least two specific traveller insights supported by the supplied research source IDs.');
+    if(supportedInsights.length<2)issues.push('Use at least two specific traveller insights supported by the verified research source URLs.');
   }
   if(!text(draft.closing,500).endsWith('?'))issues.push('End with one short, specific follow-up question.');
   return issues;
@@ -234,9 +233,9 @@ export function normalizeTripSuggestion(value: unknown, locale: string, now = ne
     if(!item||typeof item!=='object')return [];
     const entry=item as Record<string,unknown>;
     const insight=text(entry.insight,360);
-    const sourceIds=textArray(entry.sourceIds,3,20);
-    const sources=sourceIds.flatMap(id=>{
-      const source=researchSources.find(candidate=>candidate.id===id);
+    const sourceUrls=textArray(entry.sourceUrls,3,1000);
+    const sources=sourceUrls.flatMap(url=>{
+      const source=researchSources.find(candidate=>candidate.url===url);
       return source?[{title:source.title,url:source.url,domain:source.domain}]:[];
     });
     return insight&&sources.length?[{insight,sources}]:[];
@@ -299,7 +298,7 @@ export const tripSuggestionJsonSchema = {
     route:{type:'array',minItems:2,maxItems:8,items:{type:'object',additionalProperties:false,properties:{days:{type:'string',description:'Exact consecutive day range, for example Days 1–3.'},place:{type:'string',description:'Country and named overnight base or sensible paired places.'},plan:{type:'string',minLength:55,description:'A full 1–2 sentence narrative explaining the base, daily rhythm and why this chapter works. Never repeat only the place name.'},highlights:{type:'array',minItems:2,maxItems:4,items:{type:'string',description:'A named place, neighbourhood, landscape or specific experience.'}},onwardTravel:{type:'string',description:'The real transport leg to the next chapter; empty only for the final chapter.'}},required:['days','place','plan','highlights','onwardTravel']}},
     fitReasons:{type:'array',minItems:2,maxItems:5,items:{type:'string'}},
     practicalNotes:{type:'array',minItems:3,maxItems:5,items:{type:'string'}},
-    travellerInsights:{type:'array',maxItems:4,items:{type:'object',additionalProperties:false,properties:{insight:{type:'string'},sourceIds:{type:'array',minItems:1,maxItems:3,items:{type:'string'}}},required:['insight','sourceIds']}},
+    travellerInsights:{type:'array',maxItems:4,items:{type:'object',additionalProperties:false,properties:{insight:{type:'string'},sourceUrls:{type:'array',minItems:1,maxItems:3,items:{type:'string',description:'An exact URL returned by web research.'}}},required:['insight','sourceUrls']}},
     matchedJourneySlugs:{type:'array',maxItems:4,items:{type:'string'}},
     closing:{type:'string'},
   },
