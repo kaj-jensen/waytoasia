@@ -44,11 +44,13 @@ Rules:
 - Ground named Way to Asia journeys only in the supplied catalogue. matchedJourneySlugs may contain only exact catalogue slugs.
 - Do not force a catalogue match. Return an empty matchedJourneySlugs array when no real catalogue journey fits.
 - Create a coherent route with realistic geographic flow and enough nights in each base. Never describe a country as if it were a single stop: name the actual cities, regions and overnight bases.
+- Order the route to minimize backtracking. For multi-country journeys, make the international connection at the logical border between country sections, not midway through a chapter.
 - Cover every requested day exactly once with consecutive, non-overlapping ranges such as "Days 1–3", "Days 4–7". The last range must end on durationDays.
 - For trips of 10 days or more, normally use 4–6 itinerary chapters. A chapter may combine a base and a sensible day trip, as in "Japan: Tokyo & Nikko".
 - Write a direct overview in summary: state the total duration, the country split when relevant, the trip's character, and the full route using arrows. Do not begin with vague marketing language.
-- Each route chapter must contain: a precise day range; a useful country-and-place heading; a plan field containing a full 1–2 sentence narrative explaining the base, rhythm and why those days work; 2–4 named experiences; and onwardTravel describing the real next leg. The plan field is prose, never a heading, city name, theme label or fragment. Use an empty onwardTravel only for the final chapter.
+- Each route chapter must contain: a precise day range; a useful country-and-place heading; a plan field containing a full 1–2 sentence narrative explaining the base, rhythm and why those days work; 2–4 named experiences; and onwardTravel describing the real next leg. The plan field is prose, never a heading, city name, theme label or fragment. If a heading combines places, the plan and highlights must cover every named place. Use an empty onwardTravel only for the final chapter.
 - Keep transport geographically honest. Distinguish international flights from domestic flights. Never imply that rail or overland travel can replace a necessary sea crossing. Give approximate journey times only when reasonably confident and never invent exact schedules.
+- Give one recommended onward route, not a list of ambiguous alternatives. Do not call an ordinary or connecting rail journey a bullet-train trip. Omit a journey time if unsure.
 - practicalNotes must be 3–5 route-specific notes. Prioritize transport/pass trade-offs, the international connection, best seasons for the named places, and an honest pace note that says what to cut if the route is brisk.
 - Do not use generic filler such as "check the weather", "check visa requirements", "research vaccinations", or "ensure documents are in order" unless the traveller's stated circumstances make it specifically relevant.
 - Do not invent hotels, suppliers, live availability, booking status, discounts, exact transport schedules or confirmed prices.
@@ -85,7 +87,7 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
         {role:'user',content:JSON.stringify(userPayload)},
       ];
     const runModel=async(modelMessages:Array<{role:string;content:string}>)=>{
-      const result=await env.AI!.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast',{messages:modelMessages,response_format:{type:'json_schema',json_schema:tripSuggestionJsonSchema},max_tokens:3200,temperature:0.3});
+      const result=await env.AI!.run('@cf/openai/gpt-oss-120b',{messages:modelMessages,response_format:{type:'json_schema',json_schema:tripSuggestionJsonSchema},max_tokens:3600,temperature:0.25});
       const container=result&&typeof result==='object'?result as Record<string,unknown>:{};
       const response=container.response;
       return typeof response==='string'?JSON.parse(response):response;
