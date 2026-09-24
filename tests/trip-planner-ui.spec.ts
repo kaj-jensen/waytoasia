@@ -27,3 +27,26 @@ test('trip planner remains usable at a mobile width',async({page})=>{
   await expect(page.locator('.menu')).not.toHaveAccessibleName('');
   await expect(page.getByRole('button',{name:/Skab mit rejseforslag/})).toBeVisible();
 });
+
+test('agent plans beyond the catalogue and revises the complete journey',async({page})=>{
+  const independent={...suggestion,title:'Japan and Taiwan beyond the catalogue',summary:'A tailor-made route that is not limited to published Way to Asia journeys.',route:[{days:'Days 1–6',place:'Japan',focus:'Tokyo neighbourhoods, Kanazawa craft and mountain landscapes.'},{days:'Days 7–12',place:'Taiwan',focus:'Taipei food culture and the quieter east coast.'}],matchedJourneys:[]};
+  const revised={...independent,title:'Japan and Taiwan with fewer cities',route:[{days:'Days 1–5',place:'Japanese Alps',focus:'Village walks, craft and two unhurried bases.'},{days:'Days 6–12',place:'Eastern Taiwan',focus:'Rail travel, coast and national-park landscapes.'}]};
+  let receivedDestination='';
+  let receivedRefinement='';
+  await page.route('**/api/trip-suggestion',async route=>{
+    const body=route.request().postDataJSON() as {destinationIdeas?:string;refinement?:string};
+    receivedDestination=body.destinationIdeas??receivedDestination;
+    receivedRefinement=body.refinement??receivedRefinement;
+    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({suggestion:body.refinement?revised:independent,requestId:'agent-test'})});
+  });
+  await page.goto('/en/trip-planner');
+  await page.getByLabel('Destinations or regions — anywhere in Asia').fill('Japan and Taiwan');
+  await page.getByRole('button',{name:/Create my trip idea/}).click();
+  await expect(page.getByRole('heading',{name:independent.title})).toBeVisible();
+  await expect(page.getByText('Tailor-made beyond the catalogue')).toBeVisible();
+  await page.getByPlaceholder(/Replace the final city/).fill('Use fewer cities and add more nature.');
+  await page.getByRole('button',{name:/Revise my journey/}).click();
+  await expect(page.getByRole('heading',{name:revised.title})).toBeVisible();
+  expect(receivedDestination).toBe('Japan and Taiwan');
+  expect(receivedRefinement).toBe('Use fewer cities and add more nature.');
+});
