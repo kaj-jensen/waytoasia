@@ -762,7 +762,7 @@ export const tours:Tour[]=[
       "NOK": 54400,
       "HUF": 1830000
     },
-    "image": "https://images.unsplash.com/photo-1691358370468-bde3dfd3ef62?auto=format&fit=crop&w=1400&q=82",
+    "image": "/images/tours/china-rivers-river-woman-2400.jpg",
     "teaser": "Karst rivers, village kitchens and the sculpted hillsides of Longji.",
     "departures": [
       "Apr–Jun",
