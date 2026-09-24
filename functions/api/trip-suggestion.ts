@@ -81,16 +81,21 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
   const requestId = crypto.randomUUID();
   try {
     const travellerResearch=await researchTravellerConsensus(profile,env.TAVILY_API_KEY);
-    const userPayload=refinement?{task:'revise_itinerary',travellerProfile:profile,currentItinerary:refinement.currentSuggestion,travellerRefinement:refinement.instruction,travellerResearch,wayToAsiaCatalogue:tripCatalogForAgent()}:{task:'create_itinerary',travellerProfile:profile,travellerResearch,wayToAsiaCatalogue:tripCatalogForAgent()};
+    const userPayload=refinement?{task:'revise_itinerary',travellerProfile:profile,currentItinerary:refinement.currentSuggestion,travellerRefinement:refinement.instruction,travellerResearch,wayToAsiaCatalogue:tripCatalogForAgent(),outputSchema:tripSuggestionJsonSchema}:{task:'create_itinerary',travellerProfile:profile,travellerResearch,wayToAsiaCatalogue:tripCatalogForAgent(),outputSchema:tripSuggestionJsonSchema};
     const messages=[
         {role:'system',content:systemPrompt},
         {role:'user',content:JSON.stringify(userPayload)},
-      ];
+    ];
     const runModel=async(modelMessages:Array<{role:string;content:string}>)=>{
-      const result=await env.AI!.run('@cf/openai/gpt-oss-120b',{messages:modelMessages,response_format:{type:'json_schema',json_schema:tripSuggestionJsonSchema},max_tokens:3600,temperature:0.25});
+      const result=await env.AI!.run('@cf/openai/gpt-oss-120b',{messages:modelMessages,max_tokens:5000,temperature:0.25});
       const container=result&&typeof result==='object'?result as Record<string,unknown>:{};
       const response=container.response;
-      return typeof response==='string'?JSON.parse(response):response;
+      if(typeof response!=='string')return response;
+      const cleaned=response.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');
+      const firstBrace=cleaned.indexOf('{');
+      const lastBrace=cleaned.lastIndexOf('}');
+      if(firstBrace<0||lastBrace<=firstBrace)throw new Error('Model response did not contain a JSON itinerary.');
+      return JSON.parse(cleaned.slice(firstBrace,lastBrace+1));
     };
     let parsed=await runModel(messages);
     let qualityIssues=assessTripSuggestionQuality(parsed,profile);
