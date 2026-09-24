@@ -89,7 +89,10 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
     const runModel=async(modelMessages:Array<{role:string;content:string}>)=>{
       const result=await env.AI!.run('@cf/openai/gpt-oss-120b',{messages:modelMessages,max_tokens:5000,temperature:0.25});
       const container=result&&typeof result==='object'?result as Record<string,unknown>:{};
-      const response=container.response;
+      const choices=Array.isArray(container.choices)?container.choices:[];
+      const firstChoice=choices[0]&&typeof choices[0]==='object'?choices[0] as Record<string,unknown>:{};
+      const message=firstChoice.message&&typeof firstChoice.message==='object'?firstChoice.message as Record<string,unknown>:{};
+      const response=typeof result==='string'?result:container.response??container.output_text??message.content;
       if(typeof response!=='string')return response;
       const cleaned=response.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');
       const firstBrace=cleaned.indexOf('{');
