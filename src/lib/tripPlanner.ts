@@ -155,9 +155,12 @@ export function assessTripSuggestionQuality(value:unknown,profile:TripPlannerReq
   if(!routeCoversDuration(route,profile.durationDays))issues.push(`Cover Days 1–${profile.durationDays} exactly once with no gaps or overlaps.`);
   if(route.some(stop=>stop.plan.length<55||stop.plan.toLowerCase()===stop.place.toLowerCase()))issues.push('Every chapter plan must be a concrete 1–2 sentence narrative about the base, rhythm and purpose, not a label or fragment.');
   if(route.slice(0,-1).some(stop=>!stop.onwardTravel)||route.at(-1)?.onwardTravel)issues.push('Give every non-final chapter a real onward journey and leave the final onwardTravel empty.');
+  const unsupportedTravelTime=/\b(?:about|around|approximately|approx\.?|≈|~)?\s*\d+(?:[.,]\d+)?\s*(?:h|hr|hrs|hour|hours|minute|minutes|min)\b/i;
+  if(route.some(stop=>unsupportedTravelTime.test(stop.onwardTravel)))issues.push('Remove unverified journey times; describe the recommended transport and connection without a duration.');
   const practical=textArray(draft.practicalNotes,5,300);
   const boilerplate=/check (the )?(weather|visa)|research (any )?vaccinations|ensure (that )?(all )?(necessary )?documents|book(ing)? accommodations? in advance|cost-effective (train|rail) pass/i;
   if(practical.length<3||practical.some(note=>boilerplate.test(note)))issues.push('Replace generic booking, visa, vaccine, weather or pass advice with route-specific transport, season and pace trade-offs.');
+  if(practical.some(note=>/\bpass\b/i.test(note)&&!/compare|calculate|current point-to-point|individual fares/i.test(note)))issues.push('Never tell the traveller to buy a rail pass without a current fare comparison; advise comparing it with individual tickets instead.');
   if(!text(draft.closing,500).endsWith('?'))issues.push('End with one short, specific follow-up question.');
   return issues;
 }

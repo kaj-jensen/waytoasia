@@ -43,9 +43,11 @@ test('rejects an itinerary with gaps in the requested day ranges',()=>{
 test('flags thin chapters and generic practical filler for automatic rewriting',()=>{
   const profile=parseTripPlannerRequest({destinationIdeas:'Japan and South Korea',durationDays:12,interests:['food','history']});
   assert.ok(profile);
-  const issues=assessTripSuggestionQuality({route:[{days:'Days 1–6',place:'Japan',focus:'Japan',highlights:['Tokyo','Kyoto'],onwardTravel:'Fly to Korea.'},{days:'Days 7–12',place:'Korea',focus:'Korea',highlights:['Seoul','Busan'],onwardTravel:''}],practicalNotes:['Book accommodation in advance.','Check the weather.','Ensure all documents are in order.'],closing:'A first idea.'},profile);
+  const issues=assessTripSuggestionQuality({route:[{days:'Days 1–6',place:'Japan',focus:'Japan',highlights:['Tokyo','Kyoto'],onwardTravel:'Fly to Korea in approximately 2 hours.'},{days:'Days 7–12',place:'Korea',focus:'Korea',highlights:['Seoul','Busan'],onwardTravel:''}],practicalNotes:['Buy a JR Pass for the Japan leg.','Check the weather.','Ensure all documents are in order.'],closing:'A first idea.'},profile);
   assert.ok(issues.some(issue=>issue.includes('concrete')));
   assert.ok(issues.some(issue=>issue.includes('generic')));
+  assert.ok(issues.some(issue=>issue.includes('journey times')));
+  assert.ok(issues.some(issue=>issue.includes('rail pass')));
   assert.ok(issues.some(issue=>issue.includes('question')));
 });
 
