@@ -47,6 +47,8 @@ test('agent plans beyond the catalogue and revises the complete journey',async({
   await page.getByPlaceholder(/Replace the final city/).fill('Use fewer cities and add more nature.');
   await page.getByRole('button',{name:/Revise my journey/}).click();
   await expect(page.getByRole('heading',{name:revised.title})).toBeVisible();
+  await expect(page.getByPlaceholder(/Replace the final city/)).toHaveValue('');
+  await expect(page.getByRole('alert')).toHaveCount(0);
   expect(receivedDestination).toBe('Japan and Taiwan');
   expect(receivedRefinement).toBe('Use fewer cities and add more nature.');
 });
