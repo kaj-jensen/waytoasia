@@ -84,6 +84,16 @@ test('returns a validated suggestion from the Workers AI binding',async()=>{
   assert.equal(body.suggestion.matchedJourneys[0].slug,'seoul-and-ancient-kingdoms');
 });
 
+test('returns a clear retryable response when the daily Workers AI allowance is exhausted',async()=>{
+  const request=new Request('https://waytoasia.com/api/trip-suggestion',{method:'POST',headers:{'Content-Type':'application/json','Origin':'https://waytoasia.com'},body:JSON.stringify({locale:'en',destinationIdeas:'Japan',durationDays:7,interests:['food']})});
+  const response=await onRequestPost({request,env:{AI:{run:async()=>{throw new Error('4006: you have used up your daily free allocation of 10,000 neurons')}}}});
+  assert.equal(response.status,429);
+  assert.ok(Number(response.headers.get('Retry-After'))>=60);
+  const body=await response.json() as {code:string;error:string};
+  assert.equal(body.code,'AI_DAILY_LIMIT');
+  assert.match(body.error,/daily allowance/);
+});
+
 test('sends the existing itinerary and latest request when refining',async()=>{
   let modelInput='';
   const current={title:'Japan and Taiwan',summary:'A 14-day route linking Japanese food and design with Taiwan’s markets and landscapes, moving Tokyo → Kanazawa → Kyoto, then flying to Taipei → Hualien.',recommendedDuration:'14 days',route:[{days:'Days 1–3',place:'Japan: Tokyo',focus:'Use one Tokyo base for neighbourhood food, contemporary design and an early market morning without changing hotels.',highlights:['Tokyo markets','Yanaka lanes'],onwardTravel:'Travel by train to Kanazawa.'},{days:'Days 4–5',place:'Japan: Kanazawa',focus:'Spend two focused days on garden design, preserved districts and the city’s distinctive craft traditions.',highlights:['Kenrokuen','Nagamachi craft'],onwardTravel:'Continue by rail to Kyoto.'},{days:'Days 6–8',place:'Japan: Kyoto',focus:'Give Kyoto three days for temple districts, food culture and one quieter excursion beyond the busiest sights.',highlights:['Higashiyama walk','Uji tea country'],onwardTravel:'International flight from Osaka to Taipei.'},{days:'Days 9–11',place:'Taiwan: Taipei',focus:'Use Taipei as a food-led base for historic streets, night markets and a rail day trip outside the capital.',highlights:['Dihua Street','Night-market tasting'],onwardTravel:'Take the east-coast train to Hualien.'},{days:'Days 12–14',place:'Taiwan: Hualien',focus:'Finish with coastal and mountain landscapes, building in flexibility for local access and weather conditions.',highlights:['East-coast scenery','Mountain walking'],onwardTravel:''}],fitReasons:['Fits the brief.','Uses two countries.'],practicalNotes:['Compare Japanese point-to-point rail tickets before buying a pass.','Use the Osaka–Taipei flight for the country change.','Autumn particularly suits the city walks and east-coast landscapes.'],travellerInsights:[],closing:'Would you like to slow it down?'};

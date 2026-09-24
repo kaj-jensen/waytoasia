@@ -7,6 +7,10 @@ interface Env { AI?: WorkersAiBinding;TAVILY_API_KEY?:string }
 interface PagesContext {request:Request;env:Env}
 
 const json = (body: unknown, status = 200, extraHeaders: Record<string,string> = {}) => Response.json(body,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...extraHeaders}});
+const secondsUntilUtcReset=()=>{
+  const now=new Date();
+  return Math.max(60,Math.ceil((Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()+1)-now.getTime())/1000));
+};
 
 const researchDomains=['reddit.com','tripadvisor.com','fodors.com','lonelyplanet.com','travel.stackexchange.com'];
 const researchTravellerConsensus=async(profile:TripPlannerRequest,apiKey?:string):Promise<TravellerResearchSource[]>=>{
@@ -116,7 +120,11 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
     if (!suggestion) throw new Error('Model response did not match the trip suggestion contract.');
     return json({suggestion,requestId});
   } catch (error) {
-    console.error('Trip suggestion failed',{requestId,error:error instanceof Error ? error.message : 'Unknown error'});
+    const message=error instanceof Error ? error.message : 'Unknown error';
+    console.error('Trip suggestion failed',{requestId,error:message});
+    if(/(?:4006|3036)|daily free allocation|10,?000 neurons/i.test(message)){
+      return json({error:'The AI service has reached its daily allowance. Please try again after the daily reset.',code:'AI_DAILY_LIMIT',requestId},429,{'Retry-After':String(secondsUntilUtcReset())});
+    }
     return json({error:'We could not prepare a suggestion just now. Please try again.',requestId},502);
   }
 };
