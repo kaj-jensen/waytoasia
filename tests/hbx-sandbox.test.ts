@@ -54,7 +54,7 @@ test('activity search uses the activity key and keeps short-lived rate keys rech
     return Response.json({activities:[{code:'ACT-1',name:'Bangkok food walk',type:'EXCURSION',modalities:[{name:'Evening tour',currency:'EUR',rates:[{rateKey:'activity-rate',amountFrom:38,cancellationPolicies:[]}]}]}]});
   }});
   const result=await adapter.search({vertical:'activity',requestId:'req-activity',locale:'en',currency:'EUR',travellerCountry:'DK',party:{adults:2,childAges:[10]},destination:{name:'Bangkok',supplierCode:'BKK'},from:'2027-02-12',to:'2027-02-13',interests:['food']},new AbortController().signal);
-  assert.equal(captured?.url,'https://api.test.hotelbeds.com/activity-api/3.0/activities');
+  assert.equal(captured?.url,'https://api.test.hotelbeds.com/activity-api/3.0/activities/availability');
   assert.equal(captured?.headers.get('api-key'),'activity-key');
   assert.equal(result.offers[0]?.productId,'ACT-1');
   assert.equal(result.offers[0]?.total.amountMinor,3800);
