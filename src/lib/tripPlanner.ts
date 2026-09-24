@@ -29,6 +29,8 @@ export interface SuggestedRouteStop {
   days: string;
   place: string;
   focus: string;
+  highlights: string[];
+  onwardTravel: string;
 }
 
 export interface TripSuggestionDraft {
@@ -38,15 +40,18 @@ export interface TripSuggestionDraft {
   route: SuggestedRouteStop[];
   fitReasons: string[];
   practicalNotes: string[];
+  travellerInsights: Array<{insight:string;sourceIds:string[]}>;
   matchedJourneySlugs: string[];
   closing: string;
 }
 
-export interface TripSuggestion extends Omit<TripSuggestionDraft,'matchedJourneySlugs'> {
+export interface TripSuggestion extends Omit<TripSuggestionDraft,'matchedJourneySlugs'|'travellerInsights'> {
   id: string;
   generatedAt: string;
   availability: 'not-connected';
   pricing: 'illustrative-only';
+  travellerResearch: 'live-sources'|'not-connected';
+  travellerInsights: Array<{insight:string;sources:Array<{title:string;url:string;domain:string}>}>;
   matchedJourneys: Array<{
     slug: string;
     name: string;
@@ -56,6 +61,8 @@ export interface TripSuggestion extends Omit<TripSuggestionDraft,'matchedJourney
     prices: Record<string,number>;
   }>;
 }
+
+export interface TravellerResearchSource {id:string;title:string;url:string;domain:string;excerpt:string}
 
 const localePattern = /^(en|es|it|fr|nl|hu|sv|da|no)$/;
 const monthPattern = /^(flexible|\d{4}-(0[1-9]|1[0-2]))$/;
@@ -108,10 +115,35 @@ const text = (value: unknown, max = 500): string => typeof value === 'string' ? 
 const textArray = (value: unknown, limit: number, max = 240): string[] => Array.isArray(value) ? value.map(item=>text(item,max)).filter(Boolean).slice(0,limit) : [];
 const asRoute=(value:unknown):SuggestedRouteStop[]=>Array.isArray(value)?value.map(item=>{
   const stop=item&&typeof item==='object'?item as Record<string,unknown>:{};
-  return {days:text(stop.days,40),place:text(stop.place,100),focus:text(stop.focus,260)};
-}).filter(stop=>stop.days&&stop.place&&stop.focus).slice(0,8):[];
+  return {days:text(stop.days,40),place:text(stop.place,120),focus:text(stop.focus,500),highlights:textArray(stop.highlights,4,180),onwardTravel:text(stop.onwardTravel,300)};
+}).filter(stop=>stop.days&&stop.place&&stop.focus&&stop.highlights.length>=2).slice(0,8):[];
 
-export function normalizeTripSuggestion(value: unknown, locale: string, now = new Date()): TripSuggestion | null {
+const durationCopy:Record<string,(days:number)=>string>={
+  en:days=>`${days} days / ${Math.max(1,days-1)} nights`,
+  da:days=>`${days} dage / ${Math.max(1,days-1)} nætter`,
+  es:days=>`${days} días / ${Math.max(1,days-1)} noches`,
+  it:days=>`${days} giorni / ${Math.max(1,days-1)} notti`,
+  fr:days=>`${days} jours / ${Math.max(1,days-1)} nuits`,
+  nl:days=>`${days} dagen / ${Math.max(1,days-1)} nachten`,
+  hu:days=>`${days} nap / ${Math.max(1,days-1)} éjszaka`,
+  sv:days=>`${days} dagar / ${Math.max(1,days-1)} nätter`,
+  no:days=>`${days} dager / ${Math.max(1,days-1)} netter`,
+};
+
+const routeCoversDuration=(route:SuggestedRouteStop[],durationDays:number):boolean=>{
+  let expectedStart=1;
+  for(const stop of route){
+    const numbers=stop.days.match(/\d+/g)?.map(Number)??[];
+    if(!numbers.length)return false;
+    const start=numbers[0];
+    const end=numbers[1]??start;
+    if(start!==expectedStart||end<start)return false;
+    expectedStart=end+1;
+  }
+  return expectedStart===durationDays+1;
+};
+
+export function normalizeTripSuggestion(value: unknown, locale: string, now = new Date(), requestedDurationDays?:number, researchSources:TravellerResearchSource[]=[]): TripSuggestion | null {
   if (!value || typeof value !== 'object') return null;
   const draft = value as Record<string,unknown>;
   const route=asRoute(draft.route);
@@ -120,21 +152,36 @@ export function normalizeTripSuggestion(value: unknown, locale: string, now = ne
     const tour = tours.find(item=>item.slug===slug);
     return tour ? [{slug:tour.slug,name:tour.name,country:tour.country,duration:tour.duration,href:`/${locale}/${tour.country}/tours/${tour.slug}`,prices:tour.prices}] : [];
   });
+  const rawInsights=Array.isArray(draft.travellerInsights)?draft.travellerInsights:[];
+  const travellerInsights=rawInsights.flatMap(item=>{
+    if(!item||typeof item!=='object')return [];
+    const entry=item as Record<string,unknown>;
+    const insight=text(entry.insight,360);
+    const sourceIds=textArray(entry.sourceIds,3,20);
+    const sources=sourceIds.flatMap(id=>{
+      const source=researchSources.find(candidate=>candidate.id===id);
+      return source?[{title:source.title,url:source.url,domain:source.domain}]:[];
+    });
+    return insight&&sources.length?[{insight,sources}]:[];
+  }).slice(0,4);
   const suggestion = {
     id:crypto.randomUUID(),
     generatedAt:now.toISOString(),
     title:text(draft.title,160),
     summary:text(draft.summary,900),
-    recommendedDuration:text(draft.recommendedDuration,80),
+    recommendedDuration:requestedDurationDays?(durationCopy[locale]??durationCopy.en)(requestedDurationDays):text(draft.recommendedDuration,80),
     route,
     fitReasons:textArray(draft.fitReasons,5),
     practicalNotes:textArray(draft.practicalNotes,5),
     closing:text(draft.closing,500),
     availability:'not-connected' as const,
     pricing:'illustrative-only' as const,
+    travellerResearch:researchSources.length?'live-sources' as const:'not-connected' as const,
+    travellerInsights,
     matchedJourneys,
   };
-  return suggestion.title && suggestion.summary && suggestion.recommendedDuration && suggestion.route.length >= 2 && suggestion.fitReasons.length >= 2 ? suggestion : null;
+  const coversDuration=!requestedDurationDays||routeCoversDuration(route,requestedDurationDays);
+  return suggestion.title && suggestion.summary.length>=120 && suggestion.recommendedDuration && suggestion.route.length >= 2 && suggestion.fitReasons.length >= 2 && suggestion.practicalNotes.length>=3 && coversDuration ? suggestion : null;
 }
 
 export interface TripPlannerRefinement {
@@ -158,6 +205,7 @@ export function parseTripPlannerRefinement(value:unknown):TripPlannerRefinement|
     route,
     fitReasons:textArray(plan.fitReasons,5),
     practicalNotes:textArray(plan.practicalNotes,5),
+    travellerInsights:[],
     matchedJourneySlugs:[],
     closing:text(plan.closing,500),
   };
@@ -171,11 +219,12 @@ export const tripSuggestionJsonSchema = {
     title:{type:'string'},
     summary:{type:'string'},
     recommendedDuration:{type:'string'},
-    route:{type:'array',minItems:2,maxItems:8,items:{type:'object',additionalProperties:false,properties:{days:{type:'string'},place:{type:'string'},focus:{type:'string'}},required:['days','place','focus']}},
+    route:{type:'array',minItems:2,maxItems:8,items:{type:'object',additionalProperties:false,properties:{days:{type:'string'},place:{type:'string'},focus:{type:'string'},highlights:{type:'array',minItems:2,maxItems:4,items:{type:'string'}},onwardTravel:{type:'string'}},required:['days','place','focus','highlights','onwardTravel']}},
     fitReasons:{type:'array',minItems:2,maxItems:5,items:{type:'string'}},
-    practicalNotes:{type:'array',minItems:2,maxItems:5,items:{type:'string'}},
+    practicalNotes:{type:'array',minItems:3,maxItems:5,items:{type:'string'}},
+    travellerInsights:{type:'array',maxItems:4,items:{type:'object',additionalProperties:false,properties:{insight:{type:'string'},sourceIds:{type:'array',minItems:1,maxItems:3,items:{type:'string'}}},required:['insight','sourceIds']}},
     matchedJourneySlugs:{type:'array',maxItems:4,items:{type:'string'}},
     closing:{type:'string'},
   },
-  required:['title','summary','recommendedDuration','route','fitReasons','practicalNotes','matchedJourneySlugs','closing'],
+  required:['title','summary','recommendedDuration','route','fitReasons','practicalNotes','travellerInsights','matchedJourneySlugs','closing'],
 } as const;
