@@ -1,0 +1,8 @@
+# Local Cloudflare Pages development only. Copy to .dev.vars and fill locally.
+# Never commit real HBX keys or secrets.
+HBX_HOTEL_API_KEY=
+HBX_HOTEL_SECRET=
+HBX_ACTIVITY_API_KEY=
+HBX_ACTIVITY_SECRET=
+HBX_TRANSFER_API_KEY=
+HBX_TRANSFER_SECRET=

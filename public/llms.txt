@@ -1,0 +1,19 @@
+# Way to Asia
+
+Way to Asia creates private and small-group journeys across China, South Korea, Thailand, Vietnam and Indonesia.
+
+## Main sections
+
+- [Destinations](https://waytoasia.com/en/#destinations): Browse countries and regional travel ideas.
+- [Journeys](https://waytoasia.com/en/tours/): Browse sample itineraries and travel styles.
+- [Inspiration](https://waytoasia.com/en/inspiration/): Read practical destination guidance.
+- [Our Team](https://waytoasia.com/en/about/): Learn about the people behind Way to Asia.
+- [Start planning](https://waytoasia.com/en/contact/): Request a tailored proposal.
+
+## Languages
+
+English, Spanish, Italian, French, Dutch, Hungarian, Swedish, Danish and Norwegian versions are available under their respective language prefixes.
+
+## Usage
+
+Public pages may be indexed for discovery. Respect robots.txt, copyright, and personal-data protections. Way to Asia is a brand name and must not be translated.

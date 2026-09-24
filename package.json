@@ -5,17 +5,21 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "build": "npm run check:translations && astro check && astro build && node scripts/localize-built-html.mjs && node scripts/check-rendered-translations.mjs",
+    "build": "npm run check:translations && astro check && astro build && node scripts/localize-built-html.mjs && node scripts/check-rendered-translations.mjs && node scripts/harden-csp.mjs",
     "preview": "astro preview",
     "lint": "eslint .",
     "typecheck": "astro check",
     "test": "npm run build && playwright test",
     "test:smoke": "playwright test",
+    "test:trip-planner": "node --import tsx --test tests/trip-planner.test.ts",
+    "test:suppliers": "node --import tsx --test tests/supplier-contracts.test.ts",
+    "test:hbx": "node --import tsx --test tests/hbx-sandbox.test.ts",
     "cf:deploy": "wrangler pages deploy dist --project-name waytoasia",
     "check:translations": "node scripts/check-translations.mjs"
   },
   "dependencies": {
     "@astrojs/react": "latest",
+    "@astrojs/sitemap": "^3.7.4",
     "@fontsource-variable/fraunces": "^5.3.0",
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource/ibm-plex-mono": "^5.3.0",
@@ -47,6 +51,7 @@
     "parse5": "^7.3.0",
     "typescript": "latest",
     "typescript-eslint": "latest",
+    "tsx": "^4.20.6",
     "wrangler": "latest"
   }
 }

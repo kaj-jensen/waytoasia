@@ -2,13 +2,13 @@ import {test,expect} from '@playwright/test';
 import {readFileSync} from 'node:fs';
 import {tours} from '../src/content/data';
 import {tourPresentation} from '../src/lib/tourPresentation';
-const csp=readFileSync('public/_headers','utf8').split('\n').find(line=>line.includes('Content-Security-Policy:'))!.split('Content-Security-Policy:')[1].trim();
+const csp=readFileSync('public/_headers','utf8').split('\n').find(line=>line.includes('Content-Security-Policy:'))!.split('Content-Security-Policy:')[1].trim().replace('__INLINE_SCRIPT_HASHES__',"'nonce-test'");
 for(const tour of tours)test(`real map under production CSP: ${tour.slug}`,async({page})=>{
  test.setTimeout(90000);
  const violations:string[]=[];const tiles:string[]=[];
  page.on('console',msg=>{if(/Content Security Policy|violates.*directive/i.test(msg.text()))violations.push(msg.text());});
  page.on('response',r=>{if(r.ok()&&/tiles.openfreemap.org.*(?:pbf|planet)/.test(r.url()))tiles.push(r.url());});
- await page.route('**/en/**',async route=>{const response=await route.fetch();await route.fulfill({response,headers:{...response.headers(),'content-security-policy':csp}});});
+ await page.route('**/en/**',async route=>{const response=await route.fetch();const responseHeaders=response.headers();const headers={...responseHeaders,'content-security-policy':csp};if(!responseHeaders['content-type']?.includes('text/html')){await route.fulfill({response,headers});return}const body=(await response.text()).replace(/<script\b/g,'<script nonce="test"');await route.fulfill({response,headers,body});});
  await page.goto(`/en/${tour.country}/tours/${tour.slug}/#itinerary`);
  await expect(page.locator('.map-card')).toHaveAttribute('data-ready','true',{timeout:45000});
  await expect(page.locator('.map-fallback')).toBeHidden();

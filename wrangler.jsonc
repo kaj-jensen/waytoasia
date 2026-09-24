@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "waytoasia",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2026-09-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "ai": { "binding": "AI" },
+  "vars": {
+    "HBX_API_BASE_URL": "https://api.test.hotelbeds.com"
+  }
+}

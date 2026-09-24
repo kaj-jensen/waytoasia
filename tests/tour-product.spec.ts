@@ -38,7 +38,7 @@ test('Swedish map and gallery controls remain Swedish after interaction',async({
 
 test('tour photographs are exclusive to each tour and match its lead image',()=>{
  const owners=new Map<string,string>();
- for(const tour of tours){const images=tourPhotos[tour.slug];expect(images).toHaveLength(6);expect(tour.image).toBe(images[0].src);for(const image of images){const asset=new URL(image.src).pathname;expect(owners.has(asset),`${asset} shared with ${owners.get(asset)}`).toBe(false);owners.set(asset,tour.slug);expect(image.source).toMatch(/^https:\/\/unsplash.com\//);}}
+ for(const tour of tours){const images=tourPhotos[tour.slug];expect(images).toHaveLength(6);expect(tour.image).toBe(images[0].src);for(const image of images){const asset=new URL(image.src,'https://waytoasia.com').pathname;expect(owners.has(asset),`${asset} shared with ${owners.get(asset)}`).toBe(false);owners.set(asset,tour.slug);expect(image.source).toMatch(/^(?:https:\/\/unsplash.com\/|User-supplied photograph:)/);}}
  expect(owners.size).toBe(120);
 });
 
