@@ -16,6 +16,9 @@ test('trip planner creates a clearly unbooked itinerary suggestion',async({page}
   await expect(page.getByRole('link',{name:/Northern Table, Southern Sea/})).toHaveAttribute('href','/en/thailand/tours/northern-table-southern-sea');
   await expect(page.getByRole('heading',{name:'What travellers consistently mention'})).toBeVisible();
   await expect(page.getByRole('link',{name:/Thailand route discussion/})).toHaveAttribute('href','https://www.reddit.com/r/ThailandTourism/example');
+  await page.setViewportSize({width:390,height:844});
+  const resultWidths=await page.locator('[data-trip-result]').evaluate(element=>({client:element.clientWidth,scroll:element.scrollWidth}));
+  expect(resultWidths.scroll).toBeLessThanOrEqual(resultWidths.client);
   await expect(page.getByRole('heading',{name:'Send this plan to a travel consultant'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Check the HBX sandbox'})).toHaveCount(0);
   await page.getByLabel('Your name').fill('Test Traveller');
