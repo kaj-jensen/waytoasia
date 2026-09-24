@@ -1,4 +1,4 @@
-import {normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest,tripCatalogForAgent,tripSuggestionJsonSchema,type TravellerResearchSource,type TripPlannerRequest} from '../../src/lib/tripPlanner';
+import {assessTripSuggestionQuality,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest,tripCatalogForAgent,tripSuggestionJsonSchema,type TravellerResearchSource,type TripPlannerRequest} from '../../src/lib/tripPlanner';
 
 interface WorkersAiBinding {
   run(model: string, input: Record<string,unknown>): Promise<unknown>;
@@ -79,18 +79,24 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
   const requestId = crypto.randomUUID();
   try {
     const travellerResearch=await researchTravellerConsensus(profile,env.TAVILY_API_KEY);
-    const result = await env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast',{
-      messages:[
+    const userPayload=refinement?{task:'revise_itinerary',travellerProfile:profile,currentItinerary:refinement.currentSuggestion,travellerRefinement:refinement.instruction,travellerResearch,wayToAsiaCatalogue:tripCatalogForAgent()}:{task:'create_itinerary',travellerProfile:profile,travellerResearch,wayToAsiaCatalogue:tripCatalogForAgent()};
+    const messages=[
         {role:'system',content:systemPrompt},
-        {role:'user',content:JSON.stringify(refinement?{task:'revise_itinerary',travellerProfile:profile,currentItinerary:refinement.currentSuggestion,travellerRefinement:refinement.instruction,travellerResearch,wayToAsiaCatalogue:tripCatalogForAgent()}:{task:'create_itinerary',travellerProfile:profile,travellerResearch,wayToAsiaCatalogue:tripCatalogForAgent()})},
-      ],
-      response_format:{type:'json_schema',json_schema:tripSuggestionJsonSchema},
-      max_tokens:3200,
-      temperature:0.35,
-    });
-    const container = result && typeof result === 'object' ? result as Record<string,unknown> : {};
-    const response = container.response;
-    const parsed = typeof response === 'string' ? JSON.parse(response) : response;
+        {role:'user',content:JSON.stringify(userPayload)},
+      ];
+    const runModel=async(modelMessages:Array<{role:string;content:string}>)=>{
+      const result=await env.AI!.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast',{messages:modelMessages,response_format:{type:'json_schema',json_schema:tripSuggestionJsonSchema},max_tokens:3200,temperature:0.3});
+      const container=result&&typeof result==='object'?result as Record<string,unknown>:{};
+      const response=container.response;
+      return typeof response==='string'?JSON.parse(response):response;
+    };
+    let parsed=await runModel(messages);
+    let qualityIssues=assessTripSuggestionQuality(parsed,profile);
+    if(qualityIssues.length){
+      parsed=await runModel([...messages,{role:'assistant',content:JSON.stringify(parsed)},{role:'user',content:`Rewrite the complete itinerary. Fix every quality failure below while preserving the traveller's brief:\n- ${qualityIssues.join('\n- ')}\nReturn only the full JSON structure.`}]);
+      qualityIssues=assessTripSuggestionQuality(parsed,profile);
+    }
+    if(qualityIssues.length)throw new Error(`Model response failed quality control: ${qualityIssues.join(' ')}`);
     const suggestion = normalizeTripSuggestion(parsed,profile.locale,new Date(),profile.durationDays,travellerResearch);
     if (!suggestion) throw new Error('Model response did not match the trip suggestion contract.');
     return json({suggestion,requestId});

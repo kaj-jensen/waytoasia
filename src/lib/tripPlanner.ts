@@ -143,6 +143,22 @@ const routeCoversDuration=(route:SuggestedRouteStop[],durationDays:number):boole
   return expectedStart===durationDays+1;
 };
 
+export function assessTripSuggestionQuality(value:unknown,profile:TripPlannerRequest):string[]{
+  if(!value||typeof value!=='object')return ['The response is not an itinerary object.'];
+  const draft=value as Record<string,unknown>;
+  const route=asRoute(draft.route);
+  const issues:string[]=[];
+  if(route.length<(profile.durationDays>=14?5:profile.durationDays>=10?3:2))issues.push('Use enough itinerary chapters for the trip length.');
+  if(!routeCoversDuration(route,profile.durationDays))issues.push(`Cover Days 1–${profile.durationDays} exactly once with no gaps or overlaps.`);
+  if(route.some(stop=>stop.focus.length<90||stop.focus.toLowerCase()===stop.place.toLowerCase()))issues.push('Every chapter needs a concrete 1–2 sentence plan of at least 90 characters, not a repeated place name.');
+  if(route.slice(0,-1).some(stop=>!stop.onwardTravel)||route.at(-1)?.onwardTravel)issues.push('Give every non-final chapter a real onward journey and leave the final onwardTravel empty.');
+  const practical=textArray(draft.practicalNotes,5,300);
+  const boilerplate=/check (the )?(weather|visa)|research (any )?vaccinations|ensure (that )?(all )?(necessary )?documents|book(ing)? accommodations? in advance|cost-effective (train|rail) pass/i;
+  if(practical.length<3||practical.some(note=>boilerplate.test(note)))issues.push('Replace generic booking, visa, vaccine, weather or pass advice with route-specific transport, season and pace trade-offs.');
+  if(!text(draft.closing,500).endsWith('?'))issues.push('End with one short, specific follow-up question.');
+  return issues;
+}
+
 export function normalizeTripSuggestion(value: unknown, locale: string, now = new Date(), requestedDurationDays?:number, researchSources:TravellerResearchSource[]=[]): TripSuggestion | null {
   if (!value || typeof value !== 'object') return null;
   const draft = value as Record<string,unknown>;
