@@ -14,6 +14,7 @@
     "test:trip-planner": "node --import tsx --test tests/trip-planner.test.ts",
     "test:suppliers": "node --import tsx --test tests/supplier-contracts.test.ts",
     "test:hbx": "node --import tsx --test tests/hbx-sandbox.test.ts",
+    "test:availability": "node --import tsx --test tests/supplier-availability.test.ts",
     "cf:deploy": "wrangler pages deploy dist --project-name waytoasia",
     "check:translations": "node scripts/check-translations.mjs"
   },

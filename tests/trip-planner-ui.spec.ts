@@ -4,6 +4,7 @@ const suggestion={id:'test-suggestion',generatedAt:'2026-09-24T00:00:00.000Z',ti
 
 test('trip planner creates a clearly unbooked itinerary suggestion',async({page})=>{
   await page.route('**/api/trip-suggestion',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({suggestion,requestId:'test-request'})}));
+  await page.route('**/api/supplier-availability',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({provider:'HBX / Hotelbeds',environment:'evaluation-sandbox',bookable:false,gateway:{id:'bangkok',name:'Bangkok'},checkedAt:'2026-09-24T00:00:00.000Z',sections:[{vertical:'accommodation',status:'available',offers:[{title:'Bangkok Test Hotel',summary:'River room · Breakfast',total:{amountMinor:50000,currency:'EUR'},cancellation:[],attributes:{},recheckRequired:true}]},{vertical:'activity',status:'none',offers:[],message:'No sandbox results were returned.'},{vertical:'transfer',status:'skipped',offers:[],message:'Transfer search needs an HBX hotel result from the same check.'}]})}));
   await page.goto('/en/trip-planner');
   await expect(page.getByRole('heading',{name:'Begin with what matters to you.'})).toBeVisible();
   await page.getByLabel('Thailand').check();
@@ -12,6 +13,10 @@ test('trip planner creates a clearly unbooked itinerary suggestion',async({page}
   await expect(page.getByRole('heading',{name:suggestion.title})).toBeVisible();
   await expect(page.getByText('Ideas only · No live availability or confirmed prices yet')).toBeVisible();
   await expect(page.getByRole('link',{name:/Northern Table, Southern Sea/})).toHaveAttribute('href','/en/thailand/tours/northern-table-southern-sea');
+  await expect(page.getByRole('heading',{name:'Check the HBX sandbox'})).toBeVisible();
+  await page.getByRole('button',{name:'Check sandbox availability'}).click();
+  await expect(page.getByText('Bangkok Test Hotel')).toBeVisible();
+  await expect(page.getByText('Evaluation data only · Prices require recheck · No booking or payment')).toBeVisible();
 });
 
 test('trip planner remains usable at a mobile width',async({page})=>{

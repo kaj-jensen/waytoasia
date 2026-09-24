@@ -126,9 +126,10 @@ function activityOffers(raw:unknown,query:ActivitySearch):SupplierOffer[]{
         if(!rateKey)continue;
         const amount=rate.amountFrom??rate.amount??modality.amountFrom;
         const currency=rate.currency??modality.currency??root.currency;
+        const content=asObject(activity.content);
         offers.push({
-          provider:PROVIDER,vertical:'activity',offerId:rateKey,productId:asString(activity.code),
-          title:asString(activity.name,'HBX activity'),summary:asString(modality.name,'Available activity option'),
+          provider:PROVIDER,vertical:'activity',offerId:rateKey,productId:asString(activity.code,asString(activity.activityCode)),
+          title:asString(activity.name,asString(content.name,'HBX activity')),summary:asString(modality.name,'Available activity option'),
           total:money(amount,currency,query.currency),bookingMode:'agency',
           cancellation:cancellationTerms(rate.cancellationPolicies,asString(currency,query.currency)),retrievedAt:retrievedAt(),
           expiresAt:new Date(Date.now()+30*60*1000).toISOString(),recheckRequired:true,
@@ -183,7 +184,7 @@ export function createHbxSandboxAdapter(options:HbxAdapterOptions):SupplierSearc
   const now=options.now??(()=>Date.now());
 
   const request=async(vertical:SupplierSearch['vertical'],path:string,init:RequestInit):Promise<unknown>=>{
-    const allowed=vertical==='accommodation'?/^\/hotel-api\/1\.0\/(?:hotels|checkrates)$/:vertical==='activity'?/^\/activity-api\/3\.0\/activities(?:\/details)?$/:/^\/transfer-api\/1\.0\/availability\//;
+    const allowed=vertical==='accommodation'?/^\/hotel-api\/1\.0\/(?:hotels|checkrates)$/:vertical==='activity'?/^\/activity-api\/3\.0\/activities(?:\/availability|\/details)?$/:/^\/transfer-api\/1\.0\/availability\//;
     if(!allowed.test(path))throw new HbxSandboxError('Blocked non-search HBX endpoint.');
     const method=(init.method??'GET').toUpperCase();
     if(!['GET','POST'].includes(method))throw new HbxSandboxError('Blocked non-read-only HBX operation.');
@@ -210,7 +211,7 @@ export function createHbxSandboxAdapter(options:HbxAdapterOptions):SupplierSearc
         offers=hotelOffers(raw,query);
       }else if(query.vertical==='activity'){
         if(!query.destination.supplierCode?.trim())throw new HbxSandboxError('HBX activity searches require a destination supplier code.');
-        raw=await request('activity','/activity-api/3.0/activities',{method:'POST',signal,body:JSON.stringify({filters:[{searchFilterItems:[{type:'destination',value:query.destination.supplierCode}]}],from:query.from,to:query.to,language:language(query.locale),paxes:[...Array.from({length:query.party.adults},()=>({age:30})),...query.party.childAges.map(age=>({age}))],pagination:{itemsPerPage:25,page:1},order:'DEFAULT'})});
+        raw=await request('activity','/activity-api/3.0/activities/availability',{method:'POST',signal,body:JSON.stringify({filters:[{searchFilterItems:[{type:'destination',value:query.destination.supplierCode}]}],from:query.from,to:query.to,language:language(query.locale),paxes:[...Array.from({length:query.party.adults},()=>({age:30})),...query.party.childAges.map(age=>({age}))],pagination:{itemsPerPage:25,page:1},order:'DEFAULT'})});
         offers=activityOffers(raw,query);
       }else{
         const from=hbxLocation(query.pickup);const to=hbxLocation(query.dropoff);
