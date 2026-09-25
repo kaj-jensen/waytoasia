@@ -47,7 +47,7 @@ export const onRequestPost=async({request,env}:PagesContext):Promise<Response>=>
     return json({error:'We could not save the proposal just now. Please try again.'},502);
   }
 
-  const proposalUrl=publicProposalUrl(request.url,publicToken),manageUrl=manageProposalUrl(request.url,manageToken);
+  const proposalUrl=publicProposalUrl(request.url,publicToken,env.PROPOSAL_ORIGIN),manageUrl=manageProposalUrl(request.url,manageToken,env.PROPOSAL_ORIGIN);
   const customer=customerEmail(row,proposalUrl),consultant=consultantEmail(row,proposalUrl,manageUrl,phone,message);
   const [customerSent,consultantSent]=await Promise.all([
     sendResend(env.RESEND_API_KEY,{to:[email],subject:customer.subject,text:customer.text,html:customer.html}),
