@@ -1,10 +1,19 @@
 {
-  "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "waytoasia",
-  "pages_build_output_dir": "./dist",
-  "compatibility_date": "2026-09-24",
-  "compatibility_flags": ["nodejs_compat"],
-  "vars": {
-    "HBX_API_BASE_URL": "https://api.test.hotelbeds.com"
-  }
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "waytoasia",
+	"pages_build_output_dir": "./dist",
+	"compatibility_date": "2026-09-24",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"vars": {
+		"HBX_API_BASE_URL": "https://api.test.hotelbeds.com"
+	},
+	"d1_databases": [
+		{
+			"binding": "PROPOSALS_DB",
+			"database_name": "waytoasia-proposals",
+			"database_id": "0cc36aa2-dbdd-4f8d-ae3b-35e5c757c18c"
+		}
+	]
 }
