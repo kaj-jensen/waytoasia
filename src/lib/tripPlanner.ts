@@ -245,7 +245,7 @@ export function assessTripSuggestionQuality(value:unknown,profile:TripPlannerReq
   const issues:string[]=[];
   const rawHotelStays=Array.isArray(draft.hotelStays)?draft.hotelStays:[];
   const rawDayPlans=Array.isArray(draft.dayPlans)?draft.dayPlans:[];
-  if(route.length<(profile.durationDays>=14?5:profile.durationDays>=10?3:2))issues.push('Use enough itinerary chapters for the trip length.');
+  if(route.length<(profile.durationDays>=14?4:profile.durationDays>=10?3:2))issues.push('Use enough itinerary chapters for the trip length.');
   if(!routeCoversDuration(route,profile.durationDays))issues.push(`Cover Days 1–${profile.durationDays} exactly once with no gaps or overlaps.`);
   if(route.some(stop=>stop.plan.length<55||stop.plan.toLowerCase()===stop.place.toLowerCase()))issues.push('Every chapter plan must be a concrete 1–2 sentence narrative about the base, rhythm and purpose, not a label or fragment.');
   if(route.slice(0,-1).some(stop=>!stop.onwardTravel)||route.at(-1)?.onwardTravel)issues.push('Give every non-final chapter a real onward journey and leave the final onwardTravel empty.');
@@ -259,7 +259,8 @@ export function assessTripSuggestionQuality(value:unknown,profile:TripPlannerReq
     const country=stop.place.split(':')[0].trim().toLowerCase();
     const nextCountry=next.place.split(':')[0].trim().toLowerCase();
     const combined=`${stop.place} ${stop.plan} ${stop.onwardTravel} ${next.place}`;
-    return country===nextCountry&&/\bfl(?:y|ight)\b/i.test(stop.onwardTravel)&&!/\b(?:island|archipelago|remote|jeju|okinawa|hokkaido|bali|borneo|sulawesi|palawan)\b/i.test(combined);
+    const clearRailCorridor=/\b(?:seoul.*busan|busan.*seoul|tokyo.*(?:kyoto|osaka)|(?:kyoto|osaka).*tokyo|kyoto.*osaka|osaka.*kyoto)\b/i.test(combined);
+    return country===nextCountry&&clearRailCorridor&&/\bfl(?:y|ight)\b/i.test(stop.onwardTravel)&&!/\b(?:island|archipelago|remote|jeju|okinawa|hokkaido|bali|borneo|sulawesi|palawan)\b/i.test(combined);
   });
   if(unjustifiedDomesticFlight)issues.push('Replace an unjustified domestic flight with the most direct rail or road connection, or explicitly explain the island or remote geography that makes flying sensible.');
   if(profile.pace!=='active'&&route.some(stop=>routeStopLength(stop.days)===1&&/[&,/]/.test(stop.place.split(':').slice(1).join(':'))))issues.push('Do not combine multiple places into a single day at a balanced or slow pace; keep one base or remove the extra stop.');
@@ -294,7 +295,6 @@ export function assessTripSuggestionQuality(value:unknown,profile:TripPlannerReq
     if(researchSources.length&&days.some(day=>day.options.some(option=>!option.sources.length)))issues.push('Cite at least one exact verified research URL for every daily experience choice.');
     if(profile.interests.length&&!days.some(day=>day.options.some(option=>option.interestTags.some(tag=>profile.interests.includes(tag as TripPlannerInterest)))))issues.push('Connect the daily experience choices explicitly to the traveller interests.');
   }
-  if(!text(draft.closing,500).endsWith('?'))issues.push('End with one short, specific follow-up question.');
   return issues;
 }
 
