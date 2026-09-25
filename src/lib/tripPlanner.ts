@@ -166,14 +166,24 @@ const sourcesForUrls=(value:unknown,researchSources:TravellerResearchSource[]):R
   return source?[{title:source.title,url:source.url,domain:source.domain}]:[];
 });
 
-const asHotelStays=(value:unknown,researchSources:TravellerResearchSource[]):SuggestedHotelStay[]=>Array.isArray(value)?value.map(item=>{
-  const stay=item&&typeof item==='object'?item as Record<string,unknown>:{},rawOptions=Array.isArray(stay.options)?stay.options:[];
-  const options=rawOptions.map(raw=>{
-    const option=raw&&typeof raw==='object'?raw as Record<string,unknown>:{};
-    return {id:text(option.id,80),name:text(option.name,180),area:text(option.area,180),standard:text(option.standard,80),whyFit:text(option.whyFit,500),roomGuidance:text(option.roomGuidance,360),reviewSignal:text(option.reviewSignal,360),sources:sourcesForUrls(option.sourceUrls,researchSources)};
-  }).filter(option=>option.id&&option.name&&option.whyFit&&option.roomGuidance).slice(0,3);
-  return {place:text(stay.place,160),nights:integerBetween(stay.nights,1,34,1),options};
-}).filter(stay=>stay.place&&stay.options.length>=2).slice(0,10):[];
+const asHotelStays=(value:unknown,researchSources:TravellerResearchSource[]):SuggestedHotelStay[]=>{
+  if(!Array.isArray(value))return [];
+  const seen=new Set<string>();
+  return value.map(item=>{
+    const stay=item&&typeof item==='object'?item as Record<string,unknown>:{},rawOptions=Array.isArray(stay.options)?stay.options:[];
+    const options=rawOptions.map(raw=>{
+      const option=raw&&typeof raw==='object'?raw as Record<string,unknown>:{};
+      return {id:text(option.id,80),name:text(option.name,180),area:text(option.area,180),standard:text(option.standard,80),whyFit:text(option.whyFit,500),roomGuidance:text(option.roomGuidance,360),reviewSignal:text(option.reviewSignal,360),sources:sourcesForUrls(option.sourceUrls,researchSources)};
+    }).filter(option=>option.id&&option.name&&option.whyFit&&option.roomGuidance).slice(0,3);
+    return {place:text(stay.place,160),nights:integerBetween(stay.nights,1,34,1),options};
+  }).filter(stay=>{
+    if(!stay.place||stay.options.length<2)return false;
+    const key=stay.place.toLocaleLowerCase();
+    if(seen.has(key))return false;
+    seen.add(key);
+    return true;
+  }).slice(0,10);
+};
 
 const asDayPlans=(value:unknown,researchSources:TravellerResearchSource[]):SuggestedDayPlan[]=>Array.isArray(value)?value.map(item=>{
   const day=item&&typeof item==='object'?item as Record<string,unknown>:{},rawOptions=Array.isArray(day.options)?day.options:[];

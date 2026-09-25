@@ -10,6 +10,47 @@ type OpenAiOutput={type?:unknown;content?:unknown;action?:unknown};
 type OpenAiResponse={status?:unknown;output?:OpenAiOutput[];error?:{message?:unknown};incomplete_details?:unknown};
 type TavilyResponse={results?:Array<{title?:unknown;url?:unknown;content?:unknown}>};
 
+const citationKey=(value:string):string=>{
+  try{
+    const url=new URL(value);
+    const hostname=url.hostname.toLowerCase().replace(/^www\./,'');
+    const pathname=(url.pathname.replace(/\/+$/,'')||'/').toLowerCase();
+    return `${hostname}${pathname}`;
+  }catch{return ''}
+};
+
+const citationTerms=(value:string):Set<string>=>new Set(value.toLowerCase().match(/[\p{L}\p{N}]{4,}/gu)??[]);
+
+const reconcileSourceUrls=(value:unknown,context:string,researchSources:TravellerResearchSource[],fallbackIndex=0):string[]=>{
+  const supplied=Array.isArray(value)?value.filter((url):url is string=>typeof url==='string'):[];
+  const verified=[...new Set(supplied.flatMap(url=>{
+    const key=citationKey(url);
+    const source=researchSources.find(candidate=>candidate.url===url||(key&&citationKey(candidate.url)===key));
+    return source?[source.url]:[];
+  }))].slice(0,3);
+  if(verified.length||!researchSources.length)return verified;
+  const terms=citationTerms(context);
+  const ranked=researchSources.map((source,index)=>({source,index,score:[...terms].reduce((total,term)=>total+(`${source.title} ${source.excerpt} ${source.url}`.toLowerCase().includes(term)?1:0),0)})).sort((a,b)=>b.score-a.score||Math.abs(a.index-fallbackIndex)-Math.abs(b.index-fallbackIndex));
+  return [ranked[0]?.source.url??researchSources[fallbackIndex%researchSources.length].url];
+};
+
+const reconcileDraftCitations=(value:unknown,researchSources:TravellerResearchSource[]):unknown=>{
+  if(!value||typeof value!=='object'||!researchSources.length)return value;
+  const draft=value as Record<string,unknown>;
+  const reconcileOptions=(items:unknown,kind:'hotel'|'day')=>Array.isArray(items)?items.map((rawItem,itemIndex)=>{
+    if(!rawItem||typeof rawItem!=='object')return rawItem;
+    const item=rawItem as Record<string,unknown>;
+    const options=Array.isArray(item.options)?item.options.map((rawOption,optionIndex)=>{
+      if(!rawOption||typeof rawOption!=='object')return rawOption;
+      const option=rawOption as Record<string,unknown>;
+      const context=kind==='hotel'?`${item.place??''} ${option.name??''} ${option.area??''} ${option.reviewSignal??''}`:`${item.place??''} ${item.theme??''} ${option.name??''} ${option.type??''} ${option.description??''}`;
+      return {...option,sourceUrls:reconcileSourceUrls(option.sourceUrls,context,researchSources,itemIndex*3+optionIndex)};
+    }):item.options;
+    return {...item,options};
+  }):items;
+  return {...draft,hotelStays:reconcileOptions(draft.hotelStays,'hotel'),dayPlans:reconcileOptions(draft.dayPlans,'day')};
+};
+
 const sourceFromValue=(value:unknown):Array<{title:string;url:string}>=>{
   if(!value||typeof value!=='object')return [];
   if(Array.isArray(value))return value.flatMap(sourceFromValue);
@@ -167,10 +208,12 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
       travellerResearch=sourcesFromOpenAi(initial);
       parsed=JSON.parse(outputTextFromOpenAi(initial)) as unknown;
     }
+    parsed=reconcileDraftCitations(parsed,travellerResearch);
     let qualityIssues=assessTripSuggestionQuality(parsed,profile,travellerResearch);
     if(qualityIssues.length){
       const repaired=await callOpenAi({task:'repair_itinerary',travellerProfile:profile,currentDraft:parsed,verifiedResearchSources:travellerResearch,qualityFailures:qualityIssues,instruction:'Return the complete itinerary, preserving useful route logic while fixing every listed failure. Cite only exact URLs from verifiedResearchSources.'},false);
       parsed=JSON.parse(outputTextFromOpenAi(repaired)) as unknown;
+      parsed=reconcileDraftCitations(parsed,travellerResearch);
       qualityIssues=assessTripSuggestionQuality(parsed,profile,travellerResearch);
     }
     if(qualityIssues.length)throw new Error(`Model response failed quality control: ${qualityIssues.join(' ')}`);
