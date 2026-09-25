@@ -1,9 +1,9 @@
-interface Env { RESEND_API_KEY?:string;LEAD_TO_EMAIL?:string }
-interface PagesContext {request:Request;env:Env}
+import {clean,consultantEmail,customerEmail,hashToken,manageProposalUrl,publicProposalUrl,randomToken,sendResend,type ProposalEnv,type ProposalRow,type StoredProposalPayload} from '../_lib/proposals';
+
+interface PagesContext {request:Request;env:ProposalEnv}
 
 const json=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
-const clean=(value:unknown,max:number)=>typeof value==='string'?value.trim().slice(0,max):'';
-const cleanScalar=(value:unknown,max:number)=>typeof value==='string'||typeof value==='number'?String(value).trim().slice(0,max):'';
+const emailPattern=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const onRequestPost=async({request,env}:PagesContext):Promise<Response>=>{
   const length=Number(request.headers.get('content-length')||0);
@@ -11,67 +11,50 @@ export const onRequestPost=async({request,env}:PagesContext):Promise<Response>=>
   const origin=request.headers.get('origin');
   if(origin&&new URL(origin).hostname!==new URL(request.url).hostname)return json({error:'Invalid request origin.'},403);
   if(!request.headers.get('content-type')?.toLowerCase().includes('application/json'))return json({error:'Expected a JSON request.'},415);
+
   let raw:unknown;
   try{raw=await request.json()}catch{return json({error:'Invalid JSON request.'},400)}
   if(!raw||typeof raw!=='object')return json({error:'Invalid enquiry.'},400);
   const input=raw as Record<string,unknown>;
   if(clean(input.website,100))return json({ok:true});
+
   const name=clean(input.name,160);
-  const email=clean(input.email,240);
+  const email=clean(input.email,240).toLowerCase();
   const phone=clean(input.phone,100);
   const message=clean(input.message,1600);
   const consent=input.consent===true;
   const locale=/^(en|es|it|fr|nl|hu|sv|da|no)$/.test(clean(input.locale,5))?clean(input.locale,5):'en';
-  const suggestion=input.suggestion&&typeof input.suggestion==='object'?input.suggestion as Record<string,unknown>:{};
-  const profile=input.profile&&typeof input.profile==='object'?input.profile as Record<string,unknown>:{};
-  const title=clean(suggestion.title,180);
-  const summary=clean(suggestion.summary,1200);
-  const duration=clean(suggestion.recommendedDuration,100);
-  const route=Array.isArray(suggestion.route)?suggestion.route.slice(0,8).flatMap(item=>{
-    if(!item||typeof item!=='object')return [];
+  const suggestion=input.suggestion&&typeof input.suggestion==='object'?input.suggestion as Record<string,unknown>:{},profile=input.profile&&typeof input.profile==='object'?input.profile as Record<string,unknown>:{},builderChoices=input.builderChoices&&typeof input.builderChoices==='object'?input.builderChoices as Record<string,unknown>:{};
+  const title=clean(suggestion.title,180),summary=clean(suggestion.summary,1200);
+  const route=Array.isArray(suggestion.route)?suggestion.route.slice(0,8).filter(item=>{
+    if(!item||typeof item!=='object')return false;
     const stop=item as Record<string,unknown>;
-    const days=clean(stop.days,50),place=clean(stop.place,160),plan=clean(stop.plan||stop.focus,800),onward=clean(stop.onwardTravel,350);
-    const highlights=Array.isArray(stop.highlights)?stop.highlights.slice(0,4).map(value=>clean(value,220)).filter(Boolean):[];
-    return days&&place&&plan?[`${days} — ${place}\n${plan}${highlights.length?`\nHighlights: ${highlights.join('; ')}`:''}${onward?`\nNext leg: ${onward}`:''}`]:[];
+    return Boolean(clean(stop.days,50)&&clean(stop.place,160)&&clean(stop.plan||stop.focus,900));
   }):[];
-  const builder=input.builderChoices&&typeof input.builderChoices==='object'?input.builderChoices as Record<string,unknown>:{};
-  const selectedHotels=builder.hotels&&typeof builder.hotels==='object'?builder.hotels as Record<string,unknown>:{};
-  const hotelNotes=builder.hotelNotes&&typeof builder.hotelNotes==='object'?builder.hotelNotes as Record<string,unknown>:{};
-  const selectedDays=builder.days&&typeof builder.days==='object'?builder.days as Record<string,unknown>:{};
-  const dayNotes=builder.dayNotes&&typeof builder.dayNotes==='object'?builder.dayNotes as Record<string,unknown>:{};
-  const hotelChoices=Array.isArray(suggestion.hotelStays)?suggestion.hotelStays.slice(0,10).flatMap((rawStay,index)=>{
-    if(!rawStay||typeof rawStay!=='object')return [];
-    const stay=rawStay as Record<string,unknown>,place=clean(stay.place,160),key=`stay-${index}`,selected=clean(selectedHotels[key],80);
-    if(!place||!selected)return [];
-    if(selected==='custom')return [`${place}: traveller preference — ${clean(hotelNotes[key],500)||'to discuss'}`];
-    const options=Array.isArray(stay.options)?stay.options:[],option=options.find(raw=>raw&&typeof raw==='object'&&clean((raw as Record<string,unknown>).id,80)===selected) as Record<string,unknown>|undefined;
-    return option?[`${place}: ${clean(option.name,180)} · ${clean(option.standard,80)} · Room request: ${clean(option.roomGuidance,360)}`]:[];
-  }):[];
-  const dayChoices=Array.isArray(suggestion.dayPlans)?suggestion.dayPlans.slice(0,35).flatMap(rawDay=>{
-    if(!rawDay||typeof rawDay!=='object')return [];
-    const day=rawDay as Record<string,unknown>,number=Number(day.day),key=`day-${number}`,selected=clean(selectedDays[key],80),place=clean(day.place,160);
-    if(!Number.isInteger(number)||number<1||number>35||!selected)return [];
-    if(selected==='open')return [`Day ${number} · ${place}: leave open for consultant`];
-    if(selected==='custom')return [`Day ${number} · ${place}: traveller idea — ${clean(dayNotes[key],500)||'to discuss'}`];
-    const options=Array.isArray(day.options)?day.options:[],option=options.find(raw=>raw&&typeof raw==='object'&&clean((raw as Record<string,unknown>).id,80)===selected) as Record<string,unknown>|undefined;
-    return option?[`Day ${number} · ${place}: ${clean(option.name,180)} · ${clean(option.type,80)}`]:[];
-  }):[];
-  if(!name||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||!consent||!title||!summary||route.length<2)return json({error:'Please complete your details and include a valid itinerary.'},400);
-  if(!env.RESEND_API_KEY||!env.LEAD_TO_EMAIL)return json({error:'The consultant email service is not configured.'},503);
-  const destinations=Array.isArray(profile.destinations)?profile.destinations.map(value=>clean(value,80)).filter(Boolean).join(', '):'';
-  const interests=Array.isArray(profile.interests)?profile.interests.map(value=>clean(value,80)).filter(Boolean).join(', '):'';
-  const brief=[
-    clean(profile.destinationIdeas,180)||destinations||'Open to ideas',
-    `${cleanScalar(profile.durationDays,30)||duration} days · ${cleanScalar(profile.adults,3)||'2'} adult(s) · ${cleanScalar(profile.children,3)||'0'} child(ren)`,
-    `Travel month: ${clean(profile.travelMonth,30)||'Flexible'}`,
-    `Comfort: ${clean(profile.budget,40)||'Not specified'} · Pace: ${clean(profile.pace,40)||'Not specified'}`,
-    interests?`Priorities: ${interests}`:'',
-    clean(profile.notes,1000)?`Original notes: ${clean(profile.notes,1000)}`:'',
-  ].filter(Boolean);
-  const text=[`Traveller: ${name}`,`Email: ${email}`,phone?`Phone: ${phone}`:'',`Language: ${locale}`,message?`Traveller note: ${message}`:'','',`ORIGINAL TRAVEL BRIEF`,...brief,'',`JOURNEY DESIGN: ${title}`,duration,summary,'',...route,'',`TRAVELLER HOTEL CHOICES`,...(hotelChoices.length?hotelChoices:['No hotel choices made yet.']),'',`TRAVELLER DAY-BY-DAY CHOICES`,...(dayChoices.length?dayChoices:['No daily choices made yet.'])].filter(Boolean).join('\n');
-  const sent=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${env.RESEND_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({from:'Way to Asia <journeys@waytoasia.com>',to:[env.LEAD_TO_EMAIL],reply_to:email,subject:`Journey Designer enquiry: ${title} · ${name}`,text}),signal:AbortSignal.timeout(12000)});
-  if(!sent.ok){console.error('Trip enquiry email failed',{status:sent.status});return json({error:'We could not send the enquiry just now. Please try again.'},502)}
-  return json({ok:true});
+  if(!name||!emailPattern.test(email)||!consent||!title||!summary||route.length<2)return json({error:'Please complete your details and include a valid itinerary.'},400);
+  if(!env.RESEND_API_KEY||!env.LEAD_TO_EMAIL||!env.PROPOSALS_DB)return json({error:'The consultant proposal service is not configured.'},503);
+
+  const [publicToken,manageToken]=[randomToken(),randomToken()];
+  const [tokenHash,manageTokenHash]=await Promise.all([hashToken(publicToken),hashToken(manageToken)]);
+  const id=crypto.randomUUID(),now=new Date(),expires=new Date(now.getTime()+60*24*60*60*1000);
+  const payload:StoredProposalPayload={traveller:{name,email,phone,message},profile,suggestion:{...suggestion,title,summary,route},builderChoices};
+  const row:ProposalRow={id,token_hash:tokenHash,manage_token_hash:manageTokenHash,traveller_name:name,traveller_email:email,locale,title,summary,estimated_price:'',consultant_note:'',payload_json:JSON.stringify(payload),status:'new',traveller_response:'',created_at:now.toISOString(),updated_at:now.toISOString(),expires_at:expires.toISOString(),revoked_at:null};
+
+  try{
+    await env.PROPOSALS_DB.prepare(`INSERT INTO proposals (id,token_hash,manage_token_hash,traveller_name,traveller_email,locale,title,summary,estimated_price,consultant_note,payload_json,status,traveller_response,created_at,updated_at,expires_at,revoked_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(row.id,row.token_hash,row.manage_token_hash,row.traveller_name,row.traveller_email,row.locale,row.title,row.summary,row.estimated_price,row.consultant_note,row.payload_json,row.status,row.traveller_response,row.created_at,row.updated_at,row.expires_at,row.revoked_at).run();
+  }catch(error){
+    console.error(JSON.stringify({message:'Proposal storage failed',error:error instanceof Error?error.message:String(error)}));
+    return json({error:'We could not save the proposal just now. Please try again.'},502);
+  }
+
+  const proposalUrl=publicProposalUrl(request.url,publicToken),manageUrl=manageProposalUrl(request.url,manageToken);
+  const customer=customerEmail(row,proposalUrl),consultant=consultantEmail(row,proposalUrl,manageUrl,phone,message);
+  const [customerSent,consultantSent]=await Promise.all([
+    sendResend(env.RESEND_API_KEY,{to:[email],subject:customer.subject,text:customer.text,html:customer.html}),
+    sendResend(env.RESEND_API_KEY,{to:[env.LEAD_TO_EMAIL],replyTo:email,subject:consultant.subject,text:consultant.text,html:consultant.html}),
+  ]);
+  if(!customerSent||!consultantSent)return json({error:'The proposal was saved, but one of the notification emails could not be delivered. Please contact Way to Asia.'},502);
+  return json({ok:true,proposalUrl,expiresAt:row.expires_at,proposalId:row.id});
 };
 
 export const onRequestGet=()=>json({error:'Method not allowed.'},405);

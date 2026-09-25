@@ -6,7 +6,7 @@ test('trip planner creates a clearly unbooked itinerary suggestion',async({page}
   const sourcedSuggestion={...suggestion,travellerResearch:'live-sources',travellerInsights:[{insight:'Travellers repeatedly recommend keeping Chiang Mai as a proper base rather than compressing the north into a day trip.',sources:[{title:'Thailand route discussion',url:'https://www.reddit.com/r/ThailandTourism/example',domain:'reddit.com'}]}]};
   let consultantRequest:{profile?:{durationDays?:number;interests?:string[]};suggestion?:{title?:string};builderChoices?:{hotels?:Record<string,string>;days?:Record<string,string>;dayNotes?:Record<string,string>}}={};
   await page.route('**/api/trip-suggestion',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({suggestion:sourcedSuggestion,requestId:'test-request'})}));
-  await page.route('**/api/trip-enquiry',route=>{consultantRequest=route.request().postDataJSON();return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true})})});
+  await page.route('**/api/trip-enquiry',route=>{consultantRequest=route.request().postDataJSON();return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,proposalUrl:'https://waytoasia.com/proposal/test-private-token'})})});
   await page.goto('/en/trip-planner');
   await expect(page.getByRole('heading',{name:'Design a journey worth taking.'})).toBeVisible();
   await expect(page.getByText('Journey Designer · Way to Asia')).toBeVisible();
@@ -28,8 +28,9 @@ test('trip planner creates a clearly unbooked itinerary suggestion',async({page}
   await page.getByLabel('Your name').fill('Test Traveller');
   await page.getByLabel('Email address').fill('test@example.com');
   await page.getByLabel(/I agree that Way to Asia/).check();
-  await page.getByRole('button',{name:/Send my trip request/}).click();
-  await expect(page.getByText(/Your itinerary has been sent/)).toBeVisible();
+  await page.getByRole('button',{name:/Create my private proposal/}).click();
+  await expect(page.getByText(/Your private journey page is ready/)).toBeVisible();
+  await expect(page.getByRole('link',{name:/View my private journey/})).toHaveAttribute('href','https://waytoasia.com/proposal/test-private-token');
   expect(consultantRequest.profile?.durationDays).toBe(12);
   expect(consultantRequest.profile?.interests).toContain('food');
   expect(consultantRequest.suggestion?.title).toBe(suggestion.title);
