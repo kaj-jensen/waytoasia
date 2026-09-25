@@ -4,7 +4,7 @@ interface Env { OPENAI_API_KEY?:string;OPENAI_MODEL?:string }
 interface PagesContext {request:Request;env:Env}
 
 const json = (body: unknown, status = 200, extraHeaders: Record<string,string> = {}) => Response.json(body,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...extraHeaders}});
-const researchDomains=['reddit.com','tripadvisor.com','fodors.com','lonelyplanet.com','travel.stackexchange.com'];
+const researchDomains=['reddit.com','tripadvisor.com','booking.com','agoda.com','hotels.com','expedia.com','viator.com','getyourguide.com','fodors.com','lonelyplanet.com','travel.stackexchange.com'];
 
 type OpenAiOutput={type?:unknown;content?:unknown;action?:unknown};
 type OpenAiResponse={status?:unknown;output?:OpenAiOutput[];error?:{message?:unknown};incomplete_details?:unknown};
@@ -27,7 +27,7 @@ const sourcesFromOpenAi=(payload:OpenAiResponse):TravellerResearchSource[]=>{
     if(seen.has(url))return [];
     seen.add(url);
     return [{id:`R${seen.size}`,title:source.title.slice(0,180),url,domain:parsed.hostname.replace(/^www\./,''),excerpt:''}];
-  }).slice(0,12);
+  }).slice(0,60);
 };
 
 const outputTextFromOpenAi=(payload:OpenAiResponse):string=>{
@@ -62,14 +62,19 @@ Rules:
 - Never instruct the traveller to buy a rail pass or claim it saves money. Pass value changes with prices and exact sectors, so tell them which individual fares to compare before deciding.
 - Do not claim that a flight or ferry runs daily, several times per day, or nonstop unless travellerResearch directly supports that exact claim; otherwise describe the connection without frequency or schedule claims.
 - Do not use generic filler such as "check the weather", "check visa requirements", "research vaccinations", or "ensure documents are in order" unless the traveller's stated circumstances make it specifically relevant.
-- Do not invent hotels, suppliers, live availability, booking status, discounts, exact transport schedules or confirmed prices.
+- Recommend two or three named hotels for every overnight base in hotelStays. Match the requested budget standard: value means dependable mid-range value; comfort means well-reviewed upper-mid-range comfort and is the default; premium means upscale design, service and location; luxury means distinctive top-tier service and facilities. If the traveller chose unsure, use comfort.
+- Hotel choices must be based on current review or booking-site research from the allowed domains. Summarize repeat strengths and any relevant caution in reviewSignal, but never invent or round a rating. Explain the neighbourhood, practical fit and why each hotel matches the selected standard. Do not claim live availability or a confirmed price.
+- Protect room comfort, not just star rating. For Japan, avoid recommending the smallest entry-level room. For two adults, target a named twin/double category of at least 20 m² and preferably 24 m² or more at comfort, premium and luxury level. State the category or minimum size to request in roomGuidance. If research does not verify an exact size, explicitly say the consultant must verify it before booking rather than inventing a measurement.
+- Produce dayPlans for every individual day from 1 through durationDays. Each day has exactly two clearly different selectable experience options, each specific to that destination and connected to the traveller's interests through interestTags. Food interests require named markets, cooking, tasting or neighbourhood food experiences; nature requires named landscapes, parks, walks or wildlife experiences; history requires named sites, districts, museums or expert-led visits. Avoid generic phrases such as "city tour" or "free day" unless the option explains exactly where and why.
+- Excursion options are researched recommendations, not live supplier inventory. Named bookable tours may be suggested when supported by an exact source URL, but never claim availability, departure times or prices. Balance full and lighter days according to the requested pace.
+- Every hotel and daily option must cite one to three exact URLs returned by web research in sourceUrls. Never invent a hotel, excursion, review score, supplier, URL or traveller consensus.
 - Be season-aware without guarantees. If dates are flexible, explain which seasons particularly suit the actual route.
 - Fit the requested duration and pace. Avoid exhausting one-night stops unless clearly justified. When two countries are explicitly requested for a trip of 12 days or more, give each a meaningful section rather than leaving one as a token stop.
 - Prefer direct rail or road connections between mainland cities in the same country. Use a domestic flight only when island or remote geography makes it sensible, and explain that reason.
 - For revisions, preserve the useful parts of the current plan and visibly apply the traveller's latest request. Return the complete revised itinerary, not a commentary about changes.
 - Prices and availability are intentionally handled outside this stage. Do not claim either is confirmed.
 - closing must be one short, specific invitation to adjust pace, swap stops, or add rest days.
-- Use web search before answering. Research independent traveller discussions and reviews from the allowed forum/review domains. Add 2–4 travellerInsights only when multiple comments or reviews support the point, and put the exact researched URLs in sourceUrls. Never invent a source, URL, review score, quotation or consensus.
+- Use web search before answering. Research independent traveller discussions, hotel reviews, destination reviews and specific excursion options from the allowed domains. Add 2–4 travellerInsights only when multiple comments or reviews support the point, and put the exact researched URLs in sourceUrls. Never invent a source, URL, review score, quotation or consensus.
 - Use concise, specific prose and return only the requested JSON structure.
 
 Quality benchmark (match its usefulness and specificity, not its destinations): "Here is a 17-day route balancing nature, history and food across Japan and Korea — 9 days in Japan and 8 in Korea, moving Tokyo → Nikko → Hakone → Kyoto → Nara → Osaka → Hiroshima/Miyajima, then flying to Busan → Gyeongju → Jeonju → Seoul." The rest of a strong answer groups those places into exact day ranges, states the international connection, gives route-specific rail and seasonal advice, and honestly identifies the easiest stop to remove for a slower pace.`;
@@ -92,7 +97,7 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
   try {
     const userPayload=refinement?{task:'revise_itinerary',travellerProfile:profile,currentItinerary:refinement.currentSuggestion,travellerRefinement:refinement.instruction,wayToAsiaCatalogue:tripCatalogForAgent()}:{task:'create_itinerary',travellerProfile:profile,wayToAsiaCatalogue:tripCatalogForAgent()};
     const callOpenAi=async(input:unknown,useWebSearch:boolean):Promise<OpenAiResponse>=>{
-      const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:env.OPENAI_MODEL||'gpt-6-sol',store:false,reasoning:{effort:'low'},instructions:systemPrompt,input:JSON.stringify(input),max_output_tokens:6000,text:{format:{type:'json_schema',name:'trip_suggestion',strict:true,schema:tripSuggestionJsonSchema}},...(useWebSearch?{tools:[{type:'web_search',filters:{allowed_domains:researchDomains},search_context_size:'medium'}],tool_choice:'required',include:['web_search_call.action.sources']}:{})}),signal:AbortSignal.timeout(55000)});
+      const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:env.OPENAI_MODEL||'gpt-6-sol',store:false,reasoning:{effort:'low'},instructions:systemPrompt,input:JSON.stringify(input),max_output_tokens:14000,text:{format:{type:'json_schema',name:'trip_suggestion',strict:true,schema:tripSuggestionJsonSchema}},...(useWebSearch?{tools:[{type:'web_search',filters:{allowed_domains:researchDomains},search_context_size:'high'}],tool_choice:'required',include:['web_search_call.action.sources']}:{})}),signal:AbortSignal.timeout(90000)});
       const payload=await response.json().catch(()=>({})) as OpenAiResponse;
       if(!response.ok){
         const detail=typeof payload.error?.message==='string'?payload.error.message:`OpenAI returned ${response.status}`;

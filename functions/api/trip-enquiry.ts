@@ -7,7 +7,7 @@ const cleanScalar=(value:unknown,max:number)=>typeof value==='string'||typeof va
 
 export const onRequestPost=async({request,env}:PagesContext):Promise<Response>=>{
   const length=Number(request.headers.get('content-length')||0);
-  if(length>60_000)return json({error:'Enquiry is too large.'},413);
+  if(length>250_000)return json({error:'Enquiry is too large.'},413);
   const origin=request.headers.get('origin');
   if(origin&&new URL(origin).hostname!==new URL(request.url).hostname)return json({error:'Invalid request origin.'},403);
   if(!request.headers.get('content-type')?.toLowerCase().includes('application/json'))return json({error:'Expected a JSON request.'},415);
@@ -34,6 +34,28 @@ export const onRequestPost=async({request,env}:PagesContext):Promise<Response>=>
     const highlights=Array.isArray(stop.highlights)?stop.highlights.slice(0,4).map(value=>clean(value,220)).filter(Boolean):[];
     return days&&place&&plan?[`${days} — ${place}\n${plan}${highlights.length?`\nHighlights: ${highlights.join('; ')}`:''}${onward?`\nNext leg: ${onward}`:''}`]:[];
   }):[];
+  const builder=input.builderChoices&&typeof input.builderChoices==='object'?input.builderChoices as Record<string,unknown>:{};
+  const selectedHotels=builder.hotels&&typeof builder.hotels==='object'?builder.hotels as Record<string,unknown>:{};
+  const hotelNotes=builder.hotelNotes&&typeof builder.hotelNotes==='object'?builder.hotelNotes as Record<string,unknown>:{};
+  const selectedDays=builder.days&&typeof builder.days==='object'?builder.days as Record<string,unknown>:{};
+  const dayNotes=builder.dayNotes&&typeof builder.dayNotes==='object'?builder.dayNotes as Record<string,unknown>:{};
+  const hotelChoices=Array.isArray(suggestion.hotelStays)?suggestion.hotelStays.slice(0,10).flatMap((rawStay,index)=>{
+    if(!rawStay||typeof rawStay!=='object')return [];
+    const stay=rawStay as Record<string,unknown>,place=clean(stay.place,160),key=`stay-${index}`,selected=clean(selectedHotels[key],80);
+    if(!place||!selected)return [];
+    if(selected==='custom')return [`${place}: traveller preference — ${clean(hotelNotes[key],500)||'to discuss'}`];
+    const options=Array.isArray(stay.options)?stay.options:[],option=options.find(raw=>raw&&typeof raw==='object'&&clean((raw as Record<string,unknown>).id,80)===selected) as Record<string,unknown>|undefined;
+    return option?[`${place}: ${clean(option.name,180)} · ${clean(option.standard,80)} · Room request: ${clean(option.roomGuidance,360)}`]:[];
+  }):[];
+  const dayChoices=Array.isArray(suggestion.dayPlans)?suggestion.dayPlans.slice(0,35).flatMap(rawDay=>{
+    if(!rawDay||typeof rawDay!=='object')return [];
+    const day=rawDay as Record<string,unknown>,number=Number(day.day),key=`day-${number}`,selected=clean(selectedDays[key],80),place=clean(day.place,160);
+    if(!Number.isInteger(number)||number<1||number>35||!selected)return [];
+    if(selected==='open')return [`Day ${number} · ${place}: leave open for consultant`];
+    if(selected==='custom')return [`Day ${number} · ${place}: traveller idea — ${clean(dayNotes[key],500)||'to discuss'}`];
+    const options=Array.isArray(day.options)?day.options:[],option=options.find(raw=>raw&&typeof raw==='object'&&clean((raw as Record<string,unknown>).id,80)===selected) as Record<string,unknown>|undefined;
+    return option?[`Day ${number} · ${place}: ${clean(option.name,180)} · ${clean(option.type,80)}`]:[];
+  }):[];
   if(!name||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||!consent||!title||!summary||route.length<2)return json({error:'Please complete your details and include a valid itinerary.'},400);
   if(!env.RESEND_API_KEY||!env.LEAD_TO_EMAIL)return json({error:'The consultant email service is not configured.'},503);
   const destinations=Array.isArray(profile.destinations)?profile.destinations.map(value=>clean(value,80)).filter(Boolean).join(', '):'';
@@ -46,7 +68,7 @@ export const onRequestPost=async({request,env}:PagesContext):Promise<Response>=>
     interests?`Priorities: ${interests}`:'',
     clean(profile.notes,1000)?`Original notes: ${clean(profile.notes,1000)}`:'',
   ].filter(Boolean);
-  const text=[`Traveller: ${name}`,`Email: ${email}`,phone?`Phone: ${phone}`:'',`Language: ${locale}`,message?`Traveller note: ${message}`:'','',`ORIGINAL TRAVEL BRIEF`,...brief,'',`JOURNEY DESIGN: ${title}`,duration,summary,'',...route].filter(Boolean).join('\n');
+  const text=[`Traveller: ${name}`,`Email: ${email}`,phone?`Phone: ${phone}`:'',`Language: ${locale}`,message?`Traveller note: ${message}`:'','',`ORIGINAL TRAVEL BRIEF`,...brief,'',`JOURNEY DESIGN: ${title}`,duration,summary,'',...route,'',`TRAVELLER HOTEL CHOICES`,...(hotelChoices.length?hotelChoices:['No hotel choices made yet.']),'',`TRAVELLER DAY-BY-DAY CHOICES`,...(dayChoices.length?dayChoices:['No daily choices made yet.'])].filter(Boolean).join('\n');
   const sent=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${env.RESEND_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({from:'Way to Asia <journeys@waytoasia.com>',to:[env.LEAD_TO_EMAIL],reply_to:email,subject:`Journey Designer enquiry: ${title} · ${name}`,text}),signal:AbortSignal.timeout(12000)});
   if(!sent.ok){console.error('Trip enquiry email failed',{status:sent.status});return json({error:'We could not send the enquiry just now. Please try again.'},502)}
   return json({ok:true});
