@@ -1,4 +1,5 @@
 interface PagesContext {
+  request: Request;
   next(): Promise<Response>;
 }
 
@@ -18,6 +19,18 @@ const createNonce = (): string => {
 };
 
 export const onRequest = async (context: PagesContext): Promise<Response> => {
+  const requestUrl = new URL(context.request.url);
+  if (requestUrl.hostname === 'waytoasia.pages.dev') {
+    const destination = new URL(`${requestUrl.pathname}${requestUrl.search}`, 'https://waytoasia.com');
+    return new Response(null, {
+      status: 308,
+      headers: {
+        location: destination.toString(),
+        'cache-control': 'no-store',
+      },
+    });
+  }
+
   const response = await context.next();
   const contentType = response.headers.get('content-type') || '';
   if (!contentType.includes('text/html')) return response;
