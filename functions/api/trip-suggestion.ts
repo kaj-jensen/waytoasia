@@ -1,6 +1,6 @@
 import {assessTripSuggestionQuality,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest,tripCatalogForAgent,tripSuggestionJsonSchema,type TravellerResearchSource} from '../../src/lib/tripPlanner';
 
-interface Env { OPENAI_API_KEY?:string;OPENAI_MODEL?:string }
+interface Env { OPENAI_API_KEY?:string;OPENAI_MODEL?:string;TAVILY_API_KEY?:string }
 interface PagesContext {request:Request;env:Env}
 
 const json = (body: unknown, status = 200, extraHeaders: Record<string,string> = {}) => Response.json(body,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...extraHeaders}});
@@ -8,6 +8,7 @@ const researchDomains=['reddit.com','tripadvisor.com','booking.com','agoda.com',
 
 type OpenAiOutput={type?:unknown;content?:unknown;action?:unknown};
 type OpenAiResponse={status?:unknown;output?:OpenAiOutput[];error?:{message?:unknown};incomplete_details?:unknown};
+type TavilyResponse={results?:Array<{title?:unknown;url?:unknown;content?:unknown}>};
 
 const sourceFromValue=(value:unknown):Array<{title:string;url:string}>=>{
   if(!value||typeof value!=='object')return [];
@@ -28,6 +29,29 @@ const sourcesFromOpenAi=(payload:OpenAiResponse):TravellerResearchSource[]=>{
     seen.add(url);
     return [{id:`R${seen.size}`,title:source.title.slice(0,180),url,domain:parsed.hostname.replace(/^www\./,''),excerpt:''}];
   }).slice(0,60);
+};
+
+const researchWithTavily=async(profile:NonNullable<ReturnType<typeof parseTripPlannerRequest>>,apiKey:string):Promise<TravellerResearchSource[]>=>{
+  const destinations=profile.destinationIdeas||profile.destinations.join(', ')||'Asia';
+  const interests=profile.interests.join(', ')||'culture';
+  const queries=[
+    `${destinations} best well reviewed ${profile.budget} hotels spacious rooms room size traveller reviews`,
+    `${destinations} best ${interests} tours excursions markets cooking classes historic sites nature experiences traveller reviews`,
+  ];
+  const responses=await Promise.all(queries.map(query=>fetch('https://api.tavily.com/search',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({query,search_depth:'basic',chunks_per_source:2,max_results:20,topic:'general',include_answer:false,include_raw_content:false,include_domains:researchDomains}),signal:AbortSignal.timeout(12000)})));
+  const payloads=await Promise.all(responses.map(async response=>{
+    const payload=await response.json().catch(()=>({})) as TavilyResponse;
+    if(!response.ok)throw new Error(`Research service returned ${response.status}.`);
+    return payload;
+  }));
+  const seen=new Set<string>();
+  return payloads.flatMap(payload=>payload.results??[]).flatMap(result=>{
+    if(typeof result.url!=='string')return [];
+    let parsed:URL;try{parsed=new URL(result.url)}catch{return []}
+    if(!researchDomains.some(domain=>parsed.hostname===domain||parsed.hostname.endsWith(`.${domain}`)))return [];
+    const url=parsed.toString();if(seen.has(url))return [];seen.add(url);
+    return [{id:`R${seen.size}`,title:typeof result.title==='string'?result.title.slice(0,180):url,url,domain:parsed.hostname.replace(/^www\./,''),excerpt:typeof result.content==='string'?result.content.slice(0,1000):''}];
+  }).slice(0,40);
 };
 
 const outputTextFromOpenAi=(payload:OpenAiResponse):string=>{
@@ -74,7 +98,7 @@ Rules:
 - For revisions, preserve the useful parts of the current plan and visibly apply the traveller's latest request. Return the complete revised itinerary, not a commentary about changes.
 - Prices and availability are intentionally handled outside this stage. Do not claim either is confirmed.
 - closing must be one short, specific invitation to adjust pace, swap stops, or add rest days.
-- Use web search before answering. Research independent traveller discussions, hotel reviews, destination reviews and specific excursion options from the allowed domains. Add 2–4 travellerInsights only when multiple comments or reviews support the point, and put the exact researched URLs in sourceUrls. Never invent a source, URL, review score, quotation or consensus.
+- Use only the exact URLs supplied in verifiedResearchSources when citing research. Research covers independent traveller discussions, hotel reviews, destination reviews and specific excursion options from the allowed domains. Add 2–4 travellerInsights only when multiple supplied sources support the point, and put those exact URLs in sourceUrls. Never invent a source, URL, review score, quotation or consensus.
 - Use concise, specific prose and return only the requested JSON structure.
 
 Quality benchmark (match its usefulness and specificity, not its destinations): "Here is a 17-day route balancing nature, history and food across Japan and Korea — 9 days in Japan and 8 in Korea, moving Tokyo → Nikko → Hakone → Kyoto → Nara → Osaka → Hiroshima/Miyajima, then flying to Busan → Gyeongju → Jeonju → Seoul." The rest of a strong answer groups those places into exact day ranges, states the international connection, gives route-specific rail and seasonal advice, and honestly identifies the easiest stop to remove for a slower pace.`;
@@ -95,10 +119,11 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
 
   const requestId = crypto.randomUUID();
   try {
-    // Keep the whole model workflow inside Cloudflare's request window. A single
-    // deadline also prevents an optional repair pass from starting a fresh clock.
-    const modelDeadline=AbortSignal.timeout(80000);
-    const userPayload=refinement?{task:'revise_itinerary',travellerProfile:profile,currentItinerary:refinement.currentSuggestion,travellerRefinement:refinement.instruction,wayToAsiaCatalogue:tripCatalogForAgent()}:{task:'create_itinerary',travellerProfile:profile,wayToAsiaCatalogue:tripCatalogForAgent()};
+    // Retrieve sources first, then let OpenAI compose from that bounded evidence.
+    // This is much faster and more predictable than a long agentic search call.
+    const tavilyResearch=env.TAVILY_API_KEY?await researchWithTavily(profile,env.TAVILY_API_KEY):[];
+    const modelDeadline=AbortSignal.timeout(65000);
+    const userPayload=refinement?{task:'revise_itinerary',travellerProfile:profile,currentItinerary:refinement.currentSuggestion,travellerRefinement:refinement.instruction,verifiedResearchSources:tavilyResearch,wayToAsiaCatalogue:tripCatalogForAgent()}:{task:'create_itinerary',travellerProfile:profile,verifiedResearchSources:tavilyResearch,wayToAsiaCatalogue:tripCatalogForAgent()};
     const callOpenAi=async(input:unknown,useWebSearch:boolean):Promise<OpenAiResponse>=>{
       const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:env.OPENAI_MODEL||'gpt-5.4-mini',store:false,reasoning:{effort:'low'},instructions:systemPrompt,input:JSON.stringify(input),max_output_tokens:12000,text:{format:{type:'json_schema',name:'trip_suggestion',strict:true,schema:tripSuggestionJsonSchema}},...(useWebSearch?{tools:[{type:'web_search',filters:{allowed_domains:researchDomains},search_context_size:'medium'}],tool_choice:'required',include:['web_search_call.action.sources']}:{})}),signal:modelDeadline});
       const payload=await response.json().catch(()=>({})) as OpenAiResponse;
@@ -109,8 +134,8 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
       if(payload.status&&payload.status!=='completed')throw new Error(`OpenAI response was ${String(payload.status)}.`);
       return payload;
     };
-    const initial=await callOpenAi(userPayload,true);
-    const travellerResearch=sourcesFromOpenAi(initial);
+    const initial=await callOpenAi(userPayload,tavilyResearch.length===0);
+    const travellerResearch=tavilyResearch.length?tavilyResearch:sourcesFromOpenAi(initial);
     let parsed=JSON.parse(outputTextFromOpenAi(initial)) as unknown;
     let qualityIssues=assessTripSuggestionQuality(parsed,profile,travellerResearch);
     if(qualityIssues.length){
