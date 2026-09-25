@@ -183,29 +183,36 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
       const dayPlanProperty=tripSuggestionJsonSchema.properties.dayPlans;
       const hotelStayProperty=tripSuggestionJsonSchema.properties.hotelStays;
       const requestedHotelStandard=hotelStandardForBudget(profile.budget);
-      const coreSchema={...tripSuggestionJsonSchema,properties:{...tripSuggestionJsonSchema.properties,hotelStays:{type:'array',maxItems:0,items:hotelStayProperty.items},dayPlans:{type:'array',maxItems:0,items:dayPlanProperty.items}}};
-      initial=await callOpenAi({...userPayload,task:'create_itinerary_core'},false,{schema:coreSchema,name:'trip_suggestion_core',maxTokens:7000,reasoning:'low'});
-      const core=JSON.parse(outputTextFromOpenAi(initial)) as Record<string,unknown>;
-      const routeCount=Array.isArray(core.route)?core.route.length:0;
-      const dayChunkSize=5;
-      const chunks=Array.from({length:Math.ceil(profile.durationDays/dayChunkSize)},(_,index)=>({start:index*dayChunkSize+1,end:Math.min(profile.durationDays,(index+1)*dayChunkSize)}));
       const hotelOptionProperty=hotelStayProperty.items.properties.options.items;
       const strictHotelStayProperty={...hotelStayProperty,items:{...hotelStayProperty.items,properties:{...hotelStayProperty.items.properties,options:{...hotelStayProperty.items.properties.options,items:{...hotelOptionProperty,properties:{...hotelOptionProperty.properties,standard:{type:'string',enum:[requestedHotelStandard],description:`Must be exactly ${requestedHotelStandard}; the named property must genuinely belong to this market tier.`}}}}}}};
-      const hotelSchema={type:'object',additionalProperties:false,properties:{hotelStays:{...strictHotelStayProperty,minItems:routeCount,maxItems:routeCount}},required:['hotelStays']};
-      const [hotelResponse,...dayResponses]=await Promise.all([
-        callOpenAi({task:'create_hotel_stays',travellerProfile:profile,route:core.route,verifiedResearchSources:tavilyResearch,requiredHotelStandard:requestedHotelStandard,instruction:`Return one hotel stay for every route chapter, in the identical order, with two or three choices that are genuinely ${requestedHotelStandard}. Do not upgrade or downgrade the traveller. When ${requestedHotelStandard} is Comfort, exclude hotels marketed as premium, five-star luxury, palace, legend, or ultra-luxury even if they have excellent reviews. Every name must be one exact, currently operating hotel, resort or cruise vessel supported by the cited source; never return an agency, restaurant, generic option, category, shortlist or placeholder.`},false,{schema:hotelSchema,name:'trip_hotels',maxTokens:Math.min(6000,1500+routeCount*700),reasoning:'none'}),
-        ...chunks.map(({start,end})=>{
-        const count=end-start+1;
-        const daySchema={type:'object',additionalProperties:false,properties:{dayPlans:{...dayPlanProperty,minItems:count,maxItems:count}},required:['dayPlans']};
-        return callOpenAi({task:'create_day_plan_chunk',travellerProfile:profile,route:core.route,dayRange:{start,end},verifiedResearchSources:tavilyResearch,instruction:'Return each requested day exactly once, with exactly two specific selectable options per day.'},false,{schema:daySchema,name:`trip_days_${start}_${end}`,maxTokens:Math.min(5200,1200+count*520),reasoning:'none'});
-      })]);
-      const hotelChunk=JSON.parse(outputTextFromOpenAi(hotelResponse)) as {hotelStays?:unknown[]};
-      const hotelStays=Array.isArray(hotelChunk.hotelStays)?hotelChunk.hotelStays:[];
-      const dayPlans=dayResponses.flatMap(response=>{
-        const chunk=JSON.parse(outputTextFromOpenAi(response)) as {dayPlans?:unknown[]};
-        return Array.isArray(chunk.dayPlans)?chunk.dayPlans:[];
-      });
-      parsed={...core,hotelStays,dayPlans};
+      const hotelInstruction=`All hotel choices must be genuinely ${requestedHotelStandard}. Do not upgrade or downgrade the traveller. When ${requestedHotelStandard} is Comfort, exclude hotels marketed as premium, five-star luxury, palace, legend, or ultra-luxury even if they have excellent reviews. Every name must be one exact, currently operating hotel, resort or cruise vessel supported by the cited source; never return an agency, restaurant, generic option, category, shortlist or placeholder.`;
+      if(profile.durationDays<=12){
+        const combinedSchema={...tripSuggestionJsonSchema,properties:{...tripSuggestionJsonSchema.properties,hotelStays:strictHotelStayProperty,dayPlans:{...dayPlanProperty,minItems:profile.durationDays,maxItems:profile.durationDays}}};
+        initial=await callOpenAi({...userPayload,requiredHotelStandard:requestedHotelStandard,instruction:`Create the complete itinerary, hotel stays and every daily choice in one response. ${hotelInstruction}`},false,{schema:combinedSchema,name:'trip_suggestion_complete',maxTokens:10000,reasoning:'none'});
+        parsed=JSON.parse(outputTextFromOpenAi(initial)) as unknown;
+      }else{
+        const coreSchema={...tripSuggestionJsonSchema,properties:{...tripSuggestionJsonSchema.properties,hotelStays:{type:'array',maxItems:0,items:hotelStayProperty.items},dayPlans:{type:'array',maxItems:0,items:dayPlanProperty.items}}};
+        initial=await callOpenAi({...userPayload,task:'create_itinerary_core'},false,{schema:coreSchema,name:'trip_suggestion_core',maxTokens:7000,reasoning:'low'});
+        const core=JSON.parse(outputTextFromOpenAi(initial)) as Record<string,unknown>;
+        const routeCount=Array.isArray(core.route)?core.route.length:0;
+        const dayChunkSize=5;
+        const chunks=Array.from({length:Math.ceil(profile.durationDays/dayChunkSize)},(_,index)=>({start:index*dayChunkSize+1,end:Math.min(profile.durationDays,(index+1)*dayChunkSize)}));
+        const hotelSchema={type:'object',additionalProperties:false,properties:{hotelStays:{...strictHotelStayProperty,minItems:routeCount,maxItems:routeCount}},required:['hotelStays']};
+        const [hotelResponse,...dayResponses]=await Promise.all([
+          callOpenAi({task:'create_hotel_stays',travellerProfile:profile,route:core.route,verifiedResearchSources:tavilyResearch,requiredHotelStandard:requestedHotelStandard,instruction:`Return one hotel stay for every route chapter, in the identical order, with two or three choices. ${hotelInstruction}`},false,{schema:hotelSchema,name:'trip_hotels',maxTokens:Math.min(6000,1500+routeCount*700),reasoning:'none'}),
+          ...chunks.map(({start,end})=>{
+          const count=end-start+1;
+          const daySchema={type:'object',additionalProperties:false,properties:{dayPlans:{...dayPlanProperty,minItems:count,maxItems:count}},required:['dayPlans']};
+          return callOpenAi({task:'create_day_plan_chunk',travellerProfile:profile,route:core.route,dayRange:{start,end},verifiedResearchSources:tavilyResearch,instruction:'Return each requested day exactly once, with exactly two specific selectable options per day.'},false,{schema:daySchema,name:`trip_days_${start}_${end}`,maxTokens:Math.min(5200,1200+count*520),reasoning:'none'});
+        })]);
+        const hotelChunk=JSON.parse(outputTextFromOpenAi(hotelResponse)) as {hotelStays?:unknown[]};
+        const hotelStays=Array.isArray(hotelChunk.hotelStays)?hotelChunk.hotelStays:[];
+        const dayPlans=dayResponses.flatMap(response=>{
+          const chunk=JSON.parse(outputTextFromOpenAi(response)) as {dayPlans?:unknown[]};
+          return Array.isArray(chunk.dayPlans)?chunk.dayPlans:[];
+        });
+        parsed={...core,hotelStays,dayPlans};
+      }
       travellerResearch=tavilyResearch;
     }else{
       initial=await callOpenAi(userPayload,true);
