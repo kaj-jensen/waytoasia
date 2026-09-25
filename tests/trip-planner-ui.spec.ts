@@ -4,7 +4,7 @@ const suggestion={id:'test-suggestion',generatedAt:'2026-09-24T00:00:00.000Z',ti
 
 test('trip planner creates a clearly unbooked itinerary suggestion',async({page})=>{
   const sourcedSuggestion={...suggestion,travellerResearch:'live-sources',travellerInsights:[{insight:'Travellers repeatedly recommend keeping Chiang Mai as a proper base rather than compressing the north into a day trip.',sources:[{title:'Thailand route discussion',url:'https://www.reddit.com/r/ThailandTourism/example',domain:'reddit.com'}]}]};
-  let consultantRequest:{profile?:{durationDays?:number;interests?:string[]};suggestion?:{title?:string};builderChoices?:{hotels?:Record<string,string>;days?:Record<string,string>;dayNotes?:Record<string,string>}}={};
+  let consultantRequest:{profile?:{durationDays?:number;interests?:string[];travelStartDate?:string;travelEndDate?:string;dateFlexibilityDays?:number;departureAirport?:string};suggestion?:{title?:string};builderChoices?:{hotels?:Record<string,string>;days?:Record<string,string>;dayNotes?:Record<string,string>}}={};
   await page.route('**/api/trip-suggestion',async route=>{await new Promise(resolve=>setTimeout(resolve,500));return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({suggestion:sourcedSuggestion,requestId:'test-request'})})});
   await page.route('**/api/trip-enquiry',route=>{consultantRequest=route.request().postDataJSON();return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,proposalUrl:'https://waytoasia.com/proposal/test-private-token'})})});
   await page.goto('/en/trip-planner');
@@ -12,6 +12,10 @@ test('trip planner creates a clearly unbooked itinerary suggestion',async({page}
   await expect(page.getByText('Journey Designer · Way to Asia')).toBeVisible();
   await page.getByLabel('Thailand').check();
   await page.getByLabel('Food & local culture').check();
+  await page.getByLabel('Outbound date').fill('2027-03-10');
+  await page.getByLabel('Return date').fill('2027-03-21');
+  await page.getByLabel('Date flexibility').selectOption('3');
+  await page.getByLabel('Departure airport or city').fill('Copenhagen (CPH)');
   await page.getByRole('button',{name:/Create my trip idea/}).click();
   await expect(page.getByRole('heading',{name:'We’re cooking up your journey'})).toBeVisible();
   await expect(page.getByText('Keep this page open — your itinerary will appear here automatically.')).toBeVisible();
@@ -36,6 +40,10 @@ test('trip planner creates a clearly unbooked itinerary suggestion',async({page}
   await expect(page.getByText(/Your private journey page is ready/)).toBeVisible();
   await expect(page.getByRole('link',{name:/View my private journey/})).toHaveAttribute('href','https://waytoasia.com/proposal/test-private-token');
   expect(consultantRequest.profile?.durationDays).toBe(12);
+  expect(consultantRequest.profile?.travelStartDate).toBe('2027-03-10');
+  expect(consultantRequest.profile?.travelEndDate).toBe('2027-03-21');
+  expect(consultantRequest.profile?.dateFlexibilityDays).toBe(3);
+  expect(consultantRequest.profile?.departureAirport).toBe('Copenhagen (CPH)');
   expect(consultantRequest.profile?.interests).toContain('food');
   expect(consultantRequest.suggestion?.title).toBe(suggestion.title);
   expect(consultantRequest.builderChoices?.hotels?.['stay-0']).toBe('bangkok-b');
@@ -65,6 +73,9 @@ test('agent plans beyond the catalogue and revises the complete journey',async({
   });
   await page.goto('/en/trip-planner');
   await page.getByLabel('Destinations or regions — anywhere in Asia').fill('Japan and Taiwan');
+  await page.getByLabel('Outbound date').fill('2027-04-05');
+  await page.getByLabel('Return date').fill('2027-04-16');
+  await page.getByLabel('Departure airport or city').fill('Copenhagen (CPH)');
   await page.getByRole('button',{name:/Create my trip idea/}).click();
   await expect(page.getByRole('heading',{name:independent.title})).toBeVisible();
   await expect(page.getByText('Tailor-made beyond the catalogue')).toBeVisible();

@@ -21,6 +21,11 @@ export interface TripPlannerRequest {
   destinations: TripPlannerDestination[];
   /** Free-form destinations or regions. This deliberately allows Asia beyond the website catalogue. */
   destinationIdeas: string;
+  travelStartDate: string;
+  travelEndDate: string;
+  dateFlexibilityDays: 0|1|2|3|7;
+  departureAirport: string;
+  /** Legacy/seasonal value retained for older saved requests. */
   travelMonth: string;
   durationDays: number;
   adults: number;
@@ -134,6 +139,15 @@ export interface TravellerResearchSource {id:string;title:string;url:string;doma
 
 const localePattern = /^(en|es|it|fr|nl|hu|sv|da|no)$/;
 const monthPattern = /^(flexible|\d{4}-(0[1-9]|1[0-2]))$/;
+const isoDatePattern=/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+const flexibilityOptions=[0,1,2,3,7] as const;
+
+const validIsoDate=(value:unknown):value is string=>{
+  if(typeof value!=='string'||!isoDatePattern.test(value))return false;
+  const date=new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(date.getTime())&&date.toISOString().slice(0,10)===value;
+};
+const inclusiveDays=(start:string,end:string):number=>Math.round((Date.parse(`${end}T00:00:00Z`)-Date.parse(`${start}T00:00:00Z`))/86_400_000)+1;
 
 const uniqueAllowed = <T extends string>(value: unknown, allowed: readonly T[], limit: number): T[] => {
   if (!Array.isArray(value)) return [];
@@ -152,15 +166,23 @@ export function parseTripPlannerRequest(value: unknown): TripPlannerRequest | nu
   const destinations = uniqueAllowed(input.destinations,tripPlannerDestinations,3);
   const destinationIdeas = typeof input.destinationIdeas === 'string' ? input.destinationIdeas.trim().slice(0,180) : '';
   const interests = uniqueAllowed(input.interests,tripPlannerInterests,5);
-  const travelMonth = typeof input.travelMonth === 'string' && monthPattern.test(input.travelMonth) ? input.travelMonth : 'flexible';
-  const durationDays = integerBetween(input.durationDays,5,35,12);
+  const hasExactDateInput=Boolean(input.travelStartDate||input.travelEndDate);
+  const travelStartDate=validIsoDate(input.travelStartDate)?input.travelStartDate:'';
+  const travelEndDate=validIsoDate(input.travelEndDate)?input.travelEndDate:'';
+  const exactDuration=travelStartDate&&travelEndDate?inclusiveDays(travelStartDate,travelEndDate):0;
+  if(hasExactDateInput&&(!travelStartDate||!travelEndDate||exactDuration<5||exactDuration>35))return null;
+  const flexibility=Number(input.dateFlexibilityDays);
+  const dateFlexibilityDays=(flexibilityOptions.includes(flexibility as typeof flexibilityOptions[number])?flexibility:0) as TripPlannerRequest['dateFlexibilityDays'];
+  const departureAirport=typeof input.departureAirport==='string'?input.departureAirport.trim().slice(0,120):'';
+  const travelMonth=travelStartDate?travelStartDate.slice(0,7):typeof input.travelMonth==='string'&&monthPattern.test(input.travelMonth)?input.travelMonth:'flexible';
+  const durationDays=exactDuration||integerBetween(input.durationDays,5,35,12);
   const adults = integerBetween(input.adults,1,12,2);
   const children = integerBetween(input.children,0,8,0);
   const budget = tripPlannerBudgets.includes(input.budget as TripPlannerBudget) ? input.budget as TripPlannerBudget : 'comfort';
   const pace = tripPlannerPaces.includes(input.pace as TripPlannerPace) ? input.pace as TripPlannerPace : 'balanced';
   const notes = typeof input.notes === 'string' ? input.notes.trim().slice(0,1000) : '';
   if (!interests.length && !destinationIdeas && !notes) return null;
-  return {locale,destinations,destinationIdeas,travelMonth,durationDays,adults,children,budget,interests,pace,notes};
+  return {locale,destinations,destinationIdeas,travelStartDate,travelEndDate,dateFlexibilityDays,departureAirport,travelMonth,durationDays,adults,children,budget,interests,pace,notes};
 }
 
 export function tripCatalogForAgent() {

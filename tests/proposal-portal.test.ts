@@ -5,7 +5,7 @@ import {onRequest as applySiteMiddleware} from '../functions/_middleware';
 
 const payload:StoredProposalPayload={
   traveller:{name:'Test Traveller',email:'test@example.com',phone:'',message:'Please keep the pace comfortable.'},
-  profile:{durationDays:8,adults:2,children:0,travelMonth:'2027-03',budget:'comfort',pace:'balanced'},
+  profile:{durationDays:8,adults:2,children:0,travelStartDate:'2027-03-10',travelEndDate:'2027-03-17',dateFlexibilityDays:2,travelMonth:'2027-03-10 – 2027-03-17 · ± 2 days',departureAirport:'Copenhagen (CPH)',budget:'comfort',pace:'balanced'},
   suggestion:{
     title:'Japan in spring',summary:'An eight-day route through Tokyo and Kyoto.',recommendedDuration:'8 days / 7 nights',
     route:[
@@ -38,6 +38,9 @@ test('customer proposal renders the structured journey and privacy controls',()=
   assert.match(html,/Approve this direction/);
   assert.match(html,/Private link/);
   assert.match(html,/From €4,500 per person/);
+  assert.match(html,/Travel dates/);
+  assert.match(html,/2027-03-10 – 2027-03-17 · ± 2 days/);
+  assert.match(html,/Copenhagen \(CPH\)/);
 });
 
 test('consultant workspace edits the same route chapters',()=>{

@@ -58,7 +58,9 @@ export const onRequestPost=async({request,env}:PagesContext):Promise<Response>=>
   }
 
   const proposalUrl=publicProposalUrl(request.url,publicToken,env.PROPOSAL_ORIGIN),manageUrl=manageProposalUrl(request.url,manageToken,env.PROPOSAL_ORIGIN);
-  const customer=customerEmail(row,proposalUrl),consultant=consultantEmail(row,proposalUrl,manageUrl,phone,message);
+  const travelStart=clean(profile.travelStartDate,10),travelEnd=clean(profile.travelEndDate,10),airport=clean(profile.departureAirport,120),flexibility=Number(profile.dateFlexibilityDays)||0;
+  const travelDetails=[travelStart&&travelEnd?`Travel dates: ${travelStart} to ${travelEnd}${flexibility?` (±${flexibility} days)`:''}`:'',airport?`Departure: ${airport}`:'',message?`Traveller note: ${message}`:''].filter(Boolean).join(' · ');
+  const customer=customerEmail(row,proposalUrl),consultant=consultantEmail(row,proposalUrl,manageUrl,phone,travelDetails);
   const [customerSent,consultantSent]=await Promise.all([
     sendResend(env.RESEND_API_KEY,{to:[email],subject:customer.subject,text:customer.text,html:customer.html}),
     sendResend(env.RESEND_API_KEY,{to:[env.LEAD_TO_EMAIL],replyTo:email,subject:consultant.subject,text:consultant.text,html:consultant.html}),

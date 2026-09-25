@@ -5,7 +5,17 @@ import {onRequestPost} from '../functions/api/trip-suggestion';
 
 test('validates and limits traveller input',()=>{
   const parsed=parseTripPlannerRequest({locale:'da',destinations:['thailand','vietnam','invalid'],destinationIdeas:'  Japan and Taiwan  ',travelMonth:'2027-02',durationDays:14,adults:2,children:0,budget:'premium',pace:'slow',interests:['food','nature','food'],notes:'  Local markets  '});
-  assert.deepEqual(parsed,{locale:'da',destinations:['thailand','vietnam'],destinationIdeas:'Japan and Taiwan',travelMonth:'2027-02',durationDays:14,adults:2,children:0,budget:'premium',pace:'slow',interests:['food','nature'],notes:'Local markets'});
+  assert.deepEqual(parsed,{locale:'da',destinations:['thailand','vietnam'],destinationIdeas:'Japan and Taiwan',travelStartDate:'',travelEndDate:'',dateFlexibilityDays:0,departureAirport:'',travelMonth:'2027-02',durationDays:14,adults:2,children:0,budget:'premium',pace:'slow',interests:['food','nature'],notes:'Local markets'});
+});
+
+test('accepts exact dates, derives trip length and keeps flexibility and departure airport',()=>{
+  const parsed=parseTripPlannerRequest({locale:'en',destinationIdeas:'Vietnam',travelStartDate:'2027-03-10',travelEndDate:'2027-03-22',dateFlexibilityDays:3,departureAirport:'Copenhagen (CPH)',durationDays:7,interests:['food']});
+  assert.ok(parsed);
+  assert.equal(parsed.durationDays,13);
+  assert.equal(parsed.travelMonth,'2027-03');
+  assert.equal(parsed.dateFlexibilityDays,3);
+  assert.equal(parsed.departureAirport,'Copenhagen (CPH)');
+  assert.equal(parseTripPlannerRequest({destinationIdeas:'Vietnam',travelStartDate:'2027-03-10',travelEndDate:'2027-03-11',interests:['food']}),null);
 });
 
 test('accepts a natural-language Asia brief without catalogue interests',()=>{
