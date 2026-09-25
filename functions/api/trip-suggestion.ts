@@ -1,10 +1,10 @@
-import {assessTripSuggestionQuality,estimateTripPrice,hotelOptionMatchesBudget,hotelStandardForBudget,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest,tripCatalogForAgent,tripPlannerCurrencyForLocale,tripSuggestionJsonSchema,type TravellerResearchSource} from '../../src/lib/tripPlanner';
+import {assessTripSuggestionQuality,estimateTripPrice,hotelOptionMatchesBudget,hotelStandardForBudget,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest,tripCatalogForAgent,tripPlannerCurrencyForLocale,tripSuggestionJsonSchema,type TravellerResearchSource,type TripSuggestion} from '../../src/lib/tripPlanner';
 
 interface Env { OPENAI_API_KEY?:string;OPENAI_MODEL?:string;TAVILY_API_KEY?:string }
 interface PagesContext {request:Request;env:Env}
 
 const json = (body: unknown, status = 200, extraHeaders: Record<string,string> = {}) => Response.json(body,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...extraHeaders}});
-const researchDomains=['reddit.com','tripadvisor.com','booking.com','agoda.com','hotels.com','expedia.com','viator.com','getyourguide.com','fodors.com','lonelyplanet.com','travel.stackexchange.com'];
+const researchDomains=['reddit.com','tripadvisor.com','booking.com','agoda.com','hotels.com','expedia.com','viator.com','getyourguide.com','fodors.com','lonelyplanet.com','travel.stackexchange.com','wise.com','xe.com'];
 
 type OpenAiOutput={type?:unknown;content?:unknown;action?:unknown};
 type OpenAiResponse={status?:unknown;output?:OpenAiOutput[];error?:{message?:unknown};incomplete_details?:unknown};
@@ -72,6 +72,23 @@ const sourcesFromOpenAi=(payload:OpenAiResponse):TravellerResearchSource[]=>{
   }).slice(0,60);
 };
 
+const searchWithTavily=async(queries:string[],apiKey:string,options?:{maxSources?:number;searchDepth?:'basic'|'advanced'}):Promise<TravellerResearchSource[]>=>{
+  const responses=await Promise.allSettled(queries.map(query=>fetch('https://api.tavily.com/search',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({query,search_depth:options?.searchDepth??'basic',chunks_per_source:3,max_results:12,topic:'general',include_answer:false,include_raw_content:false,include_domains:researchDomains}),signal:AbortSignal.timeout(12000)})));
+  const payloads:TavilyResponse[]=[];
+  for(const result of responses){
+    if(result.status!=='fulfilled'||!result.value.ok)continue;
+    payloads.push(await result.value.json().catch(()=>({})) as TavilyResponse);
+  }
+  const seen=new Set<string>();
+  return payloads.flatMap(payload=>payload.results??[]).flatMap(result=>{
+    if(typeof result.url!=='string')return [];
+    let parsed:URL;try{parsed=new URL(result.url)}catch{return []}
+    if(!researchDomains.some(domain=>parsed.hostname===domain||parsed.hostname.endsWith(`.${domain}`)))return [];
+    const url=parsed.toString();if(seen.has(url))return [];seen.add(url);
+    return [{id:`R${seen.size}`,title:typeof result.title==='string'?result.title.slice(0,180):url,url,domain:parsed.hostname.replace(/^www\./,''),excerpt:typeof result.content==='string'?result.content.slice(0,1000):''}];
+  }).slice(0,options?.maxSources??40);
+};
+
 const researchWithTavily=async(profile:NonNullable<ReturnType<typeof parseTripPlannerRequest>>,apiKey:string):Promise<TravellerResearchSource[]>=>{
   const destinations=profile.destinationIdeas||profile.destinations.join(', ')||'Asia';
   const interests=profile.interests.join(', ')||'culture';
@@ -79,22 +96,30 @@ const researchWithTavily=async(profile:NonNullable<ReturnType<typeof parseTripPl
   const queries=[
     `${destinations} best well reviewed ${hotelTier} hotels spacious rooms room size traveller reviews`,
     `${destinations} best ${interests} tours excursions markets cooking classes historic sites nature experiences traveller reviews`,
-    `${destinations} current publicly listed prices ${hotelTier} hotels nightly rates tours excursions prices ${profile.travelStartDate||profile.travelMonth}`,
   ];
-  const responses=await Promise.all(queries.map(query=>fetch('https://api.tavily.com/search',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({query,search_depth:'basic',chunks_per_source:2,max_results:12,topic:'general',include_answer:false,include_raw_content:false,include_domains:researchDomains}),signal:AbortSignal.timeout(12000)})));
-  const payloads=await Promise.all(responses.map(async response=>{
-    const payload=await response.json().catch(()=>({})) as TavilyResponse;
-    if(!response.ok)throw new Error(`Research service returned ${response.status}.`);
-    return payload;
-  }));
+  return searchWithTavily(queries,apiKey);
+};
+
+const compactSearchValue=(value:string):string=>value.replace(/[\r\n\t]+/g,' ').replace(/["“”]/g,'').trim().slice(0,120);
+const chunksOf=<T>(items:T[],size:number):T[][]=>Array.from({length:Math.ceil(items.length/size)},(_,index)=>items.slice(index*size,index*size+size));
+
+/** Search after the itinerary exists so public-price evidence matches its actual first-choice components. */
+const researchPricesWithTavily=async(profile:NonNullable<ReturnType<typeof parseTripPlannerRequest>>,suggestion:TripSuggestion,apiKey:string):Promise<TravellerResearchSource[]>=>{
+  const currency=tripPlannerCurrencyForLocale[profile.locale]??'EUR';
+  const dates=profile.travelStartDate&&profile.travelEndDate?`${profile.travelStartDate} to ${profile.travelEndDate}`:profile.travelMonth;
+  const party=`${profile.adults} adults${profile.children?` ${profile.children} children`:''}`;
+  const hotels=suggestion.hotelStays.map(stay=>({place:compactSearchValue(stay.place),name:compactSearchValue(stay.options[0]?.name??''),nights:stay.nights})).filter(item=>item.name);
+  const experiences=suggestion.dayPlans.map(day=>({place:compactSearchValue(day.place),name:compactSearchValue(day.options[0]?.name??'')})).filter(item=>item.name);
+  const hotelQueries=chunksOf(hotels,3).map(batch=>`${batch.map(item=>`"${item.name}" ${item.place} ${item.nights} nights`).join(' OR ')} ${dates} ${party} current publicly listed room price per night and total in ${currency} Booking.com Agoda Hotels.com Expedia`);
+  const experienceQueries=chunksOf(experiences,7).map(batch=>`${batch.map(item=>`"${item.name}" ${item.place}`).join(' OR ')} ${dates} ${party} current publicly listed excursion or admission price per person in ${currency} Viator GetYourGuide Tripadvisor`);
+  const transport=suggestion.route.slice(0,-1).map(stop=>compactSearchValue(stop.onwardTravel)).filter(Boolean).join('; ');
+  const transportQuery=transport?`${transport} ${dates} current publicly listed regional transport fares for ${party} in ${currency}; current exchange rate to ${currency} when required`:'';
+  return searchWithTavily([...hotelQueries,...experienceQueries,...(transportQuery?[transportQuery]:[])].slice(0,7),apiKey,{maxSources:70,searchDepth:'advanced'});
+};
+
+const mergeResearchSources=(primary:TravellerResearchSource[],secondary:TravellerResearchSource[]):TravellerResearchSource[]=>{
   const seen=new Set<string>();
-  return payloads.flatMap(payload=>payload.results??[]).flatMap(result=>{
-    if(typeof result.url!=='string')return [];
-    let parsed:URL;try{parsed=new URL(result.url)}catch{return []}
-    if(!researchDomains.some(domain=>parsed.hostname===domain||parsed.hostname.endsWith(`.${domain}`)))return [];
-    const url=parsed.toString();if(seen.has(url))return [];seen.add(url);
-    return [{id:`R${seen.size}`,title:typeof result.title==='string'?result.title.slice(0,180):url,url,domain:parsed.hostname.replace(/^www\./,''),excerpt:typeof result.content==='string'?result.content.slice(0,700):''}];
-  }).slice(0,40);
+  return [...primary,...secondary].filter(source=>{const key=citationKey(source.url);if(!key||seen.has(key))return false;seen.add(key);return true}).slice(0,80).map((source,index)=>({...source,id:`R${index+1}`}));
 };
 
 const outputTextFromOpenAi=(payload:OpenAiResponse):string=>{
@@ -240,15 +265,20 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
     if(qualityIssues.length)console.warn('Trip suggestion retained after repair with quality advisories',{requestId,qualityIssues});
     if (!suggestion) throw new Error('Model response did not match the trip suggestion contract.');
     let priceEstimate;
-    if(travellerResearch.length){
+    if(env.TAVILY_API_KEY||travellerResearch.length){
       try{
+        let pricingResearch=travellerResearch;
+        if(env.TAVILY_API_KEY){
+          const focusedPriceResearch=await researchPricesWithTavily(profile,suggestion,env.TAVILY_API_KEY);
+          pricingResearch=mergeResearchSources(focusedPriceResearch,travellerResearch);
+        }
         const currency=tripPlannerCurrencyForLocale[profile.locale]??'EUR';
         const pricingSchema={type:'object',additionalProperties:false,properties:{available:{type:'boolean'},currency:{type:'string',enum:[currency]},publicTotalLow:{type:'number',minimum:0},publicTotalHigh:{type:'number',minimum:0},sourceUrls:{type:'array',maxItems:12,items:{type:'string'}}},required:['available','currency','publicTotalLow','publicTotalHigh','sourceUrls']};
         const hotelSelections=suggestion.hotelStays.map(stay=>({place:stay.place,nights:stay.nights,hotel:stay.options[0]?.name??'',sourceUrls:stay.options[0]?.sources.map(source=>source.url)??[]}));
         const experienceSelections=suggestion.dayPlans.map(day=>({day:day.day,place:day.place,experience:day.options[0]?.name??'',sourceUrls:day.options[0]?.sources.map(source=>source.url)??[]}));
-        const pricingResponse=await callOpenAi({task:'calculate_public_price_basis',travellerProfile:{locale:profile.locale,currency,adults:profile.adults,children:profile.children,standard:hotelStandardForBudget(profile.budget),travelStartDate:profile.travelStartDate,travelEndDate:profile.travelEndDate},hotelSelections,experienceSelections,regionalTravel: suggestion.route.slice(0,-1).map(stop=>stop.onwardTravel),verifiedResearchSources:travellerResearch,instruction:'Use only prices explicitly visible in the supplied public sources. Calculate a low and high base total for the whole travelling party covering every listed hotel night, the first listed experience for each day, and regional transport only when a public price is supplied. Do not include international flights. Return available=false and zero totals if the sources do not contain enough explicit public prices; never invent or infer a rate. Do not add any markup.'},false,{schema:pricingSchema,name:'public_trip_price_basis',maxTokens:1400,reasoning:'none'});
+        const pricingResponse=await callOpenAi({task:'calculate_public_price_basis',travellerProfile:{locale:profile.locale,currency,adults:profile.adults,children:profile.children,standard:hotelStandardForBudget(profile.budget),travelStartDate:profile.travelStartDate,travelEndDate:profile.travelEndDate},hotelSelections,experienceSelections,regionalTravel: suggestion.route.slice(0,-1).map(stop=>stop.onwardTravel),verifiedResearchSources:pricingResearch,instruction:'Use only explicit public prices contained in the supplied focused research. Prefer the named hotel and experience. When its exact price is unavailable, you may use an explicitly priced comparable option in the same place and requested standard as a planning benchmark, then extrapolate that verified nightly or per-person rate across the listed nights or days. Use a public exchange rate from the supplied research when conversion is required. Calculate a low and high base total for the whole travelling party covering accommodation, one planned experience per day, and regional transport when priced evidence is available. Do not include international flights. Require priced evidence for both accommodation and experiences, from at least two independent source domains. Return available=false and zero totals if those category benchmarks are missing. Never invent a price or exchange rate, and do not add any markup.'},false,{schema:pricingSchema,name:'public_trip_price_basis',maxTokens:1600,reasoning:'none'});
         const pricingEvidence=JSON.parse(outputTextFromOpenAi(pricingResponse)) as unknown;
-        priceEstimate=estimateTripPrice(profile,suggestion.route,suggestion.hotelStays,suggestion.dayPlans,pricingEvidence,travellerResearch)??undefined;
+        priceEstimate=estimateTripPrice(profile,suggestion.route,suggestion.hotelStays,suggestion.dayPlans,pricingEvidence,pricingResearch)??undefined;
       }catch(pricingError){
         console.warn('Public price estimate omitted',{requestId,error:pricingError instanceof Error?pricingError.message:String(pricingError)});
       }
