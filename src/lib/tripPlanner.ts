@@ -91,12 +91,17 @@ export interface TripPriceEstimate {
   currency:TripPlannerCurrency;
   totalLow:number;
   totalHigh:number;
-  perAdultLow:number;
-  perAdultHigh:number;
   adults:number;
   children:number;
   standard:'Value'|'Comfort'|'Premium'|'Luxury';
-  basis:'catalogue-planning-range';
+  basis:'public-listed-plus-buffer';
+  hotelNights:number;
+  hotelStays:number;
+  plannedExperiences:number;
+  regionalTravelLegs:number;
+  sourceDomains:string[];
+  planningUpliftLow:15;
+  planningUpliftHigh:20;
 }
 
 export interface TripSuggestionDraft {
@@ -286,75 +291,37 @@ const routeStopLength=(days:string):number=>{
   return Math.max(0,(numbers[1]??numbers[0])-numbers[0]+1);
 };
 
-const routeStopCountry=(place:string):string=>{
-  const normalized=place.toLowerCase();
-  if(/\bchina\b/.test(normalized))return 'china';
-  if(/\b(?:south )?korea\b/.test(normalized))return 'south-korea';
-  if(/\bthailand\b/.test(normalized))return 'thailand';
-  if(/\bvietnam\b/.test(normalized))return 'vietnam';
-  if(/\bindonesia\b|\bbali\b|\bjava\b|\bflores\b/.test(normalized))return 'indonesia';
-  if(/\bjapan\b/.test(normalized))return 'japan';
-  if(/\btaiwan\b/.test(normalized))return 'taiwan';
-  if(/\blaos\b/.test(normalized))return 'laos';
-  if(/\bcambodia\b/.test(normalized))return 'cambodia';
-  if(/\bmalaysia\b/.test(normalized))return 'malaysia';
-  if(/\bsingapore\b/.test(normalized))return 'singapore';
-  if(/\bphilippines\b/.test(normalized))return 'philippines';
-  if(/\bindia\b/.test(normalized))return 'india';
-  if(/\bsri lanka\b/.test(normalized))return 'sri-lanka';
-  if(/\bnepal\b/.test(normalized))return 'nepal';
-  if(/\bbhutan\b/.test(normalized))return 'bhutan';
-  return '';
-};
-
-const median=(values:number[]):number=>{
-  const sorted=[...values].sort((a,b)=>a-b);
-  if(!sorted.length)return 0;
-  const middle=Math.floor(sorted.length/2);
-  return sorted.length%2?sorted[middle]:(sorted[middle-1]+sorted[middle])/2;
-};
-
 const estimateRounding:Record<TripPlannerCurrency,number>={EUR:50,DKK:500,SEK:500,NOK:500,HUF:25000};
 const roundEstimate=(amount:number,currency:TripPlannerCurrency):number=>Math.max(estimateRounding[currency],Math.round(amount/estimateRounding[currency])*estimateRounding[currency]);
 
-/**
- * Produces an intentionally broad land-arrangement range from Way to Asia's
- * separately managed catalogue prices. It is deterministic and never implies
- * live supplier availability or a confirmed quotation.
- */
-export function estimateTripPrice(profile:TripPlannerRequest,route:SuggestedRouteStop[]):TripPriceEstimate{
+/** Turns independently researched public totals into a guarded planning range. */
+export function estimateTripPrice(profile:TripPlannerRequest,route:SuggestedRouteStop[],hotelStays:SuggestedHotelStay[],dayPlans:SuggestedDayPlan[],evidence:unknown,researchSources:TravellerResearchSource[]):TripPriceEstimate|null{
   const currency=tripPlannerCurrencyForLocale[profile.locale]??'EUR';
-  const allDaily=tours.map(tour=>tour.prices[currency]/tour.duration);
-  const fallbackDaily=median(allDaily);
-  let weightedDaily=0,coveredDays=0;
-  const countries=new Set<string>();
-  for(const stop of route){
-    const days=routeStopLength(stop.days);
-    if(!days)continue;
-    const country=routeStopCountry(stop.place);
-    if(country)countries.add(country);
-    const countryDaily=country?median(tours.filter(tour=>tour.country===country).map(tour=>tour.prices[currency]/tour.duration)):fallbackDaily;
-    weightedDaily+=(countryDaily||fallbackDaily)*days;
-    coveredDays+=days;
-  }
-  const dailyRate=coveredDays?weightedDaily/coveredDays:fallbackDaily;
+  if(!evidence||typeof evidence!=='object')return null;
+  const raw=evidence as Record<string,unknown>;
+  if(raw.available!==true||raw.currency!==currency)return null;
+  const baseLow=Number(raw.publicTotalLow),baseHigh=Number(raw.publicTotalHigh);
+  if(!Number.isFinite(baseLow)||!Number.isFinite(baseHigh)||baseLow<=0||baseHigh<baseLow||baseHigh>100_000_000)return null;
+  const verifiedUrls=(Array.isArray(raw.sourceUrls)?raw.sourceUrls:[]).filter((url):url is string=>typeof url==='string'&&researchSources.some(source=>source.url===url));
+  const sourceDomains=[...new Set(verifiedUrls.map(url=>{try{return new URL(url).hostname.replace(/^www\./,'')}catch{return ''}}).filter(Boolean))].slice(0,6);
+  if(sourceDomains.length<2)return null;
   const standard=hotelStandardForBudget(profile.budget);
-  const tierFactor:Record<typeof standard,number>={Value:.76,Comfort:1,Premium:1.35,Luxury:1.85};
-  const multiCountryFactor=1+Math.max(0,countries.size-1)*.07;
-  const perAdultMid=dailyRate*profile.durationDays*tierFactor[standard]*multiCountryFactor;
-  const adultEquivalent=profile.adults+profile.children*.65;
-  const perAdultLow=roundEstimate(perAdultMid*.86,currency);
-  const perAdultHigh=roundEstimate(perAdultMid*1.16,currency);
+  const totalLow=roundEstimate(baseLow*1.15,currency),totalHigh=roundEstimate(baseHigh*1.2,currency);
   return {
     currency,
-    totalLow:roundEstimate(perAdultLow*adultEquivalent,currency),
-    totalHigh:roundEstimate(perAdultHigh*adultEquivalent,currency),
-    perAdultLow,
-    perAdultHigh,
+    totalLow,
+    totalHigh,
     adults:profile.adults,
     children:profile.children,
     standard,
-    basis:'catalogue-planning-range',
+    basis:'public-listed-plus-buffer',
+    hotelNights:hotelStays.length?hotelStays.reduce((sum,stay)=>sum+stay.nights,0):Math.max(0,profile.durationDays-1),
+    hotelStays:hotelStays.length||route.length,
+    plannedExperiences:dayPlans.length,
+    regionalTravelLegs:route.filter(stop=>stop.onwardTravel.trim()).length,
+    sourceDomains,
+    planningUpliftLow:15,
+    planningUpliftHigh:20,
   };
 }
 

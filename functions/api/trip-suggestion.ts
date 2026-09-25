@@ -1,4 +1,4 @@
-import {assessTripSuggestionQuality,estimateTripPrice,hotelOptionMatchesBudget,hotelStandardForBudget,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest,tripCatalogForAgent,tripSuggestionJsonSchema,type TravellerResearchSource} from '../../src/lib/tripPlanner';
+import {assessTripSuggestionQuality,estimateTripPrice,hotelOptionMatchesBudget,hotelStandardForBudget,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest,tripCatalogForAgent,tripPlannerCurrencyForLocale,tripSuggestionJsonSchema,type TravellerResearchSource} from '../../src/lib/tripPlanner';
 
 interface Env { OPENAI_API_KEY?:string;OPENAI_MODEL?:string;TAVILY_API_KEY?:string }
 interface PagesContext {request:Request;env:Env}
@@ -79,6 +79,7 @@ const researchWithTavily=async(profile:NonNullable<ReturnType<typeof parseTripPl
   const queries=[
     `${destinations} best well reviewed ${hotelTier} hotels spacious rooms room size traveller reviews`,
     `${destinations} best ${interests} tours excursions markets cooking classes historic sites nature experiences traveller reviews`,
+    `${destinations} current publicly listed prices ${hotelTier} hotels nightly rates tours excursions prices ${profile.travelStartDate||profile.travelMonth}`,
   ];
   const responses=await Promise.all(queries.map(query=>fetch('https://api.tavily.com/search',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({query,search_depth:'basic',chunks_per_source:2,max_results:12,topic:'general',include_answer:false,include_raw_content:false,include_domains:researchDomains}),signal:AbortSignal.timeout(12000)})));
   const payloads=await Promise.all(responses.map(async response=>{
@@ -140,7 +141,7 @@ Rules:
 - Fit the requested duration and pace. Avoid exhausting one-night stops unless clearly justified. When two countries are explicitly requested for a trip of 12 days or more, give each a meaningful section rather than leaving one as a token stop.
 - Prefer direct rail or road connections between mainland cities in the same country. Use a domestic flight only when island or remote geography makes it sensible, and explain that reason.
 - For revisions, preserve the useful parts of the current plan and visibly apply the traveller's latest request. Return the complete revised itinerary, not a commentary about changes.
-- Prices and availability are intentionally handled outside this stage. Do not claim either is confirmed.
+- Do not put prices into the itinerary prose. A separate pricing task may total publicly listed hotel and excursion rates, but it must never claim live availability or a confirmed quote.
 - closing must be one short, specific invitation to adjust pace, swap stops, or add rest days.
 - Use only the exact URLs supplied in verifiedResearchSources when citing research. Research covers independent traveller discussions, hotel reviews, destination reviews and specific excursion options from the allowed domains. Add 2–4 travellerInsights only when multiple supplied sources support the point, and put those exact URLs in sourceUrls. Never invent a source, URL, review score, quotation or consensus.
 - Use concise, specific prose and return only the requested JSON structure.
@@ -238,7 +239,21 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
     // issue (for example, naming a nearby day trip beside its overnight base).
     if(qualityIssues.length)console.warn('Trip suggestion retained after repair with quality advisories',{requestId,qualityIssues});
     if (!suggestion) throw new Error('Model response did not match the trip suggestion contract.');
-    suggestion={...suggestion,priceEstimate:estimateTripPrice(profile,suggestion.route),hotelStays:suggestion.hotelStays.map(stay=>({...stay,options:stay.options.filter(option=>hotelOptionMatchesBudget(option,profile.budget))}))};
+    let priceEstimate;
+    if(travellerResearch.length){
+      try{
+        const currency=tripPlannerCurrencyForLocale[profile.locale]??'EUR';
+        const pricingSchema={type:'object',additionalProperties:false,properties:{available:{type:'boolean'},currency:{type:'string',enum:[currency]},publicTotalLow:{type:'number',minimum:0},publicTotalHigh:{type:'number',minimum:0},sourceUrls:{type:'array',maxItems:12,items:{type:'string'}}},required:['available','currency','publicTotalLow','publicTotalHigh','sourceUrls']};
+        const hotelSelections=suggestion.hotelStays.map(stay=>({place:stay.place,nights:stay.nights,hotel:stay.options[0]?.name??'',sourceUrls:stay.options[0]?.sources.map(source=>source.url)??[]}));
+        const experienceSelections=suggestion.dayPlans.map(day=>({day:day.day,place:day.place,experience:day.options[0]?.name??'',sourceUrls:day.options[0]?.sources.map(source=>source.url)??[]}));
+        const pricingResponse=await callOpenAi({task:'calculate_public_price_basis',travellerProfile:{locale:profile.locale,currency,adults:profile.adults,children:profile.children,standard:hotelStandardForBudget(profile.budget),travelStartDate:profile.travelStartDate,travelEndDate:profile.travelEndDate},hotelSelections,experienceSelections,regionalTravel: suggestion.route.slice(0,-1).map(stop=>stop.onwardTravel),verifiedResearchSources:travellerResearch,instruction:'Use only prices explicitly visible in the supplied public sources. Calculate a low and high base total for the whole travelling party covering every listed hotel night, the first listed experience for each day, and regional transport only when a public price is supplied. Do not include international flights. Return available=false and zero totals if the sources do not contain enough explicit public prices; never invent or infer a rate. Do not add any markup.'},false,{schema:pricingSchema,name:'public_trip_price_basis',maxTokens:1400,reasoning:'none'});
+        const pricingEvidence=JSON.parse(outputTextFromOpenAi(pricingResponse)) as unknown;
+        priceEstimate=estimateTripPrice(profile,suggestion.route,suggestion.hotelStays,suggestion.dayPlans,pricingEvidence,travellerResearch)??undefined;
+      }catch(pricingError){
+        console.warn('Public price estimate omitted',{requestId,error:pricingError instanceof Error?pricingError.message:String(pricingError)});
+      }
+    }
+    suggestion={...suggestion,...(priceEstimate?{priceEstimate}:{}),hotelStays:suggestion.hotelStays.map(stay=>({...stay,options:stay.options.filter(option=>hotelOptionMatchesBudget(option,profile.budget))}))};
     return json({suggestion,requestId});
   } catch (error) {
     const message=error instanceof Error ? error.message : 'Unknown error';

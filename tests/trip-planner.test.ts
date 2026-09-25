@@ -30,25 +30,30 @@ test('uses comfort as the default hotel standard',()=>{
   assert.equal(hotelNameLooksSpecific('Lan Ha Bay comfort cruise shortlist'),false);
 });
 
-test('returns broad catalogue-grounded estimates in the language currency',()=>{
+test('adds a 15–20 percent allowance to verified public price totals',()=>{
   const route=[{days:'Days 1–5',place:'Vietnam: Hanoi',plan:'Begin in Hanoi.',focus:'Begin in Hanoi.',highlights:['Old Quarter','Food walk'],onwardTravel:'Continue south.'},{days:'Days 6–9',place:'Vietnam: Hoi An',plan:'Finish in Hoi An.',focus:'Finish in Hoi An.',highlights:['Old Town','Countryside'],onwardTravel:''}];
   const comfort=parseTripPlannerRequest({locale:'da',destinationIdeas:'Vietnam',durationDays:9,adults:2,children:1,budget:'comfort',interests:['food']});
   const luxury=parseTripPlannerRequest({locale:'hu',destinationIdeas:'Vietnam',durationDays:9,adults:2,children:1,budget:'luxury',interests:['food']});
   assert.ok(comfort&&luxury);
-  const dkk=estimateTripPrice(comfort,route);
-  const huf=estimateTripPrice(luxury,route);
+  const research=[{id:'R1',title:'Hotel public price',url:'https://www.booking.com/example',domain:'booking.com',excerpt:'Public room rate.'},{id:'R2',title:'Excursion public price',url:'https://www.getyourguide.com/example',domain:'getyourguide.com',excerpt:'Public excursion price.'}];
+  const dkk=estimateTripPrice(comfort,route,[],[],{available:true,currency:'DKK',publicTotalLow:20000,publicTotalHigh:30000,sourceUrls:research.map(source=>source.url)},research);
+  const huf=estimateTripPrice(luxury,route,[],[],{available:true,currency:'HUF',publicTotalLow:1000000,publicTotalHigh:1400000,sourceUrls:research.map(source=>source.url)},research);
+  assert.ok(dkk&&huf);
   assert.equal(dkk.currency,'DKK');
   assert.equal(huf.currency,'HUF');
   assert.equal(dkk.standard,'Comfort');
   assert.equal(huf.standard,'Luxury');
-  assert.ok(dkk.totalHigh>dkk.totalLow&&dkk.totalLow>dkk.perAdultLow);
-  assert.ok(huf.perAdultLow>dkk.perAdultLow*10);
+  assert.equal(dkk.totalLow,23000);
+  assert.equal(dkk.totalHigh,36000);
+  assert.ok(dkk.totalHigh>dkk.totalLow);
+  assert.ok(huf.totalLow>dkk.totalLow*10);
   const expectedCurrencies={en:'EUR',es:'EUR',it:'EUR',fr:'EUR',nl:'EUR',da:'DKK',sv:'SEK',no:'NOK',hu:'HUF'};
   for(const [locale,currency] of Object.entries(expectedCurrencies)){
     const profile=parseTripPlannerRequest({locale,destinationIdeas:'Vietnam',durationDays:9,adults:2,children:0,budget:'comfort',interests:['food']});
     assert.ok(profile);
-    assert.equal(estimateTripPrice(profile,route).currency,currency);
+    assert.equal(estimateTripPrice(profile,route,[],[],{available:true,currency,publicTotalLow:10000,publicTotalHigh:12000,sourceUrls:research.map(source=>source.url)},research)?.currency,currency);
   }
+  assert.equal(estimateTripPrice(comfort,route,[],[],{available:false,currency:'DKK',publicTotalLow:0,publicTotalHigh:0,sourceUrls:[]},research),null);
 });
 
 test('rejects clearly higher-tier hotel brands from comfort suggestions',()=>{
@@ -151,11 +156,10 @@ test('returns a validated suggestion from the OpenAI Responses API',async()=>{
   const originalFetch=globalThis.fetch;globalThis.fetch=async()=>openAiResponse(draft);
   const response=await onRequestPost({request,env:{OPENAI_API_KEY:'test-key'}}).finally(()=>{globalThis.fetch=originalFetch});
   assert.equal(response.status,200);
-  const body=await response.json() as {suggestion: {availability:string;matchedJourneys:Array<{slug:string}>;priceEstimate:{currency:string;totalLow:number;totalHigh:number}}};
+  const body=await response.json() as {suggestion: {availability:string;matchedJourneys:Array<{slug:string}>;priceEstimate?:unknown}};
   assert.equal(body.suggestion.availability,'not-connected');
   assert.equal(body.suggestion.matchedJourneys[0].slug,'seoul-and-ancient-kingdoms');
-  assert.equal(body.suggestion.priceEstimate.currency,'EUR');
-  assert.ok(body.suggestion.priceEstimate.totalHigh>body.suggestion.priceEstimate.totalLow);
+  assert.equal(body.suggestion.priceEstimate,undefined);
 });
 
 test('builds long researched itineraries in parallel day batches',async()=>{
@@ -171,16 +175,20 @@ test('builds long researched itineraries in parallel day batches',async()=>{
     modelCalls+=1;const body=JSON.parse(String(init?.body||'{}')) as {input?:string};const input=JSON.parse(body.input||'{}') as {task?:string;dayRange?:{start:number;end:number}};
     if(input.task==='create_itinerary_core')return openAiResponse(core);
     if(input.task==='create_hotel_stays')return openAiResponse({hotelStays:[...core.hotelStays,...core.hotelStays]});
+    if(input.task==='calculate_public_price_basis')return openAiResponse({available:true,currency:'EUR',publicTotalLow:4200,publicTotalHigh:5200,sourceUrls:[source,sourceTwo]});
     return openAiResponse({dayPlans:days(input.dayRange?.start??1,input.dayRange?.end??8)});
   };
   const response=await onRequestPost({request,env:{OPENAI_API_KEY:'test-key',TAVILY_API_KEY:'research-key'}}).finally(()=>{globalThis.fetch=originalFetch});
   assert.equal(response.status,200);
-  const body=await response.json() as {suggestion:{dayPlans:Array<{options:Array<{sources:Array<{url:string}>}>}>;hotelStays:Array<{options:Array<{sources:Array<{url:string}>}>}>}};
+  const body=await response.json() as {suggestion:{dayPlans:Array<{options:Array<{sources:Array<{url:string}>}>}>;hotelStays:Array<{options:Array<{sources:Array<{url:string}>}>}>;priceEstimate:{totalLow:number;totalHigh:number;sourceDomains:string[]}}};
   assert.equal(body.suggestion.dayPlans.length,16);
   assert.equal(body.suggestion.hotelStays.length,5);
   assert.ok(body.suggestion.dayPlans.every(day=>day.options.every(option=>option.sources.length===1&&!option.sources[0].url.includes('invented.example'))));
   assert.ok(body.suggestion.hotelStays.every(stay=>stay.options.every(option=>option.sources[0].url===source)));
-  assert.equal(modelCalls,6);
+  assert.equal(body.suggestion.priceEstimate.totalLow,4850);
+  assert.equal(body.suggestion.priceEstimate.totalHigh,6250);
+  assert.deepEqual(body.suggestion.priceEstimate.sourceDomains,['tripadvisor.com','reddit.com']);
+  assert.equal(modelCalls,7);
 });
 
 test('returns a clear retryable response when OpenAI reaches its configured limit',async()=>{
