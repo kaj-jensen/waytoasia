@@ -90,6 +90,7 @@ Rules:
 - Hotel choices must be based on current review or booking-site research from the allowed domains. Summarize repeat strengths and any relevant caution in reviewSignal, but never invent or round a rating. Explain the neighbourhood, practical fit and why each hotel matches the selected standard. Do not claim live availability or a confirmed price.
 - Protect room comfort, not just star rating. For Japan, avoid recommending the smallest entry-level room. For two adults, target a named twin/double category of at least 20 m² and preferably 24 m² or more at comfort, premium and luxury level. State the category or minimum size to request in roomGuidance. If research does not verify an exact size, explicitly say the consultant must verify it before booking rather than inventing a measurement.
 - Produce dayPlans for every individual day from 1 through durationDays. Each day has exactly two clearly different selectable experience options, each specific to that destination and connected to the traveller's interests through interestTags. Food interests require named markets, cooking, tasting or neighbourhood food experiences; nature requires named landscapes, parks, walks or wildlife experiences; history requires named sites, districts, museums or expert-led visits. Avoid generic phrases such as "city tour" or "free day" unless the option explains exactly where and why.
+- For task create_itinerary_core, return the complete route and hotels but an empty dayPlans array; day plans are generated separately. For task create_day_plan_chunk, return only the requested consecutive days in dayPlans and obey the smaller supplied schema.
 - Excursion options are researched recommendations, not live supplier inventory. Named bookable tours may be suggested when supported by an exact source URL, but never claim availability, departure times or prices. Balance full and lighter days according to the requested pace.
 - Every hotel and daily option must cite one to three exact URLs returned by web research in sourceUrls. Never invent a hotel, excursion, review score, supplier, URL or traveller consensus.
 - Be season-aware without guarantees. If dates are flexible, explain which seasons particularly suit the actual route.
@@ -122,10 +123,10 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
     // Retrieve sources first, then let OpenAI compose from that bounded evidence.
     // This is much faster and more predictable than a long agentic search call.
     const tavilyResearch=env.TAVILY_API_KEY?await researchWithTavily(profile,env.TAVILY_API_KEY):[];
-    const modelDeadline=AbortSignal.timeout(65000);
+    const modelDeadline=AbortSignal.timeout(82000);
     const userPayload=refinement?{task:'revise_itinerary',travellerProfile:profile,currentItinerary:refinement.currentSuggestion,travellerRefinement:refinement.instruction,verifiedResearchSources:tavilyResearch,wayToAsiaCatalogue:tripCatalogForAgent()}:{task:'create_itinerary',travellerProfile:profile,verifiedResearchSources:tavilyResearch,wayToAsiaCatalogue:tripCatalogForAgent()};
-    const callOpenAi=async(input:unknown,useWebSearch:boolean):Promise<OpenAiResponse>=>{
-      const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:env.OPENAI_MODEL||'gpt-5.4-mini',store:false,reasoning:{effort:'low'},instructions:systemPrompt,input:JSON.stringify(input),max_output_tokens:12000,text:{format:{type:'json_schema',name:'trip_suggestion',strict:true,schema:tripSuggestionJsonSchema}},...(useWebSearch?{tools:[{type:'web_search',filters:{allowed_domains:researchDomains},search_context_size:'medium'}],tool_choice:'required',include:['web_search_call.action.sources']}:{})}),signal:modelDeadline});
+    const callOpenAi=async(input:unknown,useWebSearch:boolean,options?:{schema?:unknown;name?:string;maxTokens?:number;reasoning?:'none'|'low'}):Promise<OpenAiResponse>=>{
+      const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:env.OPENAI_MODEL||'gpt-5.4-mini',store:false,reasoning:{effort:options?.reasoning??'low'},instructions:systemPrompt,input:JSON.stringify(input),max_output_tokens:options?.maxTokens??12000,text:{format:{type:'json_schema',name:options?.name??'trip_suggestion',strict:true,schema:options?.schema??tripSuggestionJsonSchema}},...(useWebSearch?{tools:[{type:'web_search',filters:{allowed_domains:researchDomains},search_context_size:'medium'}],tool_choice:'required',include:['web_search_call.action.sources']}:{})}),signal:modelDeadline});
       const payload=await response.json().catch(()=>({})) as OpenAiResponse;
       if(!response.ok){
         const detail=typeof payload.error?.message==='string'?payload.error.message:`OpenAI returned ${response.status}`;
@@ -134,9 +135,31 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
       if(payload.status&&payload.status!=='completed')throw new Error(`OpenAI response was ${String(payload.status)}.`);
       return payload;
     };
-    const initial=await callOpenAi(userPayload,tavilyResearch.length===0);
-    const travellerResearch=tavilyResearch.length?tavilyResearch:sourcesFromOpenAi(initial);
-    let parsed=JSON.parse(outputTextFromOpenAi(initial)) as unknown;
+    let initial:OpenAiResponse;
+    let parsed:unknown;
+    let travellerResearch:TravellerResearchSource[];
+    if(tavilyResearch.length){
+      const dayPlanProperty=tripSuggestionJsonSchema.properties.dayPlans;
+      const coreSchema={...tripSuggestionJsonSchema,properties:{...tripSuggestionJsonSchema.properties,dayPlans:{type:'array',maxItems:0,items:dayPlanProperty.items}}};
+      initial=await callOpenAi({...userPayload,task:'create_itinerary_core'},false,{schema:coreSchema,name:'trip_suggestion_core',maxTokens:7000,reasoning:'low'});
+      const core=JSON.parse(outputTextFromOpenAi(initial)) as Record<string,unknown>;
+      const chunks=Array.from({length:Math.ceil(profile.durationDays/8)},(_,index)=>({start:index*8+1,end:Math.min(profile.durationDays,(index+1)*8)}));
+      const dayResponses=await Promise.all(chunks.map(({start,end})=>{
+        const count=end-start+1;
+        const daySchema={type:'object',additionalProperties:false,properties:{dayPlans:{...dayPlanProperty,minItems:count,maxItems:count}},required:['dayPlans']};
+        return callOpenAi({task:'create_day_plan_chunk',travellerProfile:profile,route:core.route,dayRange:{start,end},verifiedResearchSources:tavilyResearch,instruction:'Return each requested day exactly once, with exactly two specific selectable options per day.'},false,{schema:daySchema,name:`trip_days_${start}_${end}`,maxTokens:Math.min(7000,1800+count*600),reasoning:'none'});
+      }));
+      const dayPlans=dayResponses.flatMap(response=>{
+        const chunk=JSON.parse(outputTextFromOpenAi(response)) as {dayPlans?:unknown[]};
+        return Array.isArray(chunk.dayPlans)?chunk.dayPlans:[];
+      });
+      parsed={...core,dayPlans};
+      travellerResearch=tavilyResearch;
+    }else{
+      initial=await callOpenAi(userPayload,true);
+      travellerResearch=sourcesFromOpenAi(initial);
+      parsed=JSON.parse(outputTextFromOpenAi(initial)) as unknown;
+    }
     let qualityIssues=assessTripSuggestionQuality(parsed,profile,travellerResearch);
     if(qualityIssues.length){
       const repaired=await callOpenAi({task:'repair_itinerary',travellerProfile:profile,currentDraft:parsed,verifiedResearchSources:travellerResearch,qualityFailures:qualityIssues,instruction:'Return the complete itinerary, preserving useful route logic while fixing every listed failure. Cite only exact URLs from verifiedResearchSources.'},false);
