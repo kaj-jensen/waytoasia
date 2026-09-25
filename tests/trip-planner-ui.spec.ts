@@ -5,7 +5,7 @@ const suggestion={id:'test-suggestion',generatedAt:'2026-09-24T00:00:00.000Z',ti
 test('trip planner creates a clearly unbooked itinerary suggestion',async({page})=>{
   const sourcedSuggestion={...suggestion,travellerResearch:'live-sources',travellerInsights:[{insight:'Travellers repeatedly recommend keeping Chiang Mai as a proper base rather than compressing the north into a day trip.',sources:[{title:'Thailand route discussion',url:'https://www.reddit.com/r/ThailandTourism/example',domain:'reddit.com'}]}]};
   let consultantRequest:{profile?:{durationDays?:number;interests?:string[]};suggestion?:{title?:string};builderChoices?:{hotels?:Record<string,string>;days?:Record<string,string>;dayNotes?:Record<string,string>}}={};
-  await page.route('**/api/trip-suggestion',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({suggestion:sourcedSuggestion,requestId:'test-request'})}));
+  await page.route('**/api/trip-suggestion',async route=>{await new Promise(resolve=>setTimeout(resolve,500));return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({suggestion:sourcedSuggestion,requestId:'test-request'})})});
   await page.route('**/api/trip-enquiry',route=>{consultantRequest=route.request().postDataJSON();return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,proposalUrl:'https://waytoasia.com/proposal/test-private-token'})})});
   await page.goto('/en/trip-planner');
   await expect(page.getByRole('heading',{name:'Design a journey worth taking.'})).toBeVisible();
@@ -13,6 +13,8 @@ test('trip planner creates a clearly unbooked itinerary suggestion',async({page}
   await page.getByLabel('Thailand').check();
   await page.getByLabel('Food & local culture').check();
   await page.getByRole('button',{name:/Create my trip idea/}).click();
+  await expect(page.getByRole('heading',{name:'We’re cooking up your journey'})).toBeVisible();
+  await expect(page.getByText('Keep this page open — your itinerary will appear here automatically.')).toBeVisible();
   await expect(page.getByRole('heading',{name:suggestion.title})).toBeVisible();
   await expect(page.getByText('Ideas only · No live availability or confirmed prices yet')).toBeVisible();
   await expect(page.getByRole('link',{name:/Northern Table, Southern Sea/})).toHaveAttribute('href','/en/thailand/tours/northern-table-southern-sea');
