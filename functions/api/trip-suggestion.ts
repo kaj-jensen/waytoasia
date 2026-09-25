@@ -95,9 +95,12 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
 
   const requestId = crypto.randomUUID();
   try {
+    // Keep the whole model workflow inside Cloudflare's request window. A single
+    // deadline also prevents an optional repair pass from starting a fresh clock.
+    const modelDeadline=AbortSignal.timeout(80000);
     const userPayload=refinement?{task:'revise_itinerary',travellerProfile:profile,currentItinerary:refinement.currentSuggestion,travellerRefinement:refinement.instruction,wayToAsiaCatalogue:tripCatalogForAgent()}:{task:'create_itinerary',travellerProfile:profile,wayToAsiaCatalogue:tripCatalogForAgent()};
     const callOpenAi=async(input:unknown,useWebSearch:boolean):Promise<OpenAiResponse>=>{
-      const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:env.OPENAI_MODEL||'gpt-6-sol',store:false,reasoning:{effort:'low'},instructions:systemPrompt,input:JSON.stringify(input),max_output_tokens:14000,text:{format:{type:'json_schema',name:'trip_suggestion',strict:true,schema:tripSuggestionJsonSchema}},...(useWebSearch?{tools:[{type:'web_search',filters:{allowed_domains:researchDomains},search_context_size:'high'}],tool_choice:'required',include:['web_search_call.action.sources']}:{})}),signal:AbortSignal.timeout(90000)});
+      const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:env.OPENAI_MODEL||'gpt-5.4-mini',store:false,reasoning:{effort:'low'},instructions:systemPrompt,input:JSON.stringify(input),max_output_tokens:12000,text:{format:{type:'json_schema',name:'trip_suggestion',strict:true,schema:tripSuggestionJsonSchema}},...(useWebSearch?{tools:[{type:'web_search',filters:{allowed_domains:researchDomains},search_context_size:'medium'}],tool_choice:'required',include:['web_search_call.action.sources']}:{})}),signal:modelDeadline});
       const payload=await response.json().catch(()=>({})) as OpenAiResponse;
       if(!response.ok){
         const detail=typeof payload.error?.message==='string'?payload.error.message:`OpenAI returned ${response.status}`;
