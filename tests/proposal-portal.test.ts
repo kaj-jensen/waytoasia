@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {customerEmail,hashToken,randomToken,renderManagePage,renderProposalPage,validToken,type ProposalRow,type StoredProposalPayload} from '../functions/_lib/proposals';
+import {onRequest as applySiteMiddleware} from '../functions/_middleware';
 
 const payload:StoredProposalPayload={
   traveller:{name:'Test Traveller',email:'test@example.com',phone:'',message:'Please keep the pace comfortable.'},
@@ -52,4 +53,20 @@ test('customer email is branded, concise and links to the private page',()=>{
   assert.match(email.html,/View my journey/);
   assert.match(email.text,/https:\/\/waytoasia.com\/proposal\/private-token/);
   assert.doesNotMatch(email.html,/Consultant workspace/);
+});
+
+test('the direct Pages hostname cannot become a public alternate entrance',async()=>{
+  let continued=false;
+  const response=await applySiteMiddleware({
+    request:new Request('https://waytoasia.pages.dev/en/trip-planner/?source=direct'),
+    next:async()=>{
+      continued=true;
+      return new Response('should not be served');
+    },
+  });
+
+  assert.equal(response.status,308);
+  assert.equal(response.headers.get('location'),'https://waytoasia.com/en/trip-planner/?source=direct');
+  assert.equal(response.headers.get('cache-control'),'no-store');
+  assert.equal(continued,false);
 });
