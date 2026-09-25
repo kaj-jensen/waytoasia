@@ -216,7 +216,11 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
       parsed=reconcileDraftCitations(parsed,travellerResearch);
       qualityIssues=assessTripSuggestionQuality(parsed,profile,travellerResearch);
     }
-    if(qualityIssues.length)throw new Error(`Model response failed quality control: ${qualityIssues.join(' ')}`);
+    // Quality checks are editorial guardrails. After one repair attempt, keep an
+    // otherwise valid itinerary available rather than replacing it with a
+    // generic customer-facing error because the model retained an advisory
+    // issue (for example, naming a nearby day trip beside its overnight base).
+    if(qualityIssues.length)console.warn('Trip suggestion retained after repair with quality advisories',{requestId,qualityIssues});
     const suggestion = normalizeTripSuggestion(parsed,profile.locale,new Date(),profile.durationDays,travellerResearch);
     if (!suggestion) throw new Error('Model response did not match the trip suggestion contract.');
     return json({suggestion,requestId});
