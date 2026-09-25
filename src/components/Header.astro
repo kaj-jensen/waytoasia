@@ -3,7 +3,7 @@ import {locales,localeNames,localizedPath,t,tr,localizeContent,type Locale} from
 import {countries,journeyStyles} from '../content/data';
 const {locale,path=''}=Astro.props as {locale:Locale;path?:string};
 const displayCountries=localizeContent(locale,countries);const displayStyles=localizeContent(locale,journeyStyles);
-const plannerLabel:Record<Locale,string>={en:'AI trip planner',es:'Viaje con IA',it:'Viaggio con IA',fr:'Voyage avec IA',nl:'AI-reisplanner',hu:'AI utazástervező',sv:'AI-reseplanerare',da:'AI-rejseplanlægger',no:'AI-reiseplanlegger'};
+const plannerLabel:Record<Locale,string>={en:'Journey Designer',es:'Journey Designer',it:'Journey Designer',fr:'Journey Designer',nl:'Journey Designer',hu:'Journey Designer',sv:'Journey Designer',da:'Journey Designer',no:'Journey Designer'};
 ---
 <header class="header">
  <a class="brand" translate="no" href={localizedPath(locale)} aria-label="Way to Asia — WAY to ASIA home"><span>WAY</span><i>to</i><span>ASIA</span></a>
