@@ -3,12 +3,23 @@ import {clean,escapeHtml,hashToken,sendResend,validToken,type ProposalEnv,type P
 interface PageContext {params:{token?:string|string[]};env:ProposalEnv;request:Request}
 
 const json=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
+const originAllowed=(request:Request):boolean=>{
+  const origin=request.headers.get('origin');
+  if(!origin||origin==='null')return true;
+  try{return new URL(origin).origin===new URL(request.url).origin}catch{return false}
+};
 
-export const onRequestPost=async({params,env,request}:PageContext):Promise<Response>=>{
+const failure=(request:Request):Response=>{
+  const message='We could not save your response just now. Your proposal has not been changed. Please return to the proposal and try again.';
+  if(!(request.headers.get('accept')??'').includes('text/html'))return json({error:message},500);
+  const back=new URL(request.url);back.pathname=back.pathname.replace(/^\/api\/proposals\//,'/proposal/').replace(/\/response$/,'');back.search='';
+  return new Response(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="robots" content="noindex,nofollow"><link rel="stylesheet" href="/proposal.css"><title>Response not saved — Way to Asia</title></head><body><main class="message-page"><span class="eyebrow">Way to Asia</span><h1>Your response was not saved.</h1><p>${message}</p><a class="primary" href="${back.toString()}">Return to my proposal</a></main></body></html>`,{status:500,headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Robots-Tag':'noindex, nofollow, noarchive'}});
+};
+
+const handlePost=async({params,env,request}:PageContext):Promise<Response>=>{
   const token=typeof params.token==='string'?params.token:'';
   if(!validToken(token))return json({error:'Proposal unavailable.'},404);
-  const origin=request.headers.get('origin');
-  if(origin&&new URL(origin).hostname!==new URL(request.url).hostname)return json({error:'Invalid request origin.'},403);
+  if(!originAllowed(request))return json({error:'Invalid request origin.'},403);
   const row=await env.PROPOSALS_DB.prepare('SELECT * FROM proposals WHERE token_hash = ? AND revoked_at IS NULL AND expires_at > ?').bind(await hashToken(token),new Date().toISOString()).first<ProposalRow>();
   if(!row)return json({error:'Proposal unavailable.'},404);
   const contentType=request.headers.get('content-type')?.toLowerCase()??'';
@@ -32,6 +43,13 @@ export const onRequestPost=async({params,env,request}:PageContext):Promise<Respo
   }
   const suffix=action==='approve'?'approved':'changes';
   return Response.redirect(`${new URL(request.url).origin}/proposal/${encodeURIComponent(token)}?response=${suffix}`,303);
+};
+
+export const onRequestPost=async(context:PageContext):Promise<Response>=>{
+  try{return await handlePost(context)}catch(error){
+    console.error(JSON.stringify({message:'Proposal response failed',error:error instanceof Error?error.message:String(error)}));
+    return failure(context.request);
+  }
 };
 
 export const onRequestGet=()=>json({error:'Method not allowed.'},405);
