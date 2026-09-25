@@ -63,13 +63,13 @@ export function parseStoredPayload(value:string):StoredProposalPayload|null{
   }catch{return null}
 }
 
-export function publicProposalUrl(requestUrl:string,token:string):string{
-  const url=new URL(requestUrl);
+export function publicProposalUrl(requestUrl:string,token:string,proposalOrigin?:string):string{
+  const url=new URL(proposalOrigin||requestUrl);
   return `${url.origin}/proposal/${token}`;
 }
 
-export function manageProposalUrl(requestUrl:string,token:string):string{
-  const url=new URL(requestUrl);
+export function manageProposalUrl(requestUrl:string,token:string,proposalOrigin?:string):string{
+  const url=new URL(proposalOrigin||requestUrl);
   return `${url.origin}/proposal/manage/${token}`;
 }
 

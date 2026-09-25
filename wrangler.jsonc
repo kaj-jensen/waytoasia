@@ -7,7 +7,8 @@
 		"nodejs_compat"
 	],
 	"vars": {
-		"HBX_API_BASE_URL": "https://api.test.hotelbeds.com"
+		"HBX_API_BASE_URL": "https://api.test.hotelbeds.com",
+		"PROPOSAL_ORIGIN": "https://proposal.waytoasia.com"
 	},
 	"d1_databases": [
 		{
