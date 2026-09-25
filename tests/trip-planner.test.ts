@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {assessTripSuggestionQuality,hotelStandardMatches,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest} from '../src/lib/tripPlanner';
+import {assessTripSuggestionQuality,hotelNameLooksSpecific,hotelStandardMatches,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest} from '../src/lib/tripPlanner';
 import {onRequestPost} from '../functions/api/trip-suggestion';
 
 test('validates and limits traveller input',()=>{
@@ -16,6 +16,8 @@ test('uses comfort as the default hotel standard',()=>{
   assert.equal(parseTripPlannerRequest({destinationIdeas:'Japan',interests:['food']})?.budget,'comfort');
   assert.equal(hotelStandardMatches('Comfort','comfort'),true);
   assert.equal(hotelStandardMatches('Luxury','comfort'),false);
+  assert.equal(hotelNameLooksSpecific('The Reed Hotel Ninh Binh'),true);
+  assert.equal(hotelNameLooksSpecific('Lan Ha Bay comfort cruise shortlist'),false);
 });
 
 test('rejects a profile without interests or a written brief',()=>{
@@ -123,7 +125,7 @@ test('builds long researched itineraries in parallel day batches',async()=>{
   assert.equal(body.suggestion.hotelStays.length,5);
   assert.ok(body.suggestion.dayPlans.every(day=>day.options.every(option=>option.sources.length===1&&!option.sources[0].url.includes('invented.example'))));
   assert.ok(body.suggestion.hotelStays.every(stay=>stay.options.every(option=>option.sources[0].url===source)));
-  assert.equal(modelCalls,4);
+  assert.equal(modelCalls,6);
 });
 
 test('returns a clear retryable response when OpenAI reaches its configured limit',async()=>{

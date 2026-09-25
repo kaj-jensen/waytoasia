@@ -1,5 +1,5 @@
 import {useMemo,useState,type SyntheticEvent} from 'react';
-import {hotelStandardMatches,type TripPlannerBudget,type TripSuggestion} from '../lib/tripPlanner';
+import {hotelNameLooksSpecific,hotelStandardMatches,type TripPlannerBudget,type TripSuggestion} from '../lib/tripPlanner';
 
 type Locale = 'en'|'es'|'it'|'fr'|'nl'|'hu'|'sv'|'da'|'no';
 
@@ -84,7 +84,7 @@ const builderCopy={title:'Build this journey around you',intro:'Choose the hotel
 interface BuilderChoices {hotels:Record<string,string>;hotelNotes:Record<string,string>;days:Record<string,string>;dayNotes:Record<string,string>}
 const emptyChoices=():BuilderChoices=>({hotels:{},hotelNotes:{},days:{},dayNotes:{}});
 const recommendedChoices=(suggestion:TripSuggestion,budget:TripPlannerBudget):BuilderChoices=>({
-  hotels:(suggestion.hotelStays??[]).reduce<Record<string,string>>((selected,stay,index)=>{const option=stay.options.find(candidate=>hotelStandardMatches(candidate.standard,budget));if(option)selected[`stay-${index}`]=option.id;return selected},{}),
+  hotels:(suggestion.hotelStays??[]).reduce<Record<string,string>>((selected,stay,index)=>{const option=stay.options.find(candidate=>hotelStandardMatches(candidate.standard,budget)&&hotelNameLooksSpecific(candidate.name));if(option)selected[`stay-${index}`]=option.id;return selected},{}),
   hotelNotes:{},
   days:(suggestion.dayPlans??[]).reduce<Record<string,string>>((selected,day)=>{if(day.options[0])selected[`day-${day.day}`]=day.options[0].id;return selected},{}),
   dayNotes:{},
