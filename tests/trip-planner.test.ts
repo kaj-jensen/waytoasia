@@ -133,7 +133,7 @@ test('returns a valid itinerary when an editorial advisory remains after repair'
   const originalFetch=globalThis.fetch;let modelCalls=0;
   globalThis.fetch=async()=>{modelCalls+=1;return openAiResponse(draft)};
   const response=await onRequestPost({request,env:{OPENAI_API_KEY:'test-key'}}).finally(()=>{globalThis.fetch=originalFetch});
-  assert.equal(modelCalls,2);
+  assert.equal(modelCalls,1);
   assert.equal(response.status,200);
   const body=await response.json() as {suggestion?:{title:string}};
   assert.equal(body.suggestion?.title,draft.title);

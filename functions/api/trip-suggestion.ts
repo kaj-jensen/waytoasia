@@ -209,19 +209,24 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
       parsed=JSON.parse(outputTextFromOpenAi(initial)) as unknown;
     }
     parsed=reconcileDraftCitations(parsed,travellerResearch);
+    let suggestion=normalizeTripSuggestion(parsed,profile.locale,new Date(),profile.durationDays,travellerResearch);
     let qualityIssues=assessTripSuggestionQuality(parsed,profile,travellerResearch);
-    if(qualityIssues.length){
+    // A complete, contract-valid itinerary is more useful than making the
+    // customer wait for another full model pass to polish editorial details.
+    // Reserve the repair call for structurally invalid drafts only; the prompt
+    // and quality telemetry still guide future output improvements.
+    if(!suggestion&&qualityIssues.length){
       const repaired=await callOpenAi({task:'repair_itinerary',travellerProfile:profile,currentDraft:parsed,verifiedResearchSources:travellerResearch,qualityFailures:qualityIssues,instruction:'Return the complete itinerary, preserving useful route logic while fixing every listed failure. Cite only exact URLs from verifiedResearchSources.'},false);
       parsed=JSON.parse(outputTextFromOpenAi(repaired)) as unknown;
       parsed=reconcileDraftCitations(parsed,travellerResearch);
       qualityIssues=assessTripSuggestionQuality(parsed,profile,travellerResearch);
+      suggestion=normalizeTripSuggestion(parsed,profile.locale,new Date(),profile.durationDays,travellerResearch);
     }
     // Quality checks are editorial guardrails. After one repair attempt, keep an
     // otherwise valid itinerary available rather than replacing it with a
     // generic customer-facing error because the model retained an advisory
     // issue (for example, naming a nearby day trip beside its overnight base).
     if(qualityIssues.length)console.warn('Trip suggestion retained after repair with quality advisories',{requestId,qualityIssues});
-    const suggestion = normalizeTripSuggestion(parsed,profile.locale,new Date(),profile.durationDays,travellerResearch);
     if (!suggestion) throw new Error('Model response did not match the trip suggestion contract.');
     return json({suggestion,requestId});
   } catch (error) {
