@@ -13,6 +13,8 @@ export type TripPlannerBudget = typeof tripPlannerBudgets[number];
 export const hotelStandardForBudget=(budget:TripPlannerBudget):'Value'|'Comfort'|'Premium'|'Luxury'=>budget==='unsure'?'Comfort':budget==='value'?'Value':budget==='premium'?'Premium':budget==='luxury'?'Luxury':'Comfort';
 export const hotelStandardMatches=(standard:string,budget:TripPlannerBudget):boolean=>standard.trim().toLowerCase()===hotelStandardForBudget(budget).toLowerCase();
 export const hotelNameLooksSpecific=(name:string):boolean=>name.trim().length>=4&&!/\b(?:hotel options?|stay options?|shortlist|recommended stay|travel recommended|based in|accommodation option)\b/i.test(name);
+const clearlyHigherTierHotelName=/\b(?:luxury|premium|palace|ritz(?:-carlton)?|four seasons|mandarin oriental|rosewood|aman(?:oi|puri|sara)?|capella|park hyatt|st\.? regis|waldorf|six senses|raffles|belmond|peninsula|intercontinental|sofitel|jw marriott|vinpearl resort|emeralda resort|apricot hotel)\b/i;
+export const hotelNameMatchesBudget=(name:string,budget:TripPlannerBudget):boolean=>!(['value','comfort','unsure'] as TripPlannerBudget[]).includes(budget)||!clearlyHigherTierHotelName.test(name);
 
 export interface TripPlannerRequest {
   locale: string;
@@ -300,6 +302,7 @@ export function assessTripSuggestionQuality(value:unknown,profile:TripPlannerReq
     if(hotels.length<route.length)issues.push('Give a researched hotel shortlist for every overnight route base.');
     if(hotels.some(stay=>stay.options.length<2))issues.push('Give at least two genuinely distinct hotel choices for each stay.');
     if(hotels.some(stay=>stay.options.some(option=>!hotelStandardMatches(option.standard,profile.budget))))issues.push(`Every hotel must match the requested ${hotelStandardForBudget(profile.budget)} standard; do not substitute a higher or lower tier.`);
+    if(hotels.some(stay=>stay.options.some(option=>!hotelNameMatchesBudget(option.name,profile.budget))))issues.push(`Remove hotels whose names or brands clearly signal a higher tier than the requested ${hotelStandardForBudget(profile.budget)} standard.`);
     if(hotels.some(stay=>stay.options.some(option=>!hotelNameLooksSpecific(option.name))))issues.push('Every hotel choice must be an exact named hotel, resort or cruise vessel, never a generic option, agency, shortlist or placeholder.');
     if(researchSources.length&&hotels.some(stay=>stay.options.some(option=>!option.sources.length)))issues.push('Cite at least one exact verified research URL for every hotel choice.');
     if(/japan/i.test(`${profile.destinationIdeas} ${profile.destinations.join(' ')} ${route.map(stop=>stop.place).join(' ')}`)&&hotels.some(stay=>/japan|tokyo|kyoto|osaka|hiroshima|hakone|nikko|nara/i.test(stay.place)&&stay.options.some(option=>!/(?:m²|m2|square metre|square meter|room size|spacious|twin)/i.test(option.roomGuidance))))issues.push('For every Japan hotel, state a concrete room-size or room-category safeguard suitable for Western travellers.');

@@ -1,5 +1,5 @@
 import {useMemo,useState,type SyntheticEvent} from 'react';
-import {hotelNameLooksSpecific,hotelStandardMatches,type TripPlannerBudget,type TripSuggestion} from '../lib/tripPlanner';
+import {hotelNameLooksSpecific,hotelNameMatchesBudget,hotelStandardMatches,type TripPlannerBudget,type TripSuggestion} from '../lib/tripPlanner';
 
 type Locale = 'en'|'es'|'it'|'fr'|'nl'|'hu'|'sv'|'da'|'no';
 
@@ -84,7 +84,7 @@ const builderCopy={title:'Build this journey around you',intro:'Choose the hotel
 interface BuilderChoices {hotels:Record<string,string>;hotelNotes:Record<string,string>;days:Record<string,string>;dayNotes:Record<string,string>}
 const emptyChoices=():BuilderChoices=>({hotels:{},hotelNotes:{},days:{},dayNotes:{}});
 const recommendedChoices=(suggestion:TripSuggestion,budget:TripPlannerBudget):BuilderChoices=>({
-  hotels:(suggestion.hotelStays??[]).reduce<Record<string,string>>((selected,stay,index)=>{const option=stay.options.find(candidate=>hotelStandardMatches(candidate.standard,budget)&&hotelNameLooksSpecific(candidate.name));if(option)selected[`stay-${index}`]=option.id;return selected},{}),
+  hotels:(suggestion.hotelStays??[]).reduce<Record<string,string>>((selected,stay,index)=>{const option=stay.options.find(candidate=>hotelStandardMatches(candidate.standard,budget)&&hotelNameLooksSpecific(candidate.name)&&hotelNameMatchesBudget(candidate.name,budget));if(option)selected[`stay-${index}`]=option.id;return selected},{}),
   hotelNotes:{},
   days:(suggestion.dayPlans??[]).reduce<Record<string,string>>((selected,day)=>{if(day.options[0])selected[`day-${day.day}`]=day.options[0].id;return selected},{}),
   dayNotes:{},
@@ -104,7 +104,7 @@ export default function TripPlanner({locale='en'}:{locale?:Locale}){
   const [choices,setChoices]=useState<BuilderChoices>(emptyChoices);
   const destinations=useMemo(()=>Object.entries(destinationNames),[]);
   async function requestSuggestion(body:Record<string,unknown>){
-    const response=await fetch('/api/trip-suggestion',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const result=response.headers.get('content-type')?.includes('application/json')?await response.json() as {suggestion?:TripSuggestion;error?:string;code?:string}:null;if(!response.ok||!result?.suggestion)throw new Error(result?.code==='AI_LIMIT'?a.capacityError:result?.error||'We could not prepare a suggestion just now. Please try again.');setSuggestion(result.suggestion);setChoices(recommendedChoices(result.suggestion,String(body.budget||'comfort') as TripPlannerBudget));setStatus('idle');requestAnimationFrame(()=>document.querySelector('[data-trip-result]')?.scrollIntoView({behavior:'smooth',block:'start'}));
+    const response=await fetch('/api/trip-suggestion',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const result=response.headers.get('content-type')?.includes('application/json')?await response.json() as {suggestion?:TripSuggestion;error?:string;code?:string}:null;if(!response.ok||!result?.suggestion)throw new Error(result?.code==='AI_LIMIT'?a.capacityError:result?.error||'We could not prepare a suggestion just now. Please try again.');const budget=String(body.budget||'comfort') as TripPlannerBudget;const suggestion={...result.suggestion,hotelStays:(result.suggestion.hotelStays??[]).map(stay=>({...stay,options:stay.options.filter(option=>hotelStandardMatches(option.standard,budget)&&hotelNameLooksSpecific(option.name)&&hotelNameMatchesBudget(option.name,budget))}))};setSuggestion(suggestion);setChoices(recommendedChoices(suggestion,budget));setStatus('idle');requestAnimationFrame(()=>document.querySelector('[data-trip-result]')?.scrollIntoView({behavior:'smooth',block:'start'}));
   }
   async function submit(event:SyntheticEvent<HTMLFormElement,SubmitEvent>){
     event.preventDefault();const data=new FormData(event.currentTarget);const interests=data.getAll('interests').map(String);const destinationIdeas=String(data.get('destinationIdeas')||'').trim();const notes=String(data.get('notes')||'').trim();if(!interests.length&&!destinationIdeas&&!notes){setError(a.inputError);setStatus('error');return}

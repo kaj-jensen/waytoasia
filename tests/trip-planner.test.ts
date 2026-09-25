@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {assessTripSuggestionQuality,hotelNameLooksSpecific,hotelStandardMatches,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest} from '../src/lib/tripPlanner';
+import {assessTripSuggestionQuality,hotelNameLooksSpecific,hotelNameMatchesBudget,hotelStandardMatches,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest} from '../src/lib/tripPlanner';
 import {onRequestPost} from '../functions/api/trip-suggestion';
 
 test('validates and limits traveller input',()=>{
@@ -18,6 +18,13 @@ test('uses comfort as the default hotel standard',()=>{
   assert.equal(hotelStandardMatches('Luxury','comfort'),false);
   assert.equal(hotelNameLooksSpecific('The Reed Hotel Ninh Binh'),true);
   assert.equal(hotelNameLooksSpecific('Lan Ha Bay comfort cruise shortlist'),false);
+});
+
+test('rejects clearly higher-tier hotel brands from comfort suggestions',()=>{
+  assert.equal(hotelNameMatchesBudget('Sofitel Legend Metropole Hanoi','comfort'),false);
+  assert.equal(hotelNameMatchesBudget('Vinpearl Resort & Spa Ha Long','comfort'),false);
+  assert.equal(hotelNameMatchesBudget('The Q Hotel','comfort'),true);
+  assert.equal(hotelNameMatchesBudget('Sofitel Legend Metropole Hanoi','luxury'),true);
 });
 
 test('rejects a profile without interests or a written brief',()=>{
