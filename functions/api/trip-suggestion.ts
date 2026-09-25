@@ -90,7 +90,7 @@ Rules:
 - Hotel choices must be based on current review or booking-site research from the allowed domains. Summarize repeat strengths and any relevant caution in reviewSignal, but never invent or round a rating. Explain the neighbourhood, practical fit and why each hotel matches the selected standard. Do not claim live availability or a confirmed price.
 - Protect room comfort, not just star rating. For Japan, avoid recommending the smallest entry-level room. For two adults, target a named twin/double category of at least 20 m² and preferably 24 m² or more at comfort, premium and luxury level. State the category or minimum size to request in roomGuidance. If research does not verify an exact size, explicitly say the consultant must verify it before booking rather than inventing a measurement.
 - Produce dayPlans for every individual day from 1 through durationDays. Each day has exactly two clearly different selectable experience options, each specific to that destination and connected to the traveller's interests through interestTags. Food interests require named markets, cooking, tasting or neighbourhood food experiences; nature requires named landscapes, parks, walks or wildlife experiences; history requires named sites, districts, museums or expert-led visits. Avoid generic phrases such as "city tour" or "free day" unless the option explains exactly where and why.
-- For task create_itinerary_core, return the complete route and hotels but an empty dayPlans array; day plans are generated separately. For task create_day_plan_chunk, return only the requested consecutive days in dayPlans and obey the smaller supplied schema.
+- For task create_itinerary_core, return the complete route but empty hotelStays and dayPlans arrays; both are generated separately. For task create_hotel_stays, return one hotelStays entry for every route chapter, in the same order, with two or three researched hotel choices. For task create_day_plan_chunk, return only the requested consecutive days in dayPlans and obey the smaller supplied schema.
 - Excursion options are researched recommendations, not live supplier inventory. Named bookable tours may be suggested when supported by an exact source URL, but never claim availability, departure times or prices. Balance full and lighter days according to the requested pace.
 - Every hotel and daily option must cite one to three exact URLs returned by web research in sourceUrls. Never invent a hotel, excursion, review score, supplier, URL or traveller consensus.
 - Be season-aware without guarantees. If dates are flexible, explain which seasons particularly suit the actual route.
@@ -140,20 +140,27 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
     let travellerResearch:TravellerResearchSource[];
     if(tavilyResearch.length){
       const dayPlanProperty=tripSuggestionJsonSchema.properties.dayPlans;
-      const coreSchema={...tripSuggestionJsonSchema,properties:{...tripSuggestionJsonSchema.properties,dayPlans:{type:'array',maxItems:0,items:dayPlanProperty.items}}};
+      const hotelStayProperty=tripSuggestionJsonSchema.properties.hotelStays;
+      const coreSchema={...tripSuggestionJsonSchema,properties:{...tripSuggestionJsonSchema.properties,hotelStays:{type:'array',maxItems:0,items:hotelStayProperty.items},dayPlans:{type:'array',maxItems:0,items:dayPlanProperty.items}}};
       initial=await callOpenAi({...userPayload,task:'create_itinerary_core'},false,{schema:coreSchema,name:'trip_suggestion_core',maxTokens:7000,reasoning:'low'});
       const core=JSON.parse(outputTextFromOpenAi(initial)) as Record<string,unknown>;
+      const routeCount=Array.isArray(core.route)?core.route.length:0;
       const chunks=Array.from({length:Math.ceil(profile.durationDays/8)},(_,index)=>({start:index*8+1,end:Math.min(profile.durationDays,(index+1)*8)}));
-      const dayResponses=await Promise.all(chunks.map(({start,end})=>{
+      const hotelSchema={type:'object',additionalProperties:false,properties:{hotelStays:{...hotelStayProperty,minItems:routeCount,maxItems:routeCount}},required:['hotelStays']};
+      const [hotelResponse,...dayResponses]=await Promise.all([
+        callOpenAi({task:'create_hotel_stays',travellerProfile:profile,route:core.route,verifiedResearchSources:tavilyResearch,instruction:'Return one hotel stay for every route chapter, in the identical order, with two or three choices matched to the selected standard.'},false,{schema:hotelSchema,name:'trip_hotels',maxTokens:Math.min(7000,1800+routeCount*850),reasoning:'none'}),
+        ...chunks.map(({start,end})=>{
         const count=end-start+1;
         const daySchema={type:'object',additionalProperties:false,properties:{dayPlans:{...dayPlanProperty,minItems:count,maxItems:count}},required:['dayPlans']};
         return callOpenAi({task:'create_day_plan_chunk',travellerProfile:profile,route:core.route,dayRange:{start,end},verifiedResearchSources:tavilyResearch,instruction:'Return each requested day exactly once, with exactly two specific selectable options per day.'},false,{schema:daySchema,name:`trip_days_${start}_${end}`,maxTokens:Math.min(7000,1800+count*600),reasoning:'none'});
-      }));
+      })]);
+      const hotelChunk=JSON.parse(outputTextFromOpenAi(hotelResponse)) as {hotelStays?:unknown[]};
+      const hotelStays=Array.isArray(hotelChunk.hotelStays)?hotelChunk.hotelStays:[];
       const dayPlans=dayResponses.flatMap(response=>{
         const chunk=JSON.parse(outputTextFromOpenAi(response)) as {dayPlans?:unknown[]};
         return Array.isArray(chunk.dayPlans)?chunk.dayPlans:[];
       });
-      parsed={...core,dayPlans};
+      parsed={...core,hotelStays,dayPlans};
       travellerResearch=tavilyResearch;
     }else{
       initial=await callOpenAi(userPayload,true);

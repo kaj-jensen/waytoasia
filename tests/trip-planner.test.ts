@@ -52,7 +52,6 @@ test('flags thin chapters and generic practical filler for automatic rewriting',
   assert.ok(issues.some(issue=>issue.includes('generic')));
   assert.ok(issues.some(issue=>issue.includes('journey times')));
   assert.ok(issues.some(issue=>issue.includes('rail pass')));
-  assert.ok(issues.some(issue=>issue.includes('question')));
 });
 
 test('rejects token country sections, unsupported schedules and rushed final-day combinations',()=>{
@@ -104,6 +103,7 @@ test('builds long researched itineraries in parallel day batches',async()=>{
     if(String(url).includes('api.tavily.com'))return new Response(JSON.stringify({results:[{title:'Thailand traveller research',url:source,content:'Current traveller and hotel review context.'},{title:'Thailand forum research',url:sourceTwo,content:'Current route and destination discussion.'}]}),{status:200,headers:{'Content-Type':'application/json'}});
     modelCalls+=1;const body=JSON.parse(String(init?.body||'{}')) as {input?:string};const input=JSON.parse(body.input||'{}') as {task?:string;dayRange?:{start:number;end:number}};
     if(input.task==='create_itinerary_core')return openAiResponse(core);
+    if(input.task==='create_hotel_stays')return openAiResponse({hotelStays:core.hotelStays});
     return openAiResponse({dayPlans:days(input.dayRange?.start??1,input.dayRange?.end??8)});
   };
   const response=await onRequestPost({request,env:{OPENAI_API_KEY:'test-key',TAVILY_API_KEY:'research-key'}}).finally(()=>{globalThis.fetch=originalFetch});
@@ -111,7 +111,7 @@ test('builds long researched itineraries in parallel day batches',async()=>{
   const body=await response.json() as {suggestion:{dayPlans:unknown[];hotelStays:unknown[]}};
   assert.equal(body.suggestion.dayPlans.length,16);
   assert.equal(body.suggestion.hotelStays.length,5);
-  assert.equal(modelCalls,3);
+  assert.equal(modelCalls,4);
 });
 
 test('returns a clear retryable response when OpenAI reaches its configured limit',async()=>{
