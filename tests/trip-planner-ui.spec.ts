@@ -72,7 +72,8 @@ test('agent plans beyond the catalogue and revises the complete journey',async({
     await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({suggestion:body.refinement?revised:independent,requestId:'agent-test'})});
   });
   await page.goto('/en/trip-planner');
-  await page.getByLabel('Destinations or regions — anywhere in Asia').fill('Japan and Taiwan');
+  await expect(page.getByText('Anywhere in Asia',{exact:true})).toHaveCount(0);
+  await page.getByLabel('Other countries or regions in Asia').fill('Japan and Taiwan');
   await page.getByLabel('Outbound date').fill('2027-04-05');
   await page.getByLabel('Return date').fill('2027-04-16');
   await page.getByLabel('Departure airport or city').fill('Copenhagen (CPH)');
