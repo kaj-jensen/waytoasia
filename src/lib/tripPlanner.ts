@@ -10,6 +10,9 @@ export type TripPlannerInterest = typeof tripPlannerInterests[number];
 export type TripPlannerPace = typeof tripPlannerPaces[number];
 export type TripPlannerBudget = typeof tripPlannerBudgets[number];
 
+export const hotelStandardForBudget=(budget:TripPlannerBudget):'Value'|'Comfort'|'Premium'|'Luxury'=>budget==='unsure'?'Comfort':budget==='value'?'Value':budget==='premium'?'Premium':budget==='luxury'?'Luxury':'Comfort';
+export const hotelStandardMatches=(standard:string,budget:TripPlannerBudget):boolean=>standard.trim().toLowerCase()===hotelStandardForBudget(budget).toLowerCase();
+
 export interface TripPlannerRequest {
   locale: string;
   destinations: TripPlannerDestination[];
@@ -295,6 +298,7 @@ export function assessTripSuggestionQuality(value:unknown,profile:TripPlannerReq
     const hotels=asHotelStays(rawHotelStays,researchSources);
     if(hotels.length<route.length)issues.push('Give a researched hotel shortlist for every overnight route base.');
     if(hotels.some(stay=>stay.options.length<2))issues.push('Give at least two genuinely distinct hotel choices for each stay.');
+    if(hotels.some(stay=>stay.options.some(option=>!hotelStandardMatches(option.standard,profile.budget))))issues.push(`Every hotel must match the requested ${hotelStandardForBudget(profile.budget)} standard; do not substitute a higher or lower tier.`);
     if(researchSources.length&&hotels.some(stay=>stay.options.some(option=>!option.sources.length)))issues.push('Cite at least one exact verified research URL for every hotel choice.');
     if(/japan/i.test(`${profile.destinationIdeas} ${profile.destinations.join(' ')} ${route.map(stop=>stop.place).join(' ')}`)&&hotels.some(stay=>/japan|tokyo|kyoto|osaka|hiroshima|hakone|nikko|nara/i.test(stay.place)&&stay.options.some(option=>!/(?:m²|m2|square metre|square meter|room size|spacious|twin)/i.test(option.roomGuidance))))issues.push('For every Japan hotel, state a concrete room-size or room-category safeguard suitable for Western travellers.');
   }

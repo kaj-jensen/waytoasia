@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {assessTripSuggestionQuality,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest} from '../src/lib/tripPlanner';
+import {assessTripSuggestionQuality,hotelStandardMatches,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest} from '../src/lib/tripPlanner';
 import {onRequestPost} from '../functions/api/trip-suggestion';
 
 test('validates and limits traveller input',()=>{
@@ -14,6 +14,8 @@ test('accepts a natural-language Asia brief without catalogue interests',()=>{
 
 test('uses comfort as the default hotel standard',()=>{
   assert.equal(parseTripPlannerRequest({destinationIdeas:'Japan',interests:['food']})?.budget,'comfort');
+  assert.equal(hotelStandardMatches('Comfort','comfort'),true);
+  assert.equal(hotelStandardMatches('Luxury','comfort'),false);
 });
 
 test('rejects a profile without interests or a written brief',()=>{
@@ -76,6 +78,14 @@ test('requires source-backed traveller insights when live research is available'
   const draft={route:[{days:'Days 1–3',place:'Japan: Tokyo',plan:'Use Tokyo for food markets, old neighbourhoods and a measured introduction to the route.',highlights:['Tsukiji','Yanaka'],onwardTravel:'Continue by rail to Kyoto.'},{days:'Days 4–7',place:'Japan: Kyoto',plan:'Slow down in Kyoto for temple districts, seasonal cooking and a quieter final day beyond the centre.',highlights:['Higashiyama','Uji'],onwardTravel:''}],practicalNotes:['Compare current individual rail fares before deciding on a pass.','Spring and autumn suit the walking days.','Remove Uji for a slower pace.'],travellerInsights:[{insight:'A generic unsupported claim that should not pass the source requirement.',sourceUrls:['https://invented.example/']}],closing:'Would you like to slow the route?'};
   const research=[{id:'R1',title:'Forum route discussion',url:'https://www.reddit.com/r/JapanTravel/example',domain:'reddit.com',excerpt:'Travellers discuss route pacing.'}];
   assert.ok(assessTripSuggestionQuality(draft,profile,research).some(issue=>issue.includes('two specific traveller insights')));
+});
+
+test('flags hotel tiers that do not match the selected standard',()=>{
+  const profile=parseTripPlannerRequest({destinationIdeas:'Vietnam',durationDays:9,budget:'comfort',interests:['nature']});
+  assert.ok(profile);
+  const option=(id:string,standard:string)=>({id,name:`Hotel ${id}`,area:'Central district',standard,whyFit:'A practical and well-reviewed base for this route.',roomGuidance:'Request a larger twin or double room.',reviewSignal:'Reviews consistently mention the location and service.',sourceUrls:[]});
+  const issues=assessTripSuggestionQuality({route:[],hotelStays:[{place:'Hanoi',nights:3,options:[option('one','Luxury'),option('two','Premium')]}]},profile);
+  assert.ok(issues.some(issue=>issue.includes('requested Comfort standard')));
 });
 
 const openAiResponse=(draft:unknown,status=200,headers?:HeadersInit)=>new Response(JSON.stringify(status===200?{status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(draft),annotations:[]}]}]}:{error:{message:'Rate limit reached'}}),{status,headers:{'Content-Type':'application/json',...headers}});
