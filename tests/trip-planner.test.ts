@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {assessTripSuggestionQuality,hotelNameLooksSpecific,hotelNameMatchesBudget,hotelStandardMatches,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest} from '../src/lib/tripPlanner';
+import {assessTripSuggestionQuality,hotelNameLooksSpecific,hotelNameMatchesBudget,hotelOptionMatchesBudget,hotelStandardMatches,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest} from '../src/lib/tripPlanner';
 import {onRequestPost} from '../functions/api/trip-suggestion';
 
 test('validates and limits traveller input',()=>{
@@ -25,6 +25,7 @@ test('rejects clearly higher-tier hotel brands from comfort suggestions',()=>{
   assert.equal(hotelNameMatchesBudget('Vinpearl Resort & Spa Ha Long','comfort'),false);
   assert.equal(hotelNameMatchesBudget('The Q Hotel','comfort'),true);
   assert.equal(hotelNameMatchesBudget('Sofitel Legend Metropole Hanoi','luxury'),true);
+  assert.equal(hotelOptionMatchesBudget({id:'au-co',name:'Au Co Cruise',area:'Ha Long Bay',standard:'Comfort',whyFit:'Premium comfort cruise with wellness facilities.',roomGuidance:'Verify cabin size.',reviewSignal:'Reviews praise the service.',sources:[]},'comfort'),false);
 });
 
 test('rejects a profile without interests or a written brief',()=>{
