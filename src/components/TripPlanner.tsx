@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useState,type SyntheticEvent} from 'react';
-import {hotelOptionMatchesBudget,type TripPlannerBudget,type TripSuggestion} from '../lib/tripPlanner';
+import {compactTripSuggestionForRefinement,hotelOptionMatchesBudget,type TripPlannerBudget,type TripSuggestion} from '../lib/tripPlanner';
 
 type Locale = 'en'|'es'|'it'|'fr'|'nl'|'hu'|'sv'|'da'|'no';
 
@@ -170,7 +170,7 @@ export default function TripPlanner({locale='en'}:{locale?:Locale}){
   }
   async function refine(event:SyntheticEvent<HTMLFormElement,SubmitEvent>){
     event.preventDefault();if(!profile||!suggestion)return;const form=event.currentTarget;const data=new FormData(form);const refinement=String(data.get('refinement')||'').trim();if(!refinement){setError(a.inputError);setStatus('error');return}setStatus('loading');setError('');
-    try{await requestSuggestion({...profile,currentSuggestion:suggestion,refinement});form.reset()}catch(reason){setError(reason instanceof Error?reason.message:'Unable to refine the suggestion.');setStatus('error')}
+    try{await requestSuggestion({...profile,currentSuggestion:compactTripSuggestionForRefinement(suggestion),refinement});form.reset()}catch(reason){setError(reason instanceof Error?reason.message:'Unable to refine the suggestion.');setStatus('error')}
   }
   async function handoff(event:SyntheticEvent<HTMLFormElement,SubmitEvent>){
     event.preventDefault();if(!suggestion)return;const form=event.currentTarget;const data=new FormData(form);setHandoffStatus('sending');

@@ -133,6 +133,19 @@ export interface TripSuggestion extends Omit<TripSuggestionDraft,'matchedJourney
   }>;
 }
 
+export type TripSuggestionRefinementContext=Pick<TripSuggestionDraft,'title'|'summary'|'recommendedDuration'|'route'|'fitReasons'|'practicalNotes'|'closing'>;
+
+/** Revisions need the route narrative, not the much larger hotel, activity, pricing or source payloads. */
+export const compactTripSuggestionForRefinement=(suggestion:TripSuggestion):TripSuggestionRefinementContext=>({
+  title:suggestion.title,
+  summary:suggestion.summary,
+  recommendedDuration:suggestion.recommendedDuration,
+  route:suggestion.route,
+  fitReasons:suggestion.fitReasons,
+  practicalNotes:suggestion.practicalNotes,
+  closing:suggestion.closing,
+});
+
 export const tripPlannerCurrencyForLocale:Record<string,TripPlannerCurrency>={en:'EUR',es:'EUR',it:'EUR',fr:'EUR',nl:'EUR',hu:'HUF',sv:'SEK',da:'DKK',no:'NOK'};
 
 export interface TravellerResearchSource {id:string;title:string;url:string;domain:string;excerpt:string}

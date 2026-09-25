@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {assessTripSuggestionQuality,estimateTripPrice,hotelNameLooksSpecific,hotelNameMatchesBudget,hotelOptionMatchesBudget,hotelStandardMatches,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest} from '../src/lib/tripPlanner';
+import {assessTripSuggestionQuality,compactTripSuggestionForRefinement,estimateTripPrice,hotelNameLooksSpecific,hotelNameMatchesBudget,hotelOptionMatchesBudget,hotelStandardMatches,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest,type TripSuggestion} from '../src/lib/tripPlanner';
 import {onRequestPost} from '../functions/api/trip-suggestion';
 
 test('validates and limits traveller input',()=>{
@@ -68,6 +68,20 @@ test('sanitizes a conversational refinement and its previous itinerary',()=>{
   assert.equal(parsed?.instruction,'Replace Tokyo with rural Kyushu.');
   assert.equal(parsed?.currentSuggestion.route[0].place,'Japan: Tokyo');
   assert.deepEqual(parsed?.currentSuggestion.matchedJourneySlugs,[]);
+});
+
+test('keeps refinement requests small by excluding generated option payloads',()=>{
+  const bulky={title:'Japan in balance',summary:'A city and countryside route.',recommendedDuration:'12 days',route:[{days:'Days 1–4',place:'Japan: Tokyo',plan:'Use Tokyo as the base for neighbourhood food and a day beyond the centre.',focus:'Use Tokyo as the base for neighbourhood food and a day beyond the centre.',highlights:['Tsukiji outer market','Yanaka lanes'],onwardTravel:'Train to Kyoto.'},{days:'Days 5–12',place:'Japan: Kyoto',plan:'Slow the pace for temples, craft districts and a rural day trip.',focus:'Slow the pace for temples, craft districts and a rural day trip.',highlights:['Higashiyama walk','Uji tea country'],onwardTravel:''}],fitReasons:['Good pace.'],practicalNotes:['Compare rail fares.'],closing:'Refine it.',hotelStays:[{unused:'x'.repeat(30_000)}],dayPlans:[{unused:'y'.repeat(30_000)}]} as unknown as TripSuggestion;
+  const compact=compactTripSuggestionForRefinement(bulky);
+  assert.equal('hotelStays' in compact,false);
+  assert.equal('dayPlans' in compact,false);
+  assert.ok(JSON.stringify(compact).length<20_000);
+});
+
+test('accepts a bounded refinement from an older cached planner client',async()=>{
+  const request=new Request('https://waytoasia.com/api/trip-suggestion',{method:'POST',headers:{'Content-Type':'application/json','Content-Length':'40000','Origin':'https://waytoasia.com'},body:JSON.stringify({destinationIdeas:'Japan',interests:['food'],refinement:'Slow the route down.',currentSuggestion:{title:'Japan in balance',summary:'A city and countryside route.',recommendedDuration:'12 days',route:[{days:'Days 1–4',place:'Japan: Tokyo',focus:'Use Tokyo as the base for neighbourhood food and a day beyond the centre.',highlights:['Tsukiji outer market','Yanaka lanes'],onwardTravel:'Train to Kyoto.'},{days:'Days 5–12',place:'Japan: Kyoto',focus:'Slow the pace for temples, craft districts and a rural day trip.',highlights:['Higashiyama walk','Uji tea country'],onwardTravel:''}],hotelStays:[{unused:'x'.repeat(30_000)}],fitReasons:['Good pace.'],practicalNotes:['Compare rail fares.'],closing:'Refine it.'}})});
+  const response=await onRequestPost({request,env:{}} as never);
+  assert.equal(response.status,503);
 });
 
 test('resolves only real catalogue journeys and server-owned links',()=>{

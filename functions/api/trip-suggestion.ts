@@ -149,7 +149,9 @@ Quality benchmark (match its usefulness and specificity, not its destinations): 
 
 export const onRequestPost = async ({request,env}:PagesContext):Promise<Response> => {
   const length = Number(request.headers.get('content-length') || 0);
-  if (length > 20_000) return json({error:'Request is too large.'},413);
+  // New clients send a compact revision context. Keep a bounded allowance for older cached clients
+  // that still include the generated hotel and day-option payload in refinement requests.
+  if (length > 250_000) return json({error:'Request is too large.'},413);
   const origin = request.headers.get('origin');
   if (origin && new URL(origin).hostname !== new URL(request.url).hostname) return json({error:'Invalid request origin.'},403);
   if (!request.headers.get('content-type')?.toLowerCase().includes('application/json')) return json({error:'Expected a JSON request.'},415);
