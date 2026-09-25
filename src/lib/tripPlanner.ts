@@ -35,11 +35,49 @@ export interface SuggestedRouteStop {
   onwardTravel: string;
 }
 
+export interface ResearchLink {title:string;url:string;domain:string}
+
+export interface SuggestedHotelOption {
+  id:string;
+  name:string;
+  area:string;
+  standard:string;
+  whyFit:string;
+  roomGuidance:string;
+  reviewSignal:string;
+  sources:ResearchLink[];
+}
+
+export interface SuggestedHotelStay {
+  place:string;
+  nights:number;
+  options:SuggestedHotelOption[];
+}
+
+export interface SuggestedDayOption {
+  id:string;
+  name:string;
+  type:string;
+  description:string;
+  whyFit:string;
+  interestTags:string[];
+  sources:ResearchLink[];
+}
+
+export interface SuggestedDayPlan {
+  day:number;
+  place:string;
+  theme:string;
+  options:SuggestedDayOption[];
+}
+
 export interface TripSuggestionDraft {
   title: string;
   summary: string;
   recommendedDuration: string;
   route: SuggestedRouteStop[];
+  hotelStays: Array<Omit<SuggestedHotelStay,'options'>&{options:Array<Omit<SuggestedHotelOption,'sources'>&{sourceUrls:string[]}>}>;
+  dayPlans: Array<Omit<SuggestedDayPlan,'options'>&{options:Array<Omit<SuggestedDayOption,'sources'>&{sourceUrls:string[]}>}>;
   fitReasons: string[];
   practicalNotes: string[];
   travellerInsights: Array<{insight:string;sourceUrls:string[]}>;
@@ -47,13 +85,15 @@ export interface TripSuggestionDraft {
   closing: string;
 }
 
-export interface TripSuggestion extends Omit<TripSuggestionDraft,'matchedJourneySlugs'|'travellerInsights'> {
+export interface TripSuggestion extends Omit<TripSuggestionDraft,'matchedJourneySlugs'|'travellerInsights'|'hotelStays'|'dayPlans'> {
   id: string;
   generatedAt: string;
   availability: 'not-connected';
   pricing: 'illustrative-only';
   travellerResearch: 'live-sources'|'not-connected';
   travellerInsights: Array<{insight:string;sources:Array<{title:string;url:string;domain:string}>}>;
+  hotelStays: SuggestedHotelStay[];
+  dayPlans: SuggestedDayPlan[];
   matchedJourneys: Array<{
     slug: string;
     name: string;
@@ -90,7 +130,7 @@ export function parseTripPlannerRequest(value: unknown): TripPlannerRequest | nu
   const durationDays = integerBetween(input.durationDays,5,35,12);
   const adults = integerBetween(input.adults,1,12,2);
   const children = integerBetween(input.children,0,8,0);
-  const budget = tripPlannerBudgets.includes(input.budget as TripPlannerBudget) ? input.budget as TripPlannerBudget : 'unsure';
+  const budget = tripPlannerBudgets.includes(input.budget as TripPlannerBudget) ? input.budget as TripPlannerBudget : 'comfort';
   const pace = tripPlannerPaces.includes(input.pace as TripPlannerPace) ? input.pace as TripPlannerPace : 'balanced';
   const notes = typeof input.notes === 'string' ? input.notes.trim().slice(0,1000) : '';
   if (!interests.length && !destinationIdeas && !notes) return null;
@@ -120,6 +160,29 @@ const asRoute=(value:unknown):SuggestedRouteStop[]=>Array.isArray(value)?value.m
   const plan=text(stop.plan,700)||text(stop.focus,700);
   return {days:text(stop.days,40),place:text(stop.place,120),plan,focus:plan,highlights:textArray(stop.highlights,4,180),onwardTravel:text(stop.onwardTravel,300)};
 }).filter(stop=>stop.days&&stop.place&&stop.plan&&stop.highlights.length>=2).slice(0,8):[];
+
+const sourcesForUrls=(value:unknown,researchSources:TravellerResearchSource[]):ResearchLink[]=>textArray(value,3,1000).flatMap(url=>{
+  const source=researchSources.find(candidate=>candidate.url===url);
+  return source?[{title:source.title,url:source.url,domain:source.domain}]:[];
+});
+
+const asHotelStays=(value:unknown,researchSources:TravellerResearchSource[]):SuggestedHotelStay[]=>Array.isArray(value)?value.map(item=>{
+  const stay=item&&typeof item==='object'?item as Record<string,unknown>:{},rawOptions=Array.isArray(stay.options)?stay.options:[];
+  const options=rawOptions.map(raw=>{
+    const option=raw&&typeof raw==='object'?raw as Record<string,unknown>:{};
+    return {id:text(option.id,80),name:text(option.name,180),area:text(option.area,180),standard:text(option.standard,80),whyFit:text(option.whyFit,500),roomGuidance:text(option.roomGuidance,360),reviewSignal:text(option.reviewSignal,360),sources:sourcesForUrls(option.sourceUrls,researchSources)};
+  }).filter(option=>option.id&&option.name&&option.whyFit&&option.roomGuidance).slice(0,3);
+  return {place:text(stay.place,160),nights:integerBetween(stay.nights,1,34,1),options};
+}).filter(stay=>stay.place&&stay.options.length>=2).slice(0,10):[];
+
+const asDayPlans=(value:unknown,researchSources:TravellerResearchSource[]):SuggestedDayPlan[]=>Array.isArray(value)?value.map(item=>{
+  const day=item&&typeof item==='object'?item as Record<string,unknown>:{},rawOptions=Array.isArray(day.options)?day.options:[];
+  const options=rawOptions.map(raw=>{
+    const option=raw&&typeof raw==='object'?raw as Record<string,unknown>:{};
+    return {id:text(option.id,80),name:text(option.name,180),type:text(option.type,80),description:text(option.description,500),whyFit:text(option.whyFit,360),interestTags:textArray(option.interestTags,4,50),sources:sourcesForUrls(option.sourceUrls,researchSources)};
+  }).filter(option=>option.id&&option.name&&option.description&&option.whyFit).slice(0,3);
+  return {day:integerBetween(day.day,1,35,0),place:text(day.place,160),theme:text(day.theme,180),options};
+}).filter(day=>day.day&&day.place&&day.theme&&day.options.length>=2).slice(0,35):[];
 
 const durationCopy:Record<string,(days:number)=>string>={
   en:days=>`${days} days / ${Math.max(1,days-1)} nights`,
@@ -180,6 +243,8 @@ export function assessTripSuggestionQuality(value:unknown,profile:TripPlannerReq
   const draft=value as Record<string,unknown>;
   const route=asRoute(draft.route);
   const issues:string[]=[];
+  const rawHotelStays=Array.isArray(draft.hotelStays)?draft.hotelStays:[];
+  const rawDayPlans=Array.isArray(draft.dayPlans)?draft.dayPlans:[];
   if(route.length<(profile.durationDays>=14?5:profile.durationDays>=10?3:2))issues.push('Use enough itinerary chapters for the trip length.');
   if(!routeCoversDuration(route,profile.durationDays))issues.push(`Cover Days 1–${profile.durationDays} exactly once with no gaps or overlaps.`);
   if(route.some(stop=>stop.plan.length<55||stop.plan.toLowerCase()===stop.place.toLowerCase()))issues.push('Every chapter plan must be a concrete 1–2 sentence narrative about the base, rhythm and purpose, not a label or fragment.');
@@ -215,6 +280,20 @@ export function assessTripSuggestionQuality(value:unknown,profile:TripPlannerReq
     });
     if(supportedInsights.length<2)issues.push('Use at least two specific traveller insights supported by the verified research source URLs.');
   }
+  if(rawHotelStays.length){
+    const hotels=asHotelStays(rawHotelStays,researchSources);
+    if(hotels.length<route.length)issues.push('Give a researched hotel shortlist for every overnight route base.');
+    if(hotels.some(stay=>stay.options.length<2))issues.push('Give at least two genuinely distinct hotel choices for each stay.');
+    if(researchSources.length&&hotels.some(stay=>stay.options.some(option=>!option.sources.length)))issues.push('Cite at least one exact verified research URL for every hotel choice.');
+    if(/japan/i.test(`${profile.destinationIdeas} ${profile.destinations.join(' ')} ${route.map(stop=>stop.place).join(' ')}`)&&hotels.some(stay=>/japan|tokyo|kyoto|osaka|hiroshima|hakone|nikko|nara/i.test(stay.place)&&stay.options.some(option=>!/(?:m²|m2|square metre|square meter|room size|spacious|twin)/i.test(option.roomGuidance))))issues.push('For every Japan hotel, state a concrete room-size or room-category safeguard suitable for Western travellers.');
+  }
+  if(rawDayPlans.length){
+    const days=asDayPlans(rawDayPlans,researchSources);
+    if(days.length!==profile.durationDays||days.some((day,index)=>day.day!==index+1))issues.push(`Give selectable experience choices for every day from 1 to ${profile.durationDays}, with no gaps.`);
+    if(days.some(day=>day.options.length<2))issues.push('Give at least two distinct, interest-matched experience choices for every day.');
+    if(researchSources.length&&days.some(day=>day.options.some(option=>!option.sources.length)))issues.push('Cite at least one exact verified research URL for every daily experience choice.');
+    if(profile.interests.length&&!days.some(day=>day.options.some(option=>option.interestTags.some(tag=>profile.interests.includes(tag as TripPlannerInterest)))))issues.push('Connect the daily experience choices explicitly to the traveller interests.');
+  }
   if(!text(draft.closing,500).endsWith('?'))issues.push('End with one short, specific follow-up question.');
   return issues;
 }
@@ -223,6 +302,8 @@ export function normalizeTripSuggestion(value: unknown, locale: string, now = ne
   if (!value || typeof value !== 'object') return null;
   const draft = value as Record<string,unknown>;
   const route=asRoute(draft.route);
+  const hotelStays=asHotelStays(draft.hotelStays,researchSources);
+  const dayPlans=asDayPlans(draft.dayPlans,researchSources);
   const requestedSlugs = textArray(draft.matchedJourneySlugs,4,100);
   const matchedJourneys = requestedSlugs.flatMap(slug=>{
     const tour = tours.find(item=>item.slug===slug);
@@ -247,6 +328,8 @@ export function normalizeTripSuggestion(value: unknown, locale: string, now = ne
     summary:text(draft.summary,900),
     recommendedDuration:requestedDurationDays?(durationCopy[locale]??durationCopy.en)(requestedDurationDays):text(draft.recommendedDuration,80),
     route,
+    hotelStays,
+    dayPlans,
     fitReasons:textArray(draft.fitReasons,5),
     practicalNotes:textArray(draft.practicalNotes,5),
     closing:text(draft.closing,500),
@@ -257,7 +340,8 @@ export function normalizeTripSuggestion(value: unknown, locale: string, now = ne
     matchedJourneys,
   };
   const coversDuration=!requestedDurationDays||routeCoversDuration(route,requestedDurationDays);
-  return suggestion.title && suggestion.summary.length>=120 && suggestion.recommendedDuration && suggestion.route.length >= 2 && suggestion.fitReasons.length >= 2 && suggestion.practicalNotes.length>=3 && coversDuration ? suggestion : null;
+  const builderComplete=(!Array.isArray(draft.hotelStays)&&!Array.isArray(draft.dayPlans))||(hotelStays.length>=route.length&&(!requestedDurationDays||dayPlans.length===requestedDurationDays));
+  return suggestion.title && suggestion.summary.length>=120 && suggestion.recommendedDuration && suggestion.route.length >= 2 && suggestion.fitReasons.length >= 2 && suggestion.practicalNotes.length>=3 && coversDuration&&builderComplete ? suggestion : null;
 }
 
 export interface TripPlannerRefinement {
@@ -279,6 +363,8 @@ export function parseTripPlannerRefinement(value:unknown):TripPlannerRefinement|
     summary:text(plan.summary,900),
     recommendedDuration:text(plan.recommendedDuration,80),
     route,
+    hotelStays:[],
+    dayPlans:[],
     fitReasons:textArray(plan.fitReasons,5),
     practicalNotes:textArray(plan.practicalNotes,5),
     travellerInsights:[],
@@ -296,11 +382,13 @@ export const tripSuggestionJsonSchema = {
     summary:{type:'string'},
     recommendedDuration:{type:'string'},
     route:{type:'array',minItems:2,maxItems:8,items:{type:'object',additionalProperties:false,properties:{days:{type:'string',description:'Exact consecutive day range, for example Days 1–3.'},place:{type:'string',description:'Country and named overnight base or sensible paired places.'},plan:{type:'string',minLength:55,description:'A full 1–2 sentence narrative explaining the base, daily rhythm and why this chapter works. Never repeat only the place name.'},highlights:{type:'array',minItems:2,maxItems:4,items:{type:'string',description:'A named place, neighbourhood, landscape or specific experience.'}},onwardTravel:{type:'string',description:'The real transport leg to the next chapter; empty only for the final chapter.'}},required:['days','place','plan','highlights','onwardTravel']}},
+    hotelStays:{type:'array',minItems:2,maxItems:10,items:{type:'object',additionalProperties:false,properties:{place:{type:'string'},nights:{type:'integer',minimum:1,maximum:34},options:{type:'array',minItems:2,maxItems:3,items:{type:'object',additionalProperties:false,properties:{id:{type:'string',description:'Stable short ID unique within the itinerary.'},name:{type:'string'},area:{type:'string',description:'Neighbourhood or district and why it is practical.'},standard:{type:'string',description:'The hotel tier and how it matches the requested comfort level.'},whyFit:{type:'string'},roomGuidance:{type:'string',description:'A specific room category or minimum room-size safeguard; especially important in Japan.'},reviewSignal:{type:'string',description:'A careful summary of current review strengths and cautions. Never invent a rating.'},sourceUrls:{type:'array',minItems:1,maxItems:3,items:{type:'string',description:'An exact hotel/review URL returned by web research.'}}},required:['id','name','area','standard','whyFit','roomGuidance','reviewSignal','sourceUrls']}}},required:['place','nights','options']}},
+    dayPlans:{type:'array',minItems:5,maxItems:35,items:{type:'object',additionalProperties:false,properties:{day:{type:'integer',minimum:1,maximum:35},place:{type:'string'},theme:{type:'string'},options:{type:'array',minItems:2,maxItems:3,items:{type:'object',additionalProperties:false,properties:{id:{type:'string',description:'Stable short ID unique within the itinerary.'},name:{type:'string'},type:{type:'string',description:'For example culinary, nature, heritage, active, wellness or free time.'},description:{type:'string'},whyFit:{type:'string'},interestTags:{type:'array',minItems:1,maxItems:4,items:{type:'string',enum:['food','history','nature','art','active','wellness','family','celebration']}},sourceUrls:{type:'array',minItems:1,maxItems:3,items:{type:'string',description:'An exact excursion, attraction, forum or review URL returned by web research.'}}},required:['id','name','type','description','whyFit','interestTags','sourceUrls']}}},required:['day','place','theme','options']}},
     fitReasons:{type:'array',minItems:2,maxItems:5,items:{type:'string'}},
     practicalNotes:{type:'array',minItems:3,maxItems:5,items:{type:'string'}},
     travellerInsights:{type:'array',maxItems:4,items:{type:'object',additionalProperties:false,properties:{insight:{type:'string'},sourceUrls:{type:'array',minItems:1,maxItems:3,items:{type:'string',description:'An exact URL returned by web research.'}}},required:['insight','sourceUrls']}},
     matchedJourneySlugs:{type:'array',maxItems:4,items:{type:'string'}},
     closing:{type:'string'},
   },
-  required:['title','summary','recommendedDuration','route','fitReasons','practicalNotes','travellerInsights','matchedJourneySlugs','closing'],
+  required:['title','summary','recommendedDuration','route','hotelStays','dayPlans','fitReasons','practicalNotes','travellerInsights','matchedJourneySlugs','closing'],
 } as const;

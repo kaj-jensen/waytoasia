@@ -12,6 +12,10 @@ test('accepts a natural-language Asia brief without catalogue interests',()=>{
   assert.equal(parseTripPlannerRequest({destinationIdeas:'Japan and Taiwan',interests:[]})?.destinationIdeas,'Japan and Taiwan');
 });
 
+test('uses comfort as the default hotel standard',()=>{
+  assert.equal(parseTripPlannerRequest({destinationIdeas:'Japan',interests:['food']})?.budget,'comfort');
+});
+
 test('rejects a profile without interests or a written brief',()=>{
   assert.equal(parseTripPlannerRequest({interests:[]}),null);
 });
