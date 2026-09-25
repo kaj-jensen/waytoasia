@@ -80,6 +80,20 @@ export interface SuggestedDayPlan {
   options:SuggestedDayOption[];
 }
 
+export type TripPlannerCurrency='EUR'|'DKK'|'SEK'|'NOK'|'HUF';
+
+export interface TripPriceEstimate {
+  currency:TripPlannerCurrency;
+  totalLow:number;
+  totalHigh:number;
+  perAdultLow:number;
+  perAdultHigh:number;
+  adults:number;
+  children:number;
+  standard:'Value'|'Comfort'|'Premium'|'Luxury';
+  basis:'catalogue-planning-range';
+}
+
 export interface TripSuggestionDraft {
   title: string;
   summary: string;
@@ -99,6 +113,7 @@ export interface TripSuggestion extends Omit<TripSuggestionDraft,'matchedJourney
   generatedAt: string;
   availability: 'not-connected';
   pricing: 'illustrative-only';
+  priceEstimate?:TripPriceEstimate;
   travellerResearch: 'live-sources'|'not-connected';
   travellerInsights: Array<{insight:string;sources:Array<{title:string;url:string;domain:string}>}>;
   hotelStays: SuggestedHotelStay[];
@@ -112,6 +127,8 @@ export interface TripSuggestion extends Omit<TripSuggestionDraft,'matchedJourney
     prices: Record<string,number>;
   }>;
 }
+
+export const tripPlannerCurrencyForLocale:Record<string,TripPlannerCurrency>={en:'EUR',es:'EUR',it:'EUR',fr:'EUR',nl:'EUR',hu:'HUF',sv:'SEK',da:'DKK',no:'NOK'};
 
 export interface TravellerResearchSource {id:string;title:string;url:string;domain:string;excerpt:string}
 
@@ -233,6 +250,78 @@ const routeStopLength=(days:string):number=>{
   if(!numbers.length)return 0;
   return Math.max(0,(numbers[1]??numbers[0])-numbers[0]+1);
 };
+
+const routeStopCountry=(place:string):string=>{
+  const normalized=place.toLowerCase();
+  if(/\bchina\b/.test(normalized))return 'china';
+  if(/\b(?:south )?korea\b/.test(normalized))return 'south-korea';
+  if(/\bthailand\b/.test(normalized))return 'thailand';
+  if(/\bvietnam\b/.test(normalized))return 'vietnam';
+  if(/\bindonesia\b|\bbali\b|\bjava\b|\bflores\b/.test(normalized))return 'indonesia';
+  if(/\bjapan\b/.test(normalized))return 'japan';
+  if(/\btaiwan\b/.test(normalized))return 'taiwan';
+  if(/\blaos\b/.test(normalized))return 'laos';
+  if(/\bcambodia\b/.test(normalized))return 'cambodia';
+  if(/\bmalaysia\b/.test(normalized))return 'malaysia';
+  if(/\bsingapore\b/.test(normalized))return 'singapore';
+  if(/\bphilippines\b/.test(normalized))return 'philippines';
+  if(/\bindia\b/.test(normalized))return 'india';
+  if(/\bsri lanka\b/.test(normalized))return 'sri-lanka';
+  if(/\bnepal\b/.test(normalized))return 'nepal';
+  if(/\bbhutan\b/.test(normalized))return 'bhutan';
+  return '';
+};
+
+const median=(values:number[]):number=>{
+  const sorted=[...values].sort((a,b)=>a-b);
+  if(!sorted.length)return 0;
+  const middle=Math.floor(sorted.length/2);
+  return sorted.length%2?sorted[middle]:(sorted[middle-1]+sorted[middle])/2;
+};
+
+const estimateRounding:Record<TripPlannerCurrency,number>={EUR:50,DKK:500,SEK:500,NOK:500,HUF:25000};
+const roundEstimate=(amount:number,currency:TripPlannerCurrency):number=>Math.max(estimateRounding[currency],Math.round(amount/estimateRounding[currency])*estimateRounding[currency]);
+
+/**
+ * Produces an intentionally broad land-arrangement range from Way to Asia's
+ * separately managed catalogue prices. It is deterministic and never implies
+ * live supplier availability or a confirmed quotation.
+ */
+export function estimateTripPrice(profile:TripPlannerRequest,route:SuggestedRouteStop[]):TripPriceEstimate{
+  const currency=tripPlannerCurrencyForLocale[profile.locale]??'EUR';
+  const allDaily=tours.map(tour=>tour.prices[currency]/tour.duration);
+  const fallbackDaily=median(allDaily);
+  let weightedDaily=0,coveredDays=0;
+  const countries=new Set<string>();
+  for(const stop of route){
+    const days=routeStopLength(stop.days);
+    if(!days)continue;
+    const country=routeStopCountry(stop.place);
+    if(country)countries.add(country);
+    const countryDaily=country?median(tours.filter(tour=>tour.country===country).map(tour=>tour.prices[currency]/tour.duration)):fallbackDaily;
+    weightedDaily+=(countryDaily||fallbackDaily)*days;
+    coveredDays+=days;
+  }
+  const dailyRate=coveredDays?weightedDaily/coveredDays:fallbackDaily;
+  const standard=hotelStandardForBudget(profile.budget);
+  const tierFactor:Record<typeof standard,number>={Value:.76,Comfort:1,Premium:1.35,Luxury:1.85};
+  const multiCountryFactor=1+Math.max(0,countries.size-1)*.07;
+  const perAdultMid=dailyRate*profile.durationDays*tierFactor[standard]*multiCountryFactor;
+  const adultEquivalent=profile.adults+profile.children*.65;
+  const perAdultLow=roundEstimate(perAdultMid*.86,currency);
+  const perAdultHigh=roundEstimate(perAdultMid*1.16,currency);
+  return {
+    currency,
+    totalLow:roundEstimate(perAdultLow*adultEquivalent,currency),
+    totalHigh:roundEstimate(perAdultHigh*adultEquivalent,currency),
+    perAdultLow,
+    perAdultHigh,
+    adults:profile.adults,
+    children:profile.children,
+    standard,
+    basis:'catalogue-planning-range',
+  };
+}
 
 const requestedCountries=(profile:TripPlannerRequest):Array<{name:string;pattern:RegExp}>=>{
   const brief=`${profile.destinationIdeas} ${profile.destinations.join(' ')}`.toLowerCase();

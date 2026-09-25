@@ -1,4 +1,4 @@
-import {assessTripSuggestionQuality,hotelOptionMatchesBudget,hotelStandardForBudget,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest,tripCatalogForAgent,tripSuggestionJsonSchema,type TravellerResearchSource} from '../../src/lib/tripPlanner';
+import {assessTripSuggestionQuality,estimateTripPrice,hotelOptionMatchesBudget,hotelStandardForBudget,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest,tripCatalogForAgent,tripSuggestionJsonSchema,type TravellerResearchSource} from '../../src/lib/tripPlanner';
 
 interface Env { OPENAI_API_KEY?:string;OPENAI_MODEL?:string;TAVILY_API_KEY?:string }
 interface PagesContext {request:Request;env:Env}
@@ -235,7 +235,7 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
     // issue (for example, naming a nearby day trip beside its overnight base).
     if(qualityIssues.length)console.warn('Trip suggestion retained after repair with quality advisories',{requestId,qualityIssues});
     if (!suggestion) throw new Error('Model response did not match the trip suggestion contract.');
-    suggestion={...suggestion,hotelStays:suggestion.hotelStays.map(stay=>({...stay,options:stay.options.filter(option=>hotelOptionMatchesBudget(option,profile.budget))}))};
+    suggestion={...suggestion,priceEstimate:estimateTripPrice(profile,suggestion.route),hotelStays:suggestion.hotelStays.map(stay=>({...stay,options:stay.options.filter(option=>hotelOptionMatchesBudget(option,profile.budget))}))};
     return json({suggestion,requestId});
   } catch (error) {
     const message=error instanceof Error ? error.message : 'Unknown error';

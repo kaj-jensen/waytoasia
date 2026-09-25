@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {assessTripSuggestionQuality,hotelNameLooksSpecific,hotelNameMatchesBudget,hotelOptionMatchesBudget,hotelStandardMatches,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest} from '../src/lib/tripPlanner';
+import {assessTripSuggestionQuality,estimateTripPrice,hotelNameLooksSpecific,hotelNameMatchesBudget,hotelOptionMatchesBudget,hotelStandardMatches,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest} from '../src/lib/tripPlanner';
 import {onRequestPost} from '../functions/api/trip-suggestion';
 
 test('validates and limits traveller input',()=>{
@@ -18,6 +18,27 @@ test('uses comfort as the default hotel standard',()=>{
   assert.equal(hotelStandardMatches('Luxury','comfort'),false);
   assert.equal(hotelNameLooksSpecific('The Reed Hotel Ninh Binh'),true);
   assert.equal(hotelNameLooksSpecific('Lan Ha Bay comfort cruise shortlist'),false);
+});
+
+test('returns broad catalogue-grounded estimates in the language currency',()=>{
+  const route=[{days:'Days 1–5',place:'Vietnam: Hanoi',plan:'Begin in Hanoi.',focus:'Begin in Hanoi.',highlights:['Old Quarter','Food walk'],onwardTravel:'Continue south.'},{days:'Days 6–9',place:'Vietnam: Hoi An',plan:'Finish in Hoi An.',focus:'Finish in Hoi An.',highlights:['Old Town','Countryside'],onwardTravel:''}];
+  const comfort=parseTripPlannerRequest({locale:'da',destinationIdeas:'Vietnam',durationDays:9,adults:2,children:1,budget:'comfort',interests:['food']});
+  const luxury=parseTripPlannerRequest({locale:'hu',destinationIdeas:'Vietnam',durationDays:9,adults:2,children:1,budget:'luxury',interests:['food']});
+  assert.ok(comfort&&luxury);
+  const dkk=estimateTripPrice(comfort,route);
+  const huf=estimateTripPrice(luxury,route);
+  assert.equal(dkk.currency,'DKK');
+  assert.equal(huf.currency,'HUF');
+  assert.equal(dkk.standard,'Comfort');
+  assert.equal(huf.standard,'Luxury');
+  assert.ok(dkk.totalHigh>dkk.totalLow&&dkk.totalLow>dkk.perAdultLow);
+  assert.ok(huf.perAdultLow>dkk.perAdultLow*10);
+  const expectedCurrencies={en:'EUR',es:'EUR',it:'EUR',fr:'EUR',nl:'EUR',da:'DKK',sv:'SEK',no:'NOK',hu:'HUF'};
+  for(const [locale,currency] of Object.entries(expectedCurrencies)){
+    const profile=parseTripPlannerRequest({locale,destinationIdeas:'Vietnam',durationDays:9,adults:2,children:0,budget:'comfort',interests:['food']});
+    assert.ok(profile);
+    assert.equal(estimateTripPrice(profile,route).currency,currency);
+  }
 });
 
 test('rejects clearly higher-tier hotel brands from comfort suggestions',()=>{
@@ -106,9 +127,11 @@ test('returns a validated suggestion from the OpenAI Responses API',async()=>{
   const originalFetch=globalThis.fetch;globalThis.fetch=async()=>openAiResponse(draft);
   const response=await onRequestPost({request,env:{OPENAI_API_KEY:'test-key'}}).finally(()=>{globalThis.fetch=originalFetch});
   assert.equal(response.status,200);
-  const body=await response.json() as {suggestion: {availability:string;matchedJourneys:Array<{slug:string}>}};
+  const body=await response.json() as {suggestion: {availability:string;matchedJourneys:Array<{slug:string}>;priceEstimate:{currency:string;totalLow:number;totalHigh:number}}};
   assert.equal(body.suggestion.availability,'not-connected');
   assert.equal(body.suggestion.matchedJourneys[0].slug,'seoul-and-ancient-kingdoms');
+  assert.equal(body.suggestion.priceEstimate.currency,'EUR');
+  assert.ok(body.suggestion.priceEstimate.totalHigh>body.suggestion.priceEstimate.totalLow);
 });
 
 test('builds long researched itineraries in parallel day batches',async()=>{

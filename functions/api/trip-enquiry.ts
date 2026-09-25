@@ -4,6 +4,16 @@ interface PagesContext {request:Request;env:ProposalEnv}
 
 const json=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 const emailPattern=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const localeCurrency:Record<string,string>={en:'EUR',es:'EUR',it:'EUR',fr:'EUR',nl:'EUR',hu:'HUF',sv:'SEK',da:'DKK',no:'NOK'};
+
+export const planningEstimateLabel=(suggestion:Record<string,unknown>,locale:string):string=>{
+  const estimate=suggestion.priceEstimate&&typeof suggestion.priceEstimate==='object'?suggestion.priceEstimate as Record<string,unknown>:{};
+  const currency=clean(estimate.currency,3);
+  const low=Number(estimate.totalLow),high=Number(estimate.totalHigh);
+  if(currency!==localeCurrency[locale]||!Number.isFinite(low)||!Number.isFinite(high)||low<=0||high<low||high>100_000_000)return '';
+  const format=new Intl.NumberFormat(locale,{style:'currency',currency,maximumFractionDigits:0});
+  return `${format.format(low)}–${format.format(high)} total · rough planning estimate`;
+};
 
 export const onRequestPost=async({request,env}:PagesContext):Promise<Response>=>{
   const length=Number(request.headers.get('content-length')||0);
@@ -38,7 +48,7 @@ export const onRequestPost=async({request,env}:PagesContext):Promise<Response>=>
   const [tokenHash,manageTokenHash]=await Promise.all([hashToken(publicToken),hashToken(manageToken)]);
   const id=crypto.randomUUID(),now=new Date(),expires=new Date(now.getTime()+60*24*60*60*1000);
   const payload:StoredProposalPayload={traveller:{name,email,phone,message},profile,suggestion:{...suggestion,title,summary,route},builderChoices};
-  const row:ProposalRow={id,token_hash:tokenHash,manage_token_hash:manageTokenHash,traveller_name:name,traveller_email:email,locale,title,summary,estimated_price:'',consultant_note:'',payload_json:JSON.stringify(payload),status:'new',traveller_response:'',created_at:now.toISOString(),updated_at:now.toISOString(),expires_at:expires.toISOString(),revoked_at:null};
+  const row:ProposalRow={id,token_hash:tokenHash,manage_token_hash:manageTokenHash,traveller_name:name,traveller_email:email,locale,title,summary,estimated_price:planningEstimateLabel(suggestion,locale),consultant_note:'',payload_json:JSON.stringify(payload),status:'new',traveller_response:'',created_at:now.toISOString(),updated_at:now.toISOString(),expires_at:expires.toISOString(),revoked_at:null};
 
   try{
     await env.PROPOSALS_DB.prepare(`INSERT INTO proposals (id,token_hash,manage_token_hash,traveller_name,traveller_email,locale,title,summary,estimated_price,consultant_note,payload_json,status,traveller_response,created_at,updated_at,expires_at,revoked_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(row.id,row.token_hash,row.manage_token_hash,row.traveller_name,row.traveller_email,row.locale,row.title,row.summary,row.estimated_price,row.consultant_note,row.payload_json,row.status,row.traveller_response,row.created_at,row.updated_at,row.expires_at,row.revoked_at).run();
