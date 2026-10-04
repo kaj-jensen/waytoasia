@@ -7,7 +7,7 @@ export async function onRequest({request,env}:Context):Promise<Response>{
   try{
     const staff=await authenticate(request,env);
     if(!['GET','POST'].includes(request.method))return json({error:'Method not allowed'},405);
-    const url=new URL(request.url),path=url.pathname.replace(/^\/staff\/?/,'');
+    const url=new URL(request.url),path=url.pathname.replace(/^\/(?:staff|dashboard)\/?/,'');
     if(request.method==='GET'&&!path)return new Response(renderDashboard(staff),{headers:{...privateHeaders(),'Content-Type':'text/html; charset=utf-8'}});
     if(request.method==='GET'&&path==='api/me')return json({staff,permissions:permissions(staff),emailSending:env.EMAIL_SEND_ENABLED==='true'&&Boolean(env.RESEND_API_KEY&&env.REPLY_DOMAIN),attachments:Boolean(env.PRIVATE_ATTACHMENTS)});
     if(request.method==='GET'&&path.startsWith('attachments/')){

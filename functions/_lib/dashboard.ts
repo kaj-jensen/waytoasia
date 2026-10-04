@@ -28,8 +28,9 @@ export async function authenticate(request:Request,env:DashboardEnv):Promise<Sta
     if(!keys){keys=createRemoteJWKSet(new URL(`${issuer}/cdn-cgi/access/certs`));keysets.set(issuer,keys)}
     const local=['localhost','127.0.0.1'].includes(new URL(request.url).hostname)&&env.LOCAL_ACCESS_JWK;
     const {payload}=await jwtVerify(token,local?await importJWK(JSON.parse(env.LOCAL_ACCESS_JWK!) as JWK,'RS256'):keys,{issuer,audience:env.ACCESS_AUD,algorithms:['RS256'],maxTokenAge:'1h'});
-    // Access policy must require MFA, and the signed claim must independently confirm it.
-    if((env.ACCESS_REQUIRE_MFA!=='false'&&(!Array.isArray(payload.amr)||!payload.amr.includes('mfa')))||typeof payload.email!=='string')throw new Error('MFA required');
+    // Independent MFA is enforced by the dedicated Access application before issuance.
+    // IdP MFA mode additionally checks its signed authentication-method claim.
+    if((!['false','cloudflare'].includes(env.ACCESS_REQUIRE_MFA||'')&&(!Array.isArray(payload.amr)||!payload.amr.includes('mfa')))||typeof payload.email!=='string')throw new Error('MFA required');
     const staff=await env.PROPOSALS_DB.prepare('SELECT email,name,COALESCE(access_role,role) role,enabled FROM staff_users WHERE email=? AND enabled=1').bind(payload.email.toLowerCase()).first<Staff>();
     if(!staff)throw new Response('Staff access denied.',{status:403,headers:privateHeaders()});
     return staff;

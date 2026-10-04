@@ -127,3 +127,14 @@ test('Back-Office, Finance and View only permissions apply to direct API request
     assert.equal(me.staff.role,role);assert.equal(me.permissions.edit,role==='backoffice');assert.equal(me.permissions.proposals,false);
   }
 });
+
+test('dashboard alias uses the same signed identity, active staff and role checks',async()=>{
+  const {env,sqlite}=setup();env.ACCESS_REQUIRE_MFA='cloudflare';
+  const request=(token?:string)=>new Request('http://localhost:8788/dashboard/api/me',{headers:token?{'Cf-Access-Jwt-Assertion':token}:{}});
+  assert.equal((await onRequest({env,request:request()})).status,401);
+  assert.equal((await onRequest({env,request:request('forged')})).status,401);
+  assert.equal((await onRequest({env,request:request(await auth.token(undefined,false,{aud:'wrong'}))})).status,401);
+  assert.equal((await onRequest({env,request:request(await auth.token(undefined,false))})).status,200);
+  sqlite.prepare('UPDATE staff_users SET enabled=0').run();
+  assert.equal((await onRequest({env,request:request(await auth.token(undefined,false))})).status,403);
+});
