@@ -27,7 +27,7 @@ The current increment adds:
 
 Collaboration sources and future import controls are documented in [`CONTENT_SOURCES.md`](./CONTENT_SOURCES.md).
 
-The next increments will connect published Sanity content to the front end, add editorial story routes and introduce a Worker-backed proposal workflow. D1, R2 and Queues stay intentionally deferred until the product needs persistent enquiries, owned media storage or asynchronous supplier integrations.
+The next increments will connect published Sanity content to the front end, add editorial story routes and introduce a Worker-backed proposal workflow. D1 now stores private proposals; the internal enquiry workspace extends that storage and supports optional private R2 attachments. Queues remain deferred.
 
 ## Local development
 
@@ -75,3 +75,7 @@ In **Workers & Pages → waytoasia → Deployments**, choose the last known-good
 ## Translation checklist
 
 The current non-English UI chrome proves locale routing. Destination narratives, cultural details, tour names, itineraries and image alt text require professional human translation before public launch; do not publish machine-generated cultural copy without review.
+
+## Internal enquiry workspace
+
+The invite-only `/staff` dashboard reuses Cloudflare Pages, D1 and Resend. Start a synthetic local preview with `npm run preview:dashboard`. See [staff dashboard setup and verification](docs/STAFF-DASHBOARD.md) for Access email-code configuration, preview-only bindings, receiving-domain decisions, private attachments, backups and retention. Capture remains opt-in until migrations and staff authentication are configured. No production deployment is authorised by this implementation.

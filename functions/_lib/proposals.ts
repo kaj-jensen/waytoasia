@@ -19,6 +19,12 @@ export interface ProposalRow {
 }
 
 export interface ProposalEnv extends Env {
+  DASHBOARD_CAPTURE?:string;
+  REPLY_DOMAIN?:string;
+  ACCESS_TEAM_DOMAIN?:string;
+  ACCESS_AUD?:string;
+  ACCESS_REQUIRE_MFA?:string;
+  LOCAL_ACCESS_JWK?:string;
   RESEND_API_KEY?:string;
   LEAD_TO_EMAIL?:string;
 }
@@ -138,7 +144,7 @@ export function renderProposalPage(row:ProposalRow,token:string,responseState:st
 export function renderManagePage(row:ProposalRow,saved:boolean):string{
   const payload=parseStoredPayload(row.payload_json);
   if(!payload)return shell('Proposal unavailable','<main class="message-page"><h1>This proposal could not be displayed.</h1></main>',{description:'Way to Asia consultant workspace',locale:'en',manage:true});
-  const body=`<main id="proposal-content" class="manage-main">${saved?'<div class="notice success">Proposal updated. The customer link now shows these changes.</div>':''}<header class="manage-header"><span class="eyebrow">Consultant workspace</span><h1>${escapeHtml(row.title)}</h1><p>Update this saved proposal. Every save updates the same private customer link, so there is never a second version to reconcile.</p></header><form method="post" class="manage-form"><section><h2>Presentation</h2><label>Journey title<input name="title" value="${escapeHtml(row.title)}" maxlength="180" required></label><label>Summary<textarea name="summary" rows="5" maxlength="1200" required>${escapeHtml(row.summary)}</textarea></label><div class="manage-two"><label>Estimated price<input name="estimated_price" value="${escapeHtml(row.estimated_price)}" maxlength="120" placeholder="For example: From €6,850 per person"></label><label>Status<select name="status">${Object.entries(statusLabels).map(([value,label])=>`<option value="${value}"${row.status===value?' selected':''}>${escapeHtml(label)}</option>`).join('')}</select></label></div><label>Personal note shown to the customer<textarea name="consultant_note" rows="5" maxlength="1600">${escapeHtml(row.consultant_note)}</textarea></label></section><section><h2>Route chapters</h2>${renderRoute(payload,true)}</section><div class="manage-actions"><button class="primary">Save changes</button></div></form></main>`;
+  const body=`<main id="proposal-content" class="manage-main">${saved?'<div class="notice success">Proposal updated. The customer link now shows these changes.</div>':''}<header class="manage-header"><span class="eyebrow">Consultant workspace</span><h1>${escapeHtml(row.title)}</h1><p>Update this saved proposal. Every save updates the same private customer link. When the staff dashboard is enabled, previous versions are preserved as internal snapshots.</p></header><form method="post" class="manage-form"><section><h2>Presentation</h2><label>Journey title<input name="title" value="${escapeHtml(row.title)}" maxlength="180" required></label><label>Summary<textarea name="summary" rows="5" maxlength="1200" required>${escapeHtml(row.summary)}</textarea></label><div class="manage-two"><label>Estimated price<input name="estimated_price" value="${escapeHtml(row.estimated_price)}" maxlength="120" placeholder="For example: From €6,850 per person"></label><label>Status<select name="status">${Object.entries(statusLabels).map(([value,label])=>`<option value="${value}"${row.status===value?' selected':''}>${escapeHtml(label)}</option>`).join('')}</select></label></div><label>Personal note shown to the customer<textarea name="consultant_note" rows="5" maxlength="1600">${escapeHtml(row.consultant_note)}</textarea></label></section><section><h2>Route chapters</h2>${renderRoute(payload,true)}</section><div class="manage-actions"><button class="primary">Save changes</button></div></form></main>`;
   return shell(`Manage ${row.title}`,body,{description:'Way to Asia consultant workspace',locale:row.locale,manage:true});
 }
 

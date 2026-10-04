@@ -1,3 +1,5 @@
+import {sendLogged} from '../_lib/dashboard-email';
+import {captureEnquiry,readBytes} from '../_lib/dashboard';
 import {clean,consultantEmail,customerEmail,hashToken,manageProposalUrl,publicProposalUrl,randomToken,sendResend,type ProposalEnv,type ProposalRow,type StoredProposalPayload} from '../_lib/proposals';
 
 interface PagesContext {request:Request;env:ProposalEnv}
@@ -23,7 +25,7 @@ export const onRequestPost=async({request,env}:PagesContext):Promise<Response>=>
   if(!request.headers.get('content-type')?.toLowerCase().includes('application/json'))return json({error:'Expected a JSON request.'},415);
 
   let raw:unknown;
-  try{raw=await request.json()}catch{return json({error:'Invalid JSON request.'},400)}
+  try{raw=JSON.parse(new TextDecoder().decode(await readBytes(request,250000)))}catch(error){if(error instanceof Response)return error;return json({error:'Invalid JSON request.'},400)}
   if(!raw||typeof raw!=='object')return json({error:'Invalid enquiry.'},400);
   const input=raw as Record<string,unknown>;
   if(clean(input.website,100))return json({ok:true});
@@ -50,21 +52,28 @@ export const onRequestPost=async({request,env}:PagesContext):Promise<Response>=>
   const payload:StoredProposalPayload={traveller:{name,email,phone,message},profile,suggestion:{...suggestion,title,summary,route},builderChoices};
   const row:ProposalRow={id,token_hash:tokenHash,manage_token_hash:manageTokenHash,traveller_name:name,traveller_email:email,locale,title,summary,estimated_price:planningEstimateLabel(suggestion,locale),consultant_note:'',payload_json:JSON.stringify(payload),status:'new',traveller_response:'',created_at:now.toISOString(),updated_at:now.toISOString(),expires_at:expires.toISOString(),revoked_at:null};
 
+  const proposalUrl=publicProposalUrl(request.url,publicToken,env.PROPOSAL_ORIGIN),manageUrl=manageProposalUrl(request.url,manageToken,env.PROPOSAL_ORIGIN);
+  let reference='',enquiryId='';
   try{
-    await env.PROPOSALS_DB.prepare(`INSERT INTO proposals (id,token_hash,manage_token_hash,traveller_name,traveller_email,locale,title,summary,estimated_price,consultant_note,payload_json,status,traveller_response,created_at,updated_at,expires_at,revoked_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(row.id,row.token_hash,row.manage_token_hash,row.traveller_name,row.traveller_email,row.locale,row.title,row.summary,row.estimated_price,row.consultant_note,row.payload_json,row.status,row.traveller_response,row.created_at,row.updated_at,row.expires_at,row.revoked_at).run();
-  }catch(error){
-    console.error(JSON.stringify({message:'Proposal storage failed',error:error instanceof Error?error.message:String(error)}));
+    const insert=env.PROPOSALS_DB.prepare(`INSERT INTO proposals (id,token_hash,manage_token_hash,traveller_name,traveller_email,locale,title,summary,estimated_price,consultant_note,payload_json,status,traveller_response,created_at,updated_at,expires_at,revoked_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(row.id,row.token_hash,row.manage_token_hash,row.traveller_name,row.traveller_email,row.locale,row.title,row.summary,row.estimated_price,row.consultant_note,row.payload_json,row.status,row.traveller_response,row.created_at,row.updated_at,row.expires_at,row.revoked_at);
+    if(env.DASHBOARD_CAPTURE==='true'){
+      const enquiry=await captureEnquiry(env,{name,email,phone,source:'Journey Designer',message,requirements:{...profile,title,route}},{id,title,url:proposalUrl,snapshot:JSON.stringify(payload)},insert);
+      reference=enquiry.reference;enquiryId=enquiry.id;
+    }else await insert.run();
+  }catch{
+    console.error('Proposal storage failed');
     return json({error:'We could not save the proposal just now. Please try again.'},502);
   }
 
-  const proposalUrl=publicProposalUrl(request.url,publicToken,env.PROPOSAL_ORIGIN),manageUrl=manageProposalUrl(request.url,manageToken,env.PROPOSAL_ORIGIN);
   const travelStart=clean(profile.travelStartDate,10),travelEnd=clean(profile.travelEndDate,10),airport=clean(profile.departureAirport,120),flexibility=Number(profile.dateFlexibilityDays)||0;
   const travelDetails=[travelStart&&travelEnd?`Travel dates: ${travelStart} to ${travelEnd}${flexibility?` (±${flexibility} days)`:''}`:'',airport?`Departure: ${airport}`:'',message?`Traveller note: ${message}`:''].filter(Boolean).join(' · ');
   const customer=customerEmail(row,proposalUrl),consultant=consultantEmail(row,proposalUrl,manageUrl,phone,travelDetails);
+  if(reference){customer.subject=`[${reference}] ${customer.subject}`;consultant.subject=`[${reference}] ${consultant.subject}`}
   const [customerSent,consultantSent]=await Promise.all([
-    sendResend(env.RESEND_API_KEY,{to:[email],subject:customer.subject,text:customer.text,html:customer.html}),
+    enquiryId?sendLogged(env,enquiryId,{to:email,...customer,reference}):sendResend(env.RESEND_API_KEY,{to:[email],subject:customer.subject,text:customer.text,html:customer.html}),
     sendResend(env.RESEND_API_KEY,{to:[env.LEAD_TO_EMAIL],replyTo:email,subject:consultant.subject,text:consultant.text,html:consultant.html}),
   ]);
+  if(reference)await env.PROPOSALS_DB.prepare("UPDATE enquiry_proposals SET status=?,sent_at=? WHERE legacy_id=?").bind(customerSent?'Sent':'Draft',customerSent?new Date().toISOString():null,id).run();
   if(!customerSent||!consultantSent)return json({error:'The proposal was saved, but one of the notification emails could not be delivered. Please contact Way to Asia.'},502);
   return json({ok:true,proposalUrl,expiresAt:row.expires_at,proposalId:row.id});
 };
