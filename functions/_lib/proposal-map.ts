@@ -1,3 +1,4 @@
+import lakes from '../../src/content/geography/lakes.json';
 import rivers from '../../src/content/geography/rivers.json';
 import {geoMercator,geoPath,geoGraticule,geoCentroid} from 'd3-geo';
 import {feature} from 'topojson-client';
@@ -41,9 +42,10 @@ function bounds(geometry:unknown):Bounds{
  visit((geometry as {coordinates?:unknown})?.coordinates);return b;
 }
 const landBounds=new Map(land.map(f=>[f,bounds(f.geometry)]));
+const lakeBounds=new Map(lakes.features.map(f=>[f,bounds(f.geometry)]));
 const riverBounds=new Map(rivers.features.map(f=>[f,bounds(f.geometry)]));
 const cache=new Map<string,string>();
-export const MAP_STYLE_VERSION='natural-earth-brochure-v1';
+export const MAP_STYLE_VERSION='natural-earth-brochure-v2';
 export function routeMap(locations:RouteLocation[],copy:{title:string;illustrative:string;detail:string;unavailable:string}):string{
   const key=JSON.stringify([MAP_STYLE_VERSION,locations,copy]);if(cache.has(key))return cache.get(key)!;
   const valid=locations.filter(p=>p.coordinates&&p.coordinates.every(Number.isFinite));if(!valid.length)return `<div class="map-fallback">${escape(copy.unavailable)}</div>`;
@@ -53,7 +55,7 @@ export function routeMap(locations:RouteLocation[],copy:{title:string;illustrati
     const overview=projection(valid,780,480);
     const grouped=new Set<number>();
     for(const p of valid){if(grouped.has(p.index))continue;const a=overview(p.coordinates!)!;const group=valid.filter(q=>{const b=overview(q.coordinates!)!;return Math.hypot(a[0]-b[0],a[1]-b[1])<70});if(group.length>1){group.forEach(q=>grouped.add(q.index));panels.push({stops:group,detail:true});}}
-    const svg=panels.map((panel,panelIndex)=>renderPanel(panel.stops,panel.detail?380:780,panel.detail?Math.max(280,panel.stops.length*32+80):Math.max(480,Math.ceil(panel.stops.length/2)*32+100),panelIndex,panel.detail,copy)+(panel.detail?'':renderPanel(panel.stops,380,Math.max(430,panel.stops.length*32+100),100,false,copy).replace('map-main','map-main map-mobile'))).join('');
+    const svg=panels.map((panel,panelIndex)=>renderPanel(panel.stops,panel.detail?380:900,panel.detail?Math.max(250,panel.stops.length*32+80):Math.max(500,Math.ceil(panel.stops.length/2)*32+100),panelIndex,panel.detail,copy)+(panel.detail?'':renderPanel(panel.stops,380,Math.max(430,panel.stops.length*32+100),100,false,copy).replace('map-main','map-main map-mobile'))).join('');
     const result=`<div class="route-map-panels">${svg}</div>`;
     if(cache.size>=100)cache.delete(cache.keys().next().value!);cache.set(key,result);return result;
   }catch{return `<div class="map-fallback">${escape(copy.unavailable)}</div>`;}
@@ -69,7 +71,10 @@ function renderPanel(stops:RouteLocation[],width:number,height:number,id:number,
   const cornerA=project.invert!([0,height])!,cornerB=project.invert!([width,0])!;
   const intersects=(b:Bounds)=>b.north>=cornerA[1]&&b.south<=cornerB[1]&&(cornerB[0]<cornerA[0]||b.east>=cornerA[0]&&b.west<=cornerB[0]);
   const visibleLand=land.filter(f=>intersects(landBounds.get(f)!));
+  const lakePaths=lakes.features.filter(f=>intersects(lakeBounds.get(f)!)).map(f=>`<path d="${path(f as unknown as Parameters<typeof path>[0])||''}" class="map-lake"/>`).join('');
   const water=path({type:'FeatureCollection',features:rivers.features.filter(f=>intersects(riverBounds.get(f)!))} as unknown as Parameters<typeof path>[0])||'';
+  const contextOccupied:Array<[number,number]>=[];
+  const contextLabels=detail?'':registry.filter(p=>!stops.some(s=>s.label===p.name)).flatMap(p=>{const xy=project(p.coordinates);if(!xy||xy[0]<40||xy[0]>width-100||xy[1]<30||xy[1]>height-35||anchors.some(a=>Math.hypot(a.xy[0]-xy[0],a.xy[1]-xy[1])<65))return [];if(contextOccupied.some(p=>Math.hypot(p[0]-xy[0],p[1]-xy[1])<85))return [];contextOccupied.push(xy as [number,number]);return [`<g class="map-context"><circle cx="${xy[0]}" cy="${xy[1]}" r="2"/><text x="${xy[0]+6}" y="${xy[1]+4}">${escape(p.name)}</text></g>`]}).slice(0,12).join('');
   const countryLabels=visibleLand.flatMap(f=>{const xy=project(geoCentroid(f));if(!xy||xy[0]<30||xy[0]>width-90||xy[1]<40||xy[1]>height-30)return [];return [`<text x="${xy[0]}" y="${xy[1]}" class="map-country">${escape(String((f.properties as {name?:string})?.name||''))}</text>`]}).join('');
   const lines=anchors.slice(0,-1).map((p,i)=>{const q=anchors[i+1];if(q.index!==p.index+1)return '';return `<path d="M${p.xy.join(',')}L${q.xy.join(',')}" class="map-route" marker-end="url(#arrow-${id})"/>`;}).join('');
   const occupied:Array<[number,number,number,number]>=[];
@@ -84,5 +89,5 @@ function renderPanel(stops:RouteLocation[],width:number,height:number,id:number,
     return `<g class="map-stop" data-index="${p.index+1}" data-longitude="${p.coordinates![0]}" data-latitude="${p.coordinates![1]}"><circle cx="${x}" cy="${y}" r="3"/><path d="M${x},${y}L${lx+10},${ly-4}" class="map-leader"/><rect x="${lx-3}" y="${ly-18}" width="${labelWidth}" height="28" rx="14" class="map-label-bg"/><circle cx="${lx+10}" cy="${ly-4}" r="11" class="map-pin"/><text x="${lx+10}" y="${ly}" text-anchor="middle" class="map-number">${p.index+1}</text><text x="${lx+27}" y="${ly}" class="map-label">${escape(displayLabel)}</text><title>${escape(p.label)}</title></g>`;
   }).join('');
   const title=detail?copy.detail:copy.title;
-  return `<figure class="map-panel ${detail?'map-detail':'map-main'}"><svg viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="map-title-${id} map-desc-${id}"><title id="map-title-${id}">${escape(title)}</title><desc id="map-desc-${id}">${escape(stops.map(p=>`${p.index+1}. ${p.label}`).join(' → '))}. ${escape(copy.illustrative)}</desc><defs><marker id="arrow-${id}" viewBox="0 0 10 10" refX="15" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10" fill="#a34e35"/></marker></defs><rect width="${width}" height="${height}" fill="#dae8e5"/>${visibleLand.map(f=>`<path d="${path(f)||''}" class="map-land"/>`).join('')}<path d="${path(geoGraticule().step([5,5])())}" class="map-grid"/><path d="${water}" class="map-water"/>${countryLabels}${lines}${labels}<text x="18" y="${height-18}" class="map-compass">N ↑</text></svg>${detail?`<figcaption>${escape(copy.detail)} · ${escape(stops.map(p=>p.label).join(' / '))}</figcaption>`:''}</figure>`;
+  return `<figure class="map-panel ${detail?'map-detail':'map-main'}"><svg viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="map-title-${id} map-desc-${id}"><title id="map-title-${id}">${escape(title)}</title><desc id="map-desc-${id}">${escape(stops.map(p=>`${p.index+1}. ${p.label}`).join(' → '))}. ${escape(copy.illustrative)}</desc><defs><marker id="arrow-${id}" viewBox="0 0 10 10" refX="15" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10" fill="#a34e35"/></marker></defs><rect width="${width}" height="${height}" fill="#dae8e5"/>${visibleLand.map(f=>`<path d="${path(f)||''}" class="map-land"/>`).join('')}<path d="${path(geoGraticule().step([5,5])())}" class="map-grid"/><path d="${water}" class="map-water"/>${lakePaths}${countryLabels}${contextLabels}${lines}${labels}<text x="18" y="${height-18}" class="map-compass">N ↑</text></svg>${detail?`<figcaption>${escape(copy.detail)} · ${escape(stops.map(p=>p.label).join(' / '))}</figcaption>`:''}</figure>`;
 }
