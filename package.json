@@ -17,7 +17,9 @@
     "test:availability": "node --import tsx --test tests/supplier-availability.test.ts",
     "test:proposal": "node --import tsx --test tests/proposal-portal.test.ts tests/proposal-response.test.ts tests/trip-enquiry.test.ts",
     "cf:deploy": "wrangler pages deploy dist --project-name waytoasia",
-    "check:translations": "node scripts/check-translations.mjs"
+    "check:translations": "node scripts/check-translations.mjs",
+    "test:dashboard": "node --import tsx --test tests/dashboard/dashboard.test.ts",
+    "preview:dashboard": "mkdir -p .wrangler && node --import tsx scripts/dashboard-preview.ts"
   },
   "dependencies": {
     "@astrojs/react": "latest",
@@ -29,14 +31,17 @@
     "astro": "latest",
     "d3-geo": "^3.1.1",
     "d3-shape": "^3.2.0",
+    "jose": "^6.2.12",
     "maplibre-gl": "^6.9.0",
     "react": "latest",
     "react-dom": "latest",
+    "svix": "^2.6.1",
     "topojson-client": "^3.1.0",
     "world-atlas": "^2.0.2"
   },
   "devDependencies": {
     "@astrojs/check": "latest",
+    "@cloudflare/workers-types": "^5.20261004.1",
     "@eslint/js": "latest",
     "@lhci/cli": "latest",
     "@playwright/test": "latest",
@@ -51,9 +56,9 @@
     "eslint-plugin-astro": "latest",
     "globals": "latest",
     "parse5": "^7.3.0",
+    "tsx": "^4.20.6",
     "typescript": "latest",
     "typescript-eslint": "latest",
-    "tsx": "^4.20.6",
     "wrangler": "latest"
   }
 }

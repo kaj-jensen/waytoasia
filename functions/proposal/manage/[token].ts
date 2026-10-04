@@ -1,3 +1,4 @@
+import {authenticate,requireProposalEditor,auditStatement,activityStatement} from '../../_lib/dashboard';
 import {clean,hashToken,parseStoredPayload,renderManagePage,validToken,type ProposalEnv,type ProposalRow} from '../../_lib/proposals';
 
 interface PageContext {params:{token?:string|string[]};env:ProposalEnv;request:Request}
@@ -8,6 +9,7 @@ const headers={'Content-Type':'text/html; charset=utf-8','Cache-Control':'privat
 const getRow=async(env:ProposalEnv,token:string)=>env.PROPOSALS_DB.prepare('SELECT * FROM proposals WHERE manage_token_hash = ? AND revoked_at IS NULL AND expires_at > ?').bind(await hashToken(token),new Date().toISOString()).first<ProposalRow>();
 
 export const onRequestGet=async({params,env,request}:PageContext):Promise<Response>=>{
+  if(env.DASHBOARD_CAPTURE==='true'){try{requireProposalEditor(await authenticate(request,env))}catch(error){if(error instanceof Response)return error;return unavailable()}}
   const token=typeof params.token==='string'?params.token:'';
   if(!validToken(token))return unavailable();
   const row=await getRow(env,token);
@@ -16,10 +18,11 @@ export const onRequestGet=async({params,env,request}:PageContext):Promise<Respon
 };
 
 export const onRequestPost=async({params,env,request}:PageContext):Promise<Response>=>{
+  if(env.DASHBOARD_CAPTURE==='true'){try{requireProposalEditor(await authenticate(request,env))}catch(error){if(error instanceof Response)return error;return unavailable()}}
   const token=typeof params.token==='string'?params.token:'';
   if(!validToken(token))return unavailable();
   const origin=request.headers.get('origin');
-  if(origin&&new URL(origin).hostname!==new URL(request.url).hostname)return new Response('Invalid request origin.',{status:403});
+  if(env.DASHBOARD_CAPTURE==='true'?origin!==new URL(request.url).origin:origin&&new URL(origin).hostname!==new URL(request.url).hostname)return new Response('Invalid request origin.',{status:403});
   const row=await getRow(env,token);
   if(!row)return unavailable();
   const payload=parseStoredPayload(row.payload_json);
@@ -35,6 +38,17 @@ export const onRequestPost=async({params,env,request}:PageContext):Promise<Respo
   });
   if(route.length<2||route.some(stop=>!stop.days||!stop.place||!stop.plan))return new Response('Every route chapter needs days, place and plan.',{status:400});
   payload.suggestion={...payload.suggestion,title,summary,route};
-  await env.PROPOSALS_DB.prepare('UPDATE proposals SET title = ?, summary = ?, estimated_price = ?, consultant_note = ?, payload_json = ?, status = ?, updated_at = ? WHERE id = ?').bind(title,summary,estimatedPrice,consultantNote,JSON.stringify(payload),status,new Date().toISOString(),row.id).run();
+  const update=env.PROPOSALS_DB.prepare('UPDATE proposals SET title = ?, summary = ?, estimated_price = ?, consultant_note = ?, payload_json = ?, status = ?, updated_at = ? WHERE id = ?').bind(title,summary,estimatedPrice,consultantNote,JSON.stringify(payload),status,new Date().toISOString(),row.id);
+  if(env.DASHBOARD_CAPTURE==='true'){
+    const staff=await authenticate(request,env);
+    const linked=await env.PROPOSALS_DB.prepare('SELECT enquiry_id,url FROM enquiry_proposals WHERE legacy_id=? ORDER BY version DESC LIMIT 1').bind(row.id).first<{enquiry_id:string;url:string}>();
+    if(linked){
+      const now=new Date().toISOString();
+      await env.PROPOSALS_DB.batch([update,
+        env.PROPOSALS_DB.prepare("UPDATE enquiry_proposals SET status='Superseded' WHERE enquiry_id=?").bind(linked.enquiry_id),
+        env.PROPOSALS_DB.prepare("INSERT INTO enquiry_proposals (id,enquiry_id,legacy_id,title,url,version,status,snapshot_json,created_at) SELECT ?,?,?,?,?,COALESCE(MAX(version),0)+1,'Draft',?,? FROM enquiry_proposals WHERE enquiry_id=?").bind(crypto.randomUUID(),linked.enquiry_id,row.id,title,linked.url,JSON.stringify({payload,title,summary,estimatedPrice,consultantNote,status}),now,linked.enquiry_id),
+        activityStatement(env,linked.enquiry_id,'proposal',`Proposal revised: ${title}. Customer link retained; prior snapshot preserved.`,staff.email),auditStatement(env,staff.email,'proposal.revised',row.id)]);
+    }else await env.PROPOSALS_DB.batch([update,auditStatement(env,staff.email,'proposal.legacy_updated',row.id)]);
+  }else await update.run();
   return Response.redirect(`${new URL(request.url).origin}/proposal/manage/${encodeURIComponent(token)}?saved=1`,303);
 };

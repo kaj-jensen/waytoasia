@@ -1,0 +1,9 @@
+-- Synthetic fixtures only. Apply explicitly to the isolated preview database.
+INSERT OR IGNORE INTO staff_users (email,name,role,enabled,created_at,access_role) VALUES ('kaj.jensen@outlook.com','Kaj Jensen','admin',1,datetime('now'),'admin');
+INSERT OR IGNORE INTO clients VALUES ('demo-alex','alex@example.invalid','Alex Morgan (demo)','',datetime('now'));
+INSERT OR IGNORE INTO clients VALUES ('demo-sam','sam@example.invalid','Sam Taylor (demo)','',datetime('now'));
+INSERT OR IGNORE INTO enquiries VALUES ('demo-japan','WTA-DEMO-JAPAN','demo-alex','Synthetic test fixture','{"destinations":"Tokyo, Kyoto, Hakone","dates":"April 2027","travellers":2,"budget":"EUR 9,000 total","requirements":"Vegetarian meals; relaxed pace"}','We would love a two-week trip to Japan.','Awaiting client','kaj.jensen@outlook.com','2026-10-10',datetime('now'),datetime('now'));
+INSERT OR IGNORE INTO enquiries VALUES ('demo-vietnam','WTA-DEMO-VIETNAM','demo-alex','Synthetic test fixture','{"destinations":"Vietnam","dates":"October 2027","travellers":4}','A separate family trip to Vietnam.','New',NULL,NULL,datetime('now'),datetime('now'));
+INSERT OR IGNORE INTO enquiries VALUES ('demo-china','WTA-DEMO-CHINA','demo-sam','Synthetic test fixture','{"destinations":"China","travellers":2}','Please help us plan a cultural journey through China.','In progress','kaj.jensen@outlook.com',NULL,datetime('now'),datetime('now'));
+INSERT OR IGNORE INTO activities (id,enquiry_id,kind,actor,body,created_at) VALUES ('demo-note','demo-japan','note','Synthetic fixture','PRIVATE DEMO NOTE: confirm vegetarian accommodation options.',datetime('now'));
+INSERT OR IGNORE INTO activities (id,enquiry_id,kind,actor,sender,subject,body,created_at,unread) VALUES ('demo-reply','demo-japan','incoming','Synthetic fixture','alex@example.invalid','Japan itinerary','Could we add one more night in Kyoto?',datetime('now'),1);

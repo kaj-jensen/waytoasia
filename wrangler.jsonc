@@ -1,20 +1,40 @@
 {
-	"$schema": "./node_modules/wrangler/config-schema.json",
-	"name": "waytoasia",
-	"pages_build_output_dir": "./dist",
-	"compatibility_date": "2026-09-24",
-	"compatibility_flags": [
-		"nodejs_compat"
-	],
-	"vars": {
-		"HBX_API_BASE_URL": "https://api.test.hotelbeds.com",
-		"PROPOSAL_ORIGIN": "https://proposal.waytoasia.com"
-	},
-	"d1_databases": [
-		{
-			"binding": "PROPOSALS_DB",
-			"database_name": "waytoasia-proposals",
-			"database_id": "0cc36aa2-dbdd-4f8d-ae3b-35e5c757c18c"
-		}
-	]
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "waytoasia",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2026-09-24",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "vars": {
+    "HBX_API_BASE_URL": "https://api.test.hotelbeds.com",
+    "PROPOSAL_ORIGIN": "https://proposal.waytoasia.com"
+  },
+  "d1_databases": [
+    {
+      "binding": "PROPOSALS_DB",
+      "database_name": "waytoasia-proposals",
+      "database_id": "0cc36aa2-dbdd-4f8d-ae3b-35e5c757c18c"
+    }
+  ],
+  "env": {
+    "preview": {
+      "vars": {
+        "HBX_API_BASE_URL": "https://api.test.hotelbeds.com",
+        "PROPOSAL_ORIGIN": "https://codex-control-panel.waytoasia.pages.dev",
+        "ACCESS_TEAM_DOMAIN": "fortalezakaj.cloudflareaccess.com",
+        "ACCESS_AUD": "5691bfcb79f1088fc8a29470a7393a1e703bc23eeb2208aaacf1cb02ebac26ab",
+        "ACCESS_REQUIRE_MFA": "false",
+        "DASHBOARD_CAPTURE": "true",
+        "EMAIL_SEND_ENABLED": "false"
+      },
+      "d1_databases": [
+        {
+          "binding": "PROPOSALS_DB",
+          "database_name": "waytoasia-control-panel-preview",
+          "database_id": "b7c0f01a-8ff0-4c7a-b9ba-330c40684502"
+        }
+      ]
+    }
+  }
 }

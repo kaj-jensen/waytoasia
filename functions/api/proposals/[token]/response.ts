@@ -1,3 +1,4 @@
+import {activityStatement,auditStatement} from '../../../_lib/dashboard';
 import {clean,escapeHtml,hashToken,sendResend,validToken,type ProposalEnv,type ProposalRow} from '../../../_lib/proposals';
 
 interface PageContext {params:{token?:string|string[]};env:ProposalEnv;request:Request}
@@ -33,7 +34,12 @@ const handlePost=async({params,env,request}:PageContext):Promise<Response>=>{
   if(action!=='approve'&&action!=='change')return json({error:'Choose an action.'},400);
   if(action==='change'&&!note)return json({error:'Please describe the changes you would like.'},400);
   const status=action==='approve'?'approved':'changes_requested',now=new Date().toISOString();
-  await env.PROPOSALS_DB.prepare('UPDATE proposals SET status = ?, traveller_response = ?, updated_at = ? WHERE id = ?').bind(status,note,now,row.id).run();
+  const update=env.PROPOSALS_DB.prepare('UPDATE proposals SET status = ?, traveller_response = ?, updated_at = ? WHERE id = ?').bind(status,note,now,row.id);
+  if(env.DASHBOARD_CAPTURE==='true'){
+    const linked=await env.PROPOSALS_DB.prepare('SELECT enquiry_id FROM enquiry_proposals WHERE legacy_id=? ORDER BY version DESC LIMIT 1').bind(row.id).first<{enquiry_id:string}>();
+    if(linked)await env.PROPOSALS_DB.batch([update,activityStatement(env,linked.enquiry_id,'incoming',`Customer ${action==='approve'?'approved the journey direction':'requested changes'}. ${note}`,row.traveller_email,true),auditStatement(env,row.traveller_email,'proposal.customer_response',row.id),...(action==='approve'?[env.PROPOSALS_DB.prepare("UPDATE enquiry_proposals SET status='Accepted' WHERE legacy_id=? AND version=(SELECT MAX(version) FROM enquiry_proposals WHERE legacy_id=?)").bind(row.id,row.id)]:[])]);
+    else await update.run();
+  }else await update.run();
   if(env.RESEND_API_KEY&&env.LEAD_TO_EMAIL){
     const label=action==='approve'?'approved the journey direction':'requested changes';
     const subject=`Journey proposal response · ${row.traveller_name} · ${label}`;
@@ -46,8 +52,8 @@ const handlePost=async({params,env,request}:PageContext):Promise<Response>=>{
 };
 
 export const onRequestPost=async(context:PageContext):Promise<Response>=>{
-  try{return await handlePost(context)}catch(error){
-    console.error(JSON.stringify({message:'Proposal response failed',error:error instanceof Error?error.message:String(error)}));
+  try{return await handlePost(context)}catch{
+    console.error('Proposal response failed');
     return failure(context.request);
   }
 };

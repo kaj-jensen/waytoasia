@@ -1,11 +1,13 @@
-interface Env { RESEND_API_KEY?: string; LEAD_TO_EMAIL?: string }
+import {captureEnquiry, readBytes, type DashboardEnv} from '../_lib/dashboard';
+interface Env extends DashboardEnv { LEAD_TO_EMAIL?: string }
 interface PagesContext {request:Request;env:Env}
 export const onRequestPost = async ({request,env}:PagesContext):Promise<Response> => {
   const length=Number(request.headers.get('content-length')||0);
   if(length>50000) return new Response('Enquiry is too large.',{status:413});
   const origin=request.headers.get('origin');
   if(origin&&new URL(origin).hostname!==new URL(request.url).hostname) return new Response('Invalid request origin.',{status:403});
-  const form=await request.formData();
+  let form:FormData;
+  try{form=await new Request(request,{body:await readBytes(request,50000)}).formData()}catch(error){if(error instanceof Response)return error;return new Response('Invalid enquiry form.',{status:400})}
   if(String(form.get('website')||'')) return Response.redirect(new URL('/en/contact?sent=1',request.url),303);
   const email=String(form.get('email')||'').trim();
   if(!/^\S+@\S+\.\S+$/.test(email)) return new Response('Invalid email',{status:400});
@@ -14,9 +16,13 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
   if(!env.RESEND_API_KEY||!env.LEAD_TO_EMAIL) return new Response('Lead service is not configured.',{status:503});
   const allowed=['locale','tour','journey','title','firstName','lastName','email','phone','residence','preferredContact','destination','departureDate','dateFlexibility','duration','adults','children','childrenAges','rooms','departureAirport','flightsStatus','budgetCurrency','budgetPerPerson','accommodation','interests','pace','roomArrangement','requirements','message','consent'];
   const payload=Object.fromEntries(allowed.map(key=>[key,form.getAll(key).map(value=>String(value).slice(0,2000)).join(', ')]));
+  let reference='';
+  if(env.DASHBOARD_CAPTURE==='true'){
+    try{const enquiry=await captureEnquiry(env,{name:`${payload.firstName} ${payload.lastName}`,email,phone:payload.phone,source:'Website contact form',message:payload.message||payload.requirements,requirements:payload});reference=enquiry.reference}catch{return new Response('We could not save the enquiry. Please try again.',{status:503})}
+  }
   const labels:Record<string,string>={firstName:'First name',lastName:'Last name',preferredContact:'Preferred contact',departureDate:'Earliest departure',dateFlexibility:'Date flexibility',childrenAges:'Children ages',departureAirport:'Departure airport/city',flightsStatus:'International flights',budgetCurrency:'Budget currency',budgetPerPerson:'Budget per person',roomArrangement:'Room arrangement'};
   const text=allowed.filter(key=>payload[key]).map(key=>`${labels[key]||key.replace(/([A-Z])/g,' $1')}: ${payload[key]}`).join('\n');
-  const sent=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${env.RESEND_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({from:'Way to Asia <journeys@waytoasia.com>',to:[env.LEAD_TO_EMAIL],reply_to:email,subject:`Way to Asia proposal enquiry: ${payload.destination||'general'} · ${payload.firstName} ${payload.lastName}`,text})});
+  const sent=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${env.RESEND_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({from:'Way to Asia <journeys@waytoasia.com>',to:[env.LEAD_TO_EMAIL],reply_to:email,subject:`${reference?`[${reference}] `:''}Way to Asia proposal enquiry: ${payload.destination||'general'} · ${payload.firstName} ${payload.lastName}`,text})});
   if(!sent.ok) return new Response('Unable to send enquiry.',{status:502});
   return Response.redirect(new URL(`/${payload.locale||'en'}/contact?sent=1`,request.url),303);
 };
