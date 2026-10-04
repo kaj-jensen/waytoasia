@@ -34,11 +34,19 @@ export function resolveRoute(route:unknown,context:unknown=[]):RouteLocation[]{
 }
 const world=topology as unknown as Topology<{countries:GeometryCollection}>;
 const land=feature(world,world.objects.countries).features;
+type Bounds={west:number;east:number;south:number;north:number};
+function bounds(geometry:unknown):Bounds{
+ const b={west:Infinity,east:-Infinity,south:Infinity,north:-Infinity};
+ const visit=(v:unknown):void=>{if(!Array.isArray(v))return;if(typeof v[0]==='number'&&typeof v[1]==='number'){b.west=Math.min(b.west,v[0]);b.east=Math.max(b.east,v[0]);b.south=Math.min(b.south,v[1]);b.north=Math.max(b.north,v[1]);}else v.forEach(visit);};
+ visit((geometry as {coordinates?:unknown})?.coordinates);return b;
+}
+const landBounds=new Map(land.map(f=>[f,bounds(f.geometry)]));
+const riverBounds=new Map(rivers.features.map(f=>[f,bounds(f.geometry)]));
 const cache=new Map<string,string>();
 export const MAP_STYLE_VERSION='natural-earth-brochure-v1';
 export function routeMap(locations:RouteLocation[],copy:{title:string;illustrative:string;detail:string;unavailable:string}):string{
   const key=JSON.stringify([MAP_STYLE_VERSION,locations,copy]);if(cache.has(key))return cache.get(key)!;
-  const valid=locations.filter(p=>p.coordinates);if(!valid.length)return `<div class="map-fallback">${escape(copy.unavailable)}</div>`;
+  const valid=locations.filter(p=>p.coordinates&&p.coordinates.every(Number.isFinite));if(!valid.length)return `<div class="map-fallback">${escape(copy.unavailable)}</div>`;
   try{
     const panels:Array<{stops:RouteLocation[];detail:boolean}>=[{stops:valid,detail:false}];
     // Nearby stops get independent geographic detail panels, including repeated destinations.
@@ -58,20 +66,23 @@ function projection(stops:RouteLocation[],width:number,height:number){
 }
 function renderPanel(stops:RouteLocation[],width:number,height:number,id:number,detail:boolean,copy:{title:string;illustrative:string;detail:string}){
   const project=projection(stops,width,height),path=geoPath(project).digits(1);const anchors=stops.map(p=>({...p,xy:project(p.coordinates!)!}));
-  const water=path(rivers as unknown as Parameters<typeof path>[0])||'';
-  const countryLabels=land.flatMap(f=>{const xy=project(geoCentroid(f));if(!xy||xy[0]<30||xy[0]>width-90||xy[1]<40||xy[1]>height-30)return [];return [`<text x="${xy[0]}" y="${xy[1]}" class="map-country">${escape(String((f.properties as {name?:string})?.name||''))}</text>`]}).join('');
+  const cornerA=project.invert!([0,height])!,cornerB=project.invert!([width,0])!;
+  const intersects=(b:Bounds)=>b.north>=cornerA[1]&&b.south<=cornerB[1]&&(cornerB[0]<cornerA[0]||b.east>=cornerA[0]&&b.west<=cornerB[0]);
+  const visibleLand=land.filter(f=>intersects(landBounds.get(f)!));
+  const water=path({type:'FeatureCollection',features:rivers.features.filter(f=>intersects(riverBounds.get(f)!))} as unknown as Parameters<typeof path>[0])||'';
+  const countryLabels=visibleLand.flatMap(f=>{const xy=project(geoCentroid(f));if(!xy||xy[0]<30||xy[0]>width-90||xy[1]<40||xy[1]>height-30)return [];return [`<text x="${xy[0]}" y="${xy[1]}" class="map-country">${escape(String((f.properties as {name?:string})?.name||''))}</text>`]}).join('');
   const lines=anchors.slice(0,-1).map((p,i)=>{const q=anchors[i+1];if(q.index!==p.index+1)return '';return `<path d="M${p.xy.join(',')}L${q.xy.join(',')}" class="map-route" marker-end="url(#arrow-${id})"/>`;}).join('');
   const occupied:Array<[number,number,number,number]>=[];
   const labels=anchors.map(p=>{
-    const [x,y]=p.xy;const labelWidth=Math.min(width-30,p.label.length*7+38);let best:[number,number]=[15,15],score=Infinity;
+    const [x,y]=p.xy;const maxLabelChars=Math.floor((width-68)/7);const displayLabel=p.label.length>maxLabelChars?p.label.slice(0,maxLabelChars-1)+'…':p.label;const labelWidth=Math.min(width-30,displayLabel.length*7+38);let best:[number,number]=[15,15],score=Infinity;
     for(let row=0;row<Math.floor((height-40)/32);row++)for(const lx of [Math.min(width-labelWidth-15,x+22),Math.max(15,x-labelWidth-22)]){
       const ly=34+row*32;const collisions=occupied.filter(b=>lx<b[2]&&lx+labelWidth>b[0]&&ly-15<b[3]&&ly+10>b[1]).length;
       const cost=collisions*100000+Math.hypot(lx-x,ly-y);if(cost<score){score=cost;best=[lx,ly];}
     }
     const [lx,ly]=best;occupied.push([lx,ly-15,lx+labelWidth,ly+10]);
     // Badges may move to readable labels; leader lines retain exact geographic anchors.
-    return `<g class="map-stop" data-index="${p.index+1}" data-longitude="${p.coordinates![0]}" data-latitude="${p.coordinates![1]}"><circle cx="${x}" cy="${y}" r="3"/><path d="M${x},${y}L${lx+10},${ly-4}" class="map-leader"/><rect x="${lx-3}" y="${ly-18}" width="${labelWidth}" height="28" rx="14" class="map-label-bg"/><circle cx="${lx+10}" cy="${ly-4}" r="11" class="map-pin"/><text x="${lx+10}" y="${ly}" text-anchor="middle" class="map-number">${p.index+1}</text><text x="${lx+27}" y="${ly}" class="map-label">${escape(p.label)}</text></g>`;
+    return `<g class="map-stop" data-index="${p.index+1}" data-longitude="${p.coordinates![0]}" data-latitude="${p.coordinates![1]}"><circle cx="${x}" cy="${y}" r="3"/><path d="M${x},${y}L${lx+10},${ly-4}" class="map-leader"/><rect x="${lx-3}" y="${ly-18}" width="${labelWidth}" height="28" rx="14" class="map-label-bg"/><circle cx="${lx+10}" cy="${ly-4}" r="11" class="map-pin"/><text x="${lx+10}" y="${ly}" text-anchor="middle" class="map-number">${p.index+1}</text><text x="${lx+27}" y="${ly}" class="map-label">${escape(displayLabel)}</text><title>${escape(p.label)}</title></g>`;
   }).join('');
   const title=detail?copy.detail:copy.title;
-  return `<figure class="map-panel ${detail?'map-detail':'map-main'}"><svg viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="map-title-${id} map-desc-${id}"><title id="map-title-${id}">${escape(title)}</title><desc id="map-desc-${id}">${escape(stops.map(p=>`${p.index+1}. ${p.label}`).join(' → '))}. ${escape(copy.illustrative)}</desc><defs><marker id="arrow-${id}" viewBox="0 0 10 10" refX="15" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10" fill="#a34e35"/></marker></defs><rect width="${width}" height="${height}" fill="#dae8e5"/>${land.map(f=>`<path d="${path(f)||''}" class="map-land"/>`).join('')}<path d="${path(geoGraticule().step([5,5])())}" class="map-grid"/><path d="${water}" class="map-water"/>${countryLabels}${lines}${labels}<text x="18" y="${height-18}" class="map-compass">N ↑</text></svg>${detail?`<figcaption>${escape(copy.detail)} · ${escape(stops.map(p=>p.label).join(' / '))}</figcaption>`:''}</figure>`;
+  return `<figure class="map-panel ${detail?'map-detail':'map-main'}"><svg viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="map-title-${id} map-desc-${id}"><title id="map-title-${id}">${escape(title)}</title><desc id="map-desc-${id}">${escape(stops.map(p=>`${p.index+1}. ${p.label}`).join(' → '))}. ${escape(copy.illustrative)}</desc><defs><marker id="arrow-${id}" viewBox="0 0 10 10" refX="15" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10" fill="#a34e35"/></marker></defs><rect width="${width}" height="${height}" fill="#dae8e5"/>${visibleLand.map(f=>`<path d="${path(f)||''}" class="map-land"/>`).join('')}<path d="${path(geoGraticule().step([5,5])())}" class="map-grid"/><path d="${water}" class="map-water"/>${countryLabels}${lines}${labels}<text x="18" y="${height-18}" class="map-compass">N ↑</text></svg>${detail?`<figcaption>${escape(copy.detail)} · ${escape(stops.map(p=>p.label).join(' / '))}</figcaption>`:''}</figure>`;
 }

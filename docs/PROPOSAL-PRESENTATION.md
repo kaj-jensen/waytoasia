@@ -4,7 +4,7 @@ The renderer is `functions/_lib/proposals.ts`. Existing token URLs, expiry/revoc
 
 ## Map data and privacy
 
-`proposal-map.ts` uses the existing D3/world-atlas dependencies and bundled Natural Earth 1:50m country boundaries and rivers. Natural Earth data is public domain: https://www.naturalearthdata.com/about/. River source: https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_50m_rivers_lake_centerlines.geojson (downloaded 4 October 2026; descriptive properties removed, geometry retained). No API credentials, new environment variables, provider subscription or per-map fee. Standard Cloudflare function usage still applies.
+`proposal-map.ts` uses the existing D3/world-atlas dependencies and bundled Natural Earth 1:50m country boundaries and rivers, filtered to the current viewport before rendering. Separate desktop and phone SVG layouts retain readable labels. Natural Earth data is public domain: https://www.naturalearthdata.com/about/. River source: https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_50m_rivers_lake_centerlines.geojson (downloaded 4 October 2026; descriptive properties removed, geometry retained). No API credentials, new environment variables, provider subscription or per-map fee. Standard Cloudflare function usage still applies.
 
 The bounded isolate cache holds 100 route/style/language variants, includes actual stop order/coordinates, and automatically misses when the route changes. It holds only map geometry/labels, never traveller names, email, tokens or proposal content. It is opportunistic across warm requests and resets on cold starts/deploys. Map generation never contacts a provider. SVG retains resolution in print. Country labels and rivers provide geographic context; connections are illustrative, not surveyed roads/railways. No inferred transport modes or travel times. Explicit onward-travel prose is retained in each chapter.
 
@@ -25,11 +25,13 @@ Other destinations use a balanced text fallback. Optional `suggestion.proposalIm
 
 ## Language and responses
 
-UI strings use the same nine locale keys as `src/i18n.ts` via a server-compatible proposal dictionary. Supplied itinerary/hotel prose stays verbatim, even when older stored content mixes languages; it is not silently rewritten. Swedish legacy `total · rough planning estimate` pricing suffix is translated without changing total/per-person meaning. Amounts and other arbitrary price wording remain intact.
+UI strings use the same nine locale keys as `src/i18n.ts` via a server-compatible proposal dictionary. Supplied itinerary/hotel prose stays verbatim, even when older stored content mixes languages; it is not silently rewritten. Recognized legacy total/per-person pricing suffixes and numeric days/nights durations are localized without changing their meaning. Amounts and other arbitrary price wording remain intact.
 
 Native HTML forms work without JS. JS provides required change notes and double-click protection. The response endpoint suppresses exact repeated status/note submissions. Migration `0004_proposal_response_receipt.sql` adds an opaque receipt column; an atomic updated_at lock plus receipt-gated activity/audit statements prevent concurrent duplicate notifications and preserve transactional dashboard capture. Apply this additive migration before deploying the renderer. A stale conflicting response returns 409 for review rather than claiming a different action succeeded. Emails remain governed by existing configuration; staging fixtures must never configure Resend delivery. Approval is explicitly only direction approval, not a booking/payment.
 
 Print CSS preserves map, facts, estimate disclaimers, all daily detail and stays. Script opens details before print and restores them afterwards.
+
+Validation: 22 proposal tests, 13 dashboard tests, lint, Astro type checks, production build, and hosted desktop/mobile response and image checks passed. Browser PDF export remains unverified: the native print dialog stalled during this session. Test a saved PDF before production approval.
 
 ## Review
 
