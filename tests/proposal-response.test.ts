@@ -35,3 +35,18 @@ test('an unexpected storage error becomes a controlled response instead of a Wor
   assert.equal(response.status,500);
   assert.match(await response.text(),/Your response was not saved/);
 });
+
+test('identical retry is acknowledged without a second update',async()=>{
+  const original={...row};
+  try{row.status='changes_requested';row.traveller_response='Please add another night in Kyoto';const fixture=context('null');assert.equal((await onRequestPost(fixture.context)).status,303);assert.equal(fixture.updated(),null);}finally{Object.assign(row,original)}
+});
+
+test('concurrent stale update sends no notification and is acknowledged',async()=>{
+ let mails=0;const oldFetch=globalThis.fetch;
+ globalThis.fetch=async()=>{mails++;return new Response('{}')};
+ try{
+  const db={prepare(){return{bind(){return{first:async()=>row,run:async()=>({success:true,meta:{changes:0}})}}}}};
+  const request=new Request(`https://proposal.waytoasia.com/api/proposals/${token}/response`,{method:'POST',headers:{Origin:'null','Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({action:'approve',note:''})});
+  const response=await onRequestPost({params:{token},env:{PROPOSALS_DB:db,RESEND_API_KEY:'test-only',LEAD_TO_EMAIL:'test@example.invalid'} as unknown as ProposalEnv,request});assert.equal(response.status,409);assert.equal(mails,0);
+ }finally{globalThis.fetch=oldFetch}
+});

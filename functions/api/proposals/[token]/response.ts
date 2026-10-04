@@ -1,4 +1,3 @@
-import {activityStatement,auditStatement} from '../../../_lib/dashboard';
 import {clean,escapeHtml,hashToken,sendResend,validToken,type ProposalEnv,type ProposalRow} from '../../../_lib/proposals';
 
 interface PageContext {params:{token?:string|string[]};env:ProposalEnv;request:Request}
@@ -34,13 +33,25 @@ const handlePost=async({params,env,request}:PageContext):Promise<Response>=>{
   if(action!=='approve'&&action!=='change')return json({error:'Choose an action.'},400);
   if(action==='change'&&!note)return json({error:'Please describe the changes you would like.'},400);
   const status=action==='approve'?'approved':'changes_requested',now=new Date().toISOString();
-  const update=env.PROPOSALS_DB.prepare('UPDATE proposals SET status = ?, traveller_response = ?, updated_at = ? WHERE id = ?').bind(status,note,now,row.id);
+  const redirect=()=>Response.redirect(`${new URL(request.url).origin}/proposal/${encodeURIComponent(token)}?response=${action==='approve'?'approved':'changes'}`,303);
+  if(row.status===status&&row.traveller_response===note)return redirect();
+  // Atomic batch: only the winning compare-and-swap owns this opaque receipt.
+  const receipt=crypto.randomUUID();
+  const update=env.PROPOSALS_DB.prepare('UPDATE proposals SET status = ?, traveller_response = ?, updated_at = ?, response_receipt = ? WHERE id = ? AND updated_at = ?').bind(status,note,now,receipt,row.id,row.updated_at);
+  let result:{meta?:{changes?:number}};
   if(env.DASHBOARD_CAPTURE==='true'){
     const linked=await env.PROPOSALS_DB.prepare('SELECT enquiry_id FROM enquiry_proposals WHERE legacy_id=? ORDER BY version DESC LIMIT 1').bind(row.id).first<{enquiry_id:string}>();
-    if(linked)await env.PROPOSALS_DB.batch([update,activityStatement(env,linked.enquiry_id,'incoming',`Customer ${action==='approve'?'approved the journey direction':'requested changes'}. ${note}`,row.traveller_email,true),auditStatement(env,row.traveller_email,'proposal.customer_response',row.id),...(action==='approve'?[env.PROPOSALS_DB.prepare("UPDATE enquiry_proposals SET status='Accepted' WHERE legacy_id=? AND version=(SELECT MAX(version) FROM enquiry_proposals WHERE legacy_id=?)").bind(row.id,row.id)]:[])]);
-    else await update.run();
-  }else await update.run();
-  if(env.RESEND_API_KEY&&env.LEAD_TO_EMAIL){
+    if(linked){
+      const winner='EXISTS (SELECT 1 FROM proposals WHERE id=? AND response_receipt=?)';
+      const statements=[update,
+        env.PROPOSALS_DB.prepare(`INSERT INTO activities (id,enquiry_id,kind,actor,body,created_at,unread) SELECT ?,?,'incoming',?,?,?,1 WHERE ${winner}`).bind(crypto.randomUUID(),linked.enquiry_id,row.traveller_email,`Customer ${action==='approve'?'approved the journey direction':'requested changes'}. ${note}`,now,row.id,receipt),
+        env.PROPOSALS_DB.prepare(`INSERT INTO audit_log (id,actor,action,target,created_at) SELECT ?,?,'proposal.customer_response',?,? WHERE ${winner}`).bind(crypto.randomUUID(),row.traveller_email,row.id,now,row.id,receipt),
+        ...(action==='approve'?[env.PROPOSALS_DB.prepare(`UPDATE enquiry_proposals SET status='Accepted' WHERE legacy_id=? AND version=(SELECT MAX(version) FROM enquiry_proposals WHERE legacy_id=?) AND ${winner}`).bind(row.id,row.id,row.id,receipt)]:[])];
+      [result]=await env.PROPOSALS_DB.batch(statements);
+    }else result=await update.run();
+  }else result=await update.run();
+  if(result.meta?.changes===0)return json({error:'This proposal changed while your response was being saved. Reload the proposal to review its current state.'},409);
+  if(env.RESEND_API_KEY&&env.LEAD_TO_EMAIL&&env.EMAIL_SEND_ENABLED!=='false'){
     const label=action==='approve'?'approved the journey direction':'requested changes';
     const subject=`Journey proposal response · ${row.traveller_name} · ${label}`;
     const text=[`${row.traveller_name} ${label}.`,note?`Traveller note: ${note}`:'',`Proposal: ${row.title}`,`Reply to: ${row.traveller_email}`].filter(Boolean).join('\n\n');

@@ -39,7 +39,7 @@ test('customer proposal renders the structured journey and privacy controls',()=
   assert.match(html,/Private link/);
   assert.match(html,/From €4,500 per person/);
   assert.match(html,/Travel dates/);
-  assert.match(html,/2027-03-10 – 2027-03-17 · ± 2 days/);
+  assert.match(html,/10 Mar 2027 – 17 Mar 2027 · ± 2|Mar 10, 2027 – Mar 17, 2027 · ± 2/);
   assert.match(html,/Copenhagen \(CPH\)/);
 });
 
