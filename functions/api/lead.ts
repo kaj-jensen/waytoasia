@@ -24,5 +24,5 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
   const text=allowed.filter(key=>payload[key]).map(key=>`${labels[key]||key.replace(/([A-Z])/g,' $1')}: ${payload[key]}`).join('\n');
   const sent=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${env.RESEND_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({from:'Way to Asia <journeys@waytoasia.com>',to:[env.LEAD_TO_EMAIL],reply_to:email,subject:`${reference?`[${reference}] `:''}Way to Asia proposal enquiry: ${payload.destination||'general'} · ${payload.firstName} ${payload.lastName}`,text})});
   if(!sent.ok) return new Response('Unable to send enquiry.',{status:502});
-  return Response.redirect(new URL(`/${payload.locale||'en'}/contact?sent=1`,request.url),303);
+  return Response.redirect(new URL(`/${['en','sv','da','no','es','fr','it','nl','hu'].includes(payload.locale)?payload.locale:'en'}/contact?sent=1${reference?`&reference=${encodeURIComponent(reference)}`:''}`,request.url),303);
 };
