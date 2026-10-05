@@ -1617,7 +1617,7 @@ export const journeyStyles:JourneyStyle[]=[
     "label": "First journeys",
     "eyebrow": "A confident beginning",
     "description": "Landmark places balanced with quieter encounters, designed for travellers discovering Asia for the first time.",
-    "image": "https://images.unsplash.com/photo-1652172176427-b1f9ae5153f9?auto=format&fit=crop&w=1400&q=82",
+    "image": "https://images.unsplash.com/photo-1659233306527-226a26a08634?auto=format&fit=crop&w=1400&q=82",
     "idealFor": "First-time visitors",
     "pace": "Balanced"
   },
@@ -1626,7 +1626,7 @@ export const journeyStyles:JourneyStyle[]=[
     "label": "Food & culture",
     "eyebrow": "Follow the table",
     "description": "Market mornings, family kitchens, design studios and traditions understood through the people keeping them alive.",
-    "image": "https://images.unsplash.com/photo-1552465011-b4e21bf6e79a?auto=format&fit=crop&w=1200&q=84",
+    "image": "https://images.unsplash.com/photo-1672934324490-0b8086f41414?auto=format&fit=crop&w=1200&q=84",
     "idealFor": "Curious eaters",
     "pace": "Immersive"
   },
@@ -1635,7 +1635,7 @@ export const journeyStyles:JourneyStyle[]=[
     "label": "Nature & wild places",
     "eyebrow": "Beyond the cities",
     "description": "Volcanic islands, highland trails, forest lodges and coastlines selected for season, access and conservation.",
-    "image": "https://images.unsplash.com/photo-1518548419970-58e3b4079ab2?auto=format&fit=crop&w=1200&q=84",
+    "image": "https://images.unsplash.com/photo-1709064155843-fe1acf2998eb?auto=format&fit=crop&w=1200&q=84",
     "idealFor": "Active travellers",
     "pace": "Adventurous"
   },
@@ -1644,7 +1644,7 @@ export const journeyStyles:JourneyStyle[]=[
     "label": "Private celebrations",
     "eyebrow": "A journey with meaning",
     "description": "Beautiful stays, private access and unhurried days composed around honeymoons, anniversaries and family milestones.",
-    "image": "https://images.unsplash.com/photo-1539367628448-4bc5c9d171c8?auto=format&fit=crop&w=1200&q=84",
+    "image": "/images/journey-styles/private-dinner-koh-kut.jpg",
     "idealFor": "Couples & families",
     "pace": "Unhurried"
   }

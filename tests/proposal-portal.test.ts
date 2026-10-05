@@ -95,5 +95,5 @@ test('the direct Pages hostname cannot become a public alternate entrance',async
  html=renderProposalPage({...row,payload_json:JSON.stringify(p)},'a'.repeat(43),'');
  assert.match(html,/Breakfast &lt;daily&gt;/);assert.match(html,/International flights/);assert.match(html,/Airport transfers/);
  assert.doesNotMatch(html,/No services have yet been confirmed/);
- assert.match(renderManagePage({...row,payload_json:JSON.stringify(p)},'b'.repeat(43),false),/name="services_included"/);
+ assert.match(renderManagePage({...row,payload_json:JSON.stringify(p)},false),/name="services_included"/);
  });
