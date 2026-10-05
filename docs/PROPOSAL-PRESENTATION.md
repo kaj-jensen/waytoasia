@@ -36,3 +36,6 @@ Validation: 22 proposal tests, 13 dashboard tests, lint, Astro type checks, prod
 ## Review
 
 Run `node --import tsx scripts/proposal-preview.ts` for synthetic localhost fixtures at http://127.0.0.1:8790, with `?variant=missing`, `?variant=return`, or `?locale=fr` variants. The local preview never reads production storage. Live example inspection is read-only. Run `npm run test:proposal`, `node --import tsx --test tests/proposal-map.test.ts`, `npm run lint`, `npm run build` before the Cloudflare preview deploy. Keep production unchanged until the preview is approved.
+
+## Map layout revision
+The compact opening uses a smaller title and photo. The route overview spans the content width with nearby-stop detail panels alongside on desktop, and a numbered destination strip below. Bundled Natural Earth 1:50m lake geometry adds geographic context, together with labelled nearby cities from the reviewed gazetteer. Data source: https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_50m_lakes.geojson. Context labels are collision-spaced, never treated as additional itinerary stops. Map style version v2 invalidates cached v1 layouts. No new provider requests or credentials.
