@@ -5,7 +5,7 @@ export interface Country {slug:CountrySlug; name:string; nativeName:string; code
 export interface DailyItinerary {day:number;location:string;title:string;summary:string;activities:string[];overnight:string;meals:string;transport?:string}
 export interface Tour {slug:string;country:CountrySlug;name:string;duration:number;styles:string[];prices:PriceMap;image:string;teaser:string;groupSize:string;departures:string[];includes:string[];excludes:string[];itinerary:{day:string;title:string;copy:string}[];dailyItinerary?:DailyItinerary[];tripCode?:string;journeyType?:string;route?:string[];highlights?:string[];accommodation?:{place:string;nights:string;style:string}[];transport?:string[];bestFor?:string;pace?:string;meals?:string;priceNote?:string}
 export interface JourneyStyle {slug:string;label:string;eyebrow:string;description:string;image:string;idealFor:string;pace:string}
-export interface Article {slug:string;country:CountrySlug;category:string;title:string;standfirst:string;image:string;published:string;readTime:string;body:string[]}
+export interface Article {slug:string;country:CountrySlug|'japan';category:string;title:string;standfirst:string;image:string;imageAlt?:string;published:string;readTime:string;body:string[]}
 
 export const countries:Country[]=[
   {
@@ -1650,6 +1650,116 @@ export const journeyStyles:JourneyStyle[]=[
   }
 ];
 export const articles:Article[]=[
+
+  {
+    "slug": "lijiang-waterways-and-courtyards",
+    "country": "china",
+    "category": "Culture",
+    "title": "Lijiang, one quiet lane at a time",
+    "standfirst": "Waterways, carved timber and a mountain horizon: discovering Yunnan through the details that reward a slower walk.",
+    "image": "/images/journal/china.jpg",
+    "imageAlt": "Timber houses and tiled rooftops in Lijiang Old Town, Yunnan",
+    "published": "2026-10-05",
+    "readTime": "3 min",
+    "body": [
+      "Lijiang asks you to look down as often as you look up. Water slips beside the paving stones; tiled roofs overlap above narrow lanes. Beyond the town, the mountains give the horizon a different scale. The pleasure is in moving between those two worlds, with enough time to notice what connects them.",
+      "The old town grew at a meeting point of trading routes linking Yunnan, Sichuan and Tibet. Its timber houses and courtyards reflect cultural exchanges, with a distinctive Naxi character. A local guide can make the carved gateways and changing streetscape legible, rather than leaving them as a beautiful backdrop. Begin with one neighbourhood and follow its waterways instead of trying to complete every landmark in a morning.",
+      "Dayan, Shuhe and Baisha offer different chapters of the wider heritage landscape. Dayan has the energy of a busy visitor destination; quieter moments depend on the lane and the hour. A thoughtful route leaves space to compare settlements, sit over tea and ask about the buildings people still use. Workshops and private interiors should be visited by invitation, with permission before photographing residents.",
+      "For a memorable day, pair a guided walk with an unhurried lunch, then leave the afternoon for a second neighbourhood or a view towards the mountains. Avoid filling the gaps with long transfers simply because another famous place appears close on a map. The highland setting deserves a measured pace, and mountain excursions need separate planning around conditions and access.",
+      "Lijiang works especially well as a change of rhythm after a larger Chinese city. Spend a few nights rather than passing through between flights: one day for the town, another for its surrounding settlements, and time left open for what catches your attention. The result is a journey held together by small discoveries—a bridge, a doorway, a cup of tea—rather than a sequence of photo stops."
+    ]
+  },
+  {
+    "slug": "gyeongju-after-the-light-changes",
+    "country": "south-korea",
+    "category": "Culture",
+    "title": "Gyeongju, after the light changes",
+    "standfirst": "Ancient Silla heritage, painted wooden beams and an evening walk that reveals another side of South Korea.",
+    "image": "/images/journal/south-korea.jpg",
+    "imageAlt": "Red pillars and painted teal beams in an illuminated corridor in Gyeongju",
+    "published": "2026-10-05",
+    "readTime": "3 min",
+    "body": [
+      "In Gyeongju, the evening can be part of the itinerary rather than the end of it. Painted beams take on a deeper colour under the lights, and a covered walkway becomes an invitation to slow down. After Seoul’s intensity, the city offers a different way into South Korea: history encountered on foot, with dinner and an evening stroll given their own space.",
+      "Gyeongju was the capital of the Silla kingdom, and its heritage stretches across the city and surrounding landscape. Start by making sense of that history in daylight. Choose a focused visit to the royal tomb area or museum, rather than stacking every major site into one circuit. A guide can connect the objects, burial landscapes and buildings so the afternoon feels like a story.",
+      "Keep an evening for Woljeonggyo. The bridge seen today is a reconstruction, completed in 2018 after historical research, rather than an untouched survival from the Silla period. That distinction makes the experience more interesting: it is both an interpretation of the past and a living public place. Look at the rhythm of the columns, the decoration overhead and how the structure meets the river.",
+      "Between heritage visits, a café or a small restaurant can provide a welcome change of scale. Traditional architecture and contemporary neighbourhood life sit close together here. A hanok stay may add another layer, but check room details carefully: floor bedding, beds, bathrooms and access vary. The atmosphere should complement the comfort you want, rather than dictate it.",
+      "Allow at least an overnight stay if the evening walk matters to you. A rushed day trip often loses precisely the change of light that makes the city memorable. Build the route around a few chosen places, confirm current access locally and leave room for weather. Gyeongju then becomes more than a heritage stop: it gives a South Korea journey an entirely different tempo."
+    ]
+  },
+  {
+    "slug": "chiang-mai-gold-and-quiet-courtyards",
+    "country": "thailand",
+    "category": "Culture",
+    "title": "Chiang Mai, gold and quiet courtyards",
+    "standfirst": "Temple detail, northern craft and a place at the table: a more personal introduction to northern Thailand.",
+    "image": "/images/journal/thailand.jpg",
+    "imageAlt": "The golden chedi at Doi Suthep framed by an ornate temple arch in Chiang Mai",
+    "published": "2026-10-05",
+    "readTime": "3 min",
+    "body": [
+      "A doorway can change the whole scale of Chiang Mai. From the street, the city feels busy and practical; inside a temple courtyard, attention shifts to the grain of timber, a gilded surface and the space between buildings. Northern Thailand rewards this kind of looking. Its richness is found as much in a detail as in a panorama.",
+      "Doi Suthep makes a striking introduction, with its golden chedi above the city. The journey there should leave time for the temple itself, rather than treating it solely as a viewpoint. It remains a place of worship. Follow the dress and photography guidance at each site, give worshippers space and ask before taking a close portrait. An attentive visit is more rewarding than chasing the next angle.",
+      "Back in Chiang Mai, choose a small number of old-city temples and walk between them with a guide who can explain what makes each distinctive. Different materials, rooflines and courtyards offer a way into the region’s Lanna heritage. Then change the subject: stop for lunch, linger over coffee, or explore a workshop where the maker welcomes visitors.",
+      "Craft gives the surrounding area another dimension. Baan Tawai, south of the city in Hang Dong, is known for woodcarving and decorative work. A visit can focus on materials and technique, with time to see what is being made rather than simply browse finished objects. Workshop access and demonstrations should be arranged around the makers, and buying directly can make a thoughtful souvenir more meaningful.",
+      "A balanced stay might give one day to the city, another to a temple and a craft visit, and leave an evening for northern food. Resist turning every hour into a booked activity. Chiang Mai’s appeal is the conversation between those experiences: gold and timber, a busy table and a shaded courtyard, a remarkable place and the people whose everyday lives give it character."
+    ]
+  },
+  {
+    "slug": "hoi-an-beyond-the-lanterns",
+    "country": "vietnam",
+    "category": "Culture",
+    "title": "Hoi An, beyond the lanterns",
+    "standfirst": "Follow the town from morning streets to evening light, with time for its trading history, kitchens and living craft.",
+    "image": "/images/journal/vietnam.jpg",
+    "imageAlt": "Patterned silk lanterns glowing warmly in Hoi An, Vietnam",
+    "published": "2026-10-05",
+    "readTime": "3 min",
+    "body": [
+      "The lanterns are the image you remember first: silk, pattern and warm light against the evening streets. But Hoi An deserves more than an after-dark photograph. Arrive while the town is still changing from morning to afternoon, and the buildings behind that glow begin to tell their own story.",
+      "Hoi An’s old town reflects its history as a trading port and the meeting of several architectural traditions. A guided walk can trace those influences through merchant houses, assembly halls and the Japanese Bridge. Choose a few interiors carefully and give each time. Old timber, a courtyard and the arrangement of rooms often explain more than a long list of dates.",
+      "Food offers a second route through the town. Plan a market visit or a cooking experience around a real interest: ingredients, a family recipe, or the way a regional dish is prepared. Ask who leads the experience and how the visit works, rather than assuming every class offers the same encounter. The best meal may be the one that gives you something to notice when you next walk past a kitchen.",
+      "Lanterns bring craft and atmosphere together. If making or choosing one appeals, look for a workshop that explains the frame and fabric, and allows time to understand the process. In the evening, return to the streets without expecting them to be empty. Hoi An is popular; a good route can choose a gentler hour or a quieter stretch, but cannot promise a private old town.",
+      "Spend more than a single evening here. Balance the heritage walk with time outside the centre and an afternoon left open, then let the night’s colour feel like a return to somewhere you now understand. Conditions vary with the season, so outdoor plans should remain flexible. Hoi An’s strongest impression is the connection between its beauty and its daily life, not simply the number of lanterns in the frame."
+    ]
+  },
+  {
+    "slug": "bali-the-landscape-is-alive",
+    "country": "indonesia",
+    "category": "Culture",
+    "title": "Bali, the landscape is alive",
+    "standfirst": "Beyond the postcard: rice terraces, water and the communities shaping the island’s extraordinary green landscape.",
+    "image": "/images/journal/indonesia.jpg",
+    "imageAlt": "Layered rice terraces and palms at Tegallalang near Ubud, Bali",
+    "published": "2026-10-05",
+    "readTime": "3 min",
+    "body": [
+      "At first, Bali’s terraces look like a composition of greens. Then you notice the paths, channels and people moving through them, and the picture becomes a working landscape. Around Ubud, that change in perspective is the beginning of a more rewarding visit: beauty understood through the effort and cooperation that sustain it.",
+      "Across Bali, the subak system connects irrigation, community and religious life. Water temples and shared management have helped shape the island’s rice-growing landscapes over centuries. UNESCO recognises a specific group of cultural landscape sites; not every photographed terrace belongs to that World Heritage property. The Tegallalang scene shown here is an introduction to the wider landscape, rather than a claim about the boundaries of the inscription.",
+      "A walk is most meaningful when someone can explain what you are seeing: how water moves, where a field begins, and why the land looks different at another point in the growing cycle. Use established visitor paths, respect working plots and ask before entering private land. The terraces are farms, and the people in the picture are going about their day.",
+      "Balance the landscape with a visit to a village or an accessible temple, and give time to a craft you actually want to understand. Ceremonies and workshops have their own rhythms; visits should follow local guidance instead of expecting a performance on demand. Even a short conversation about a material or a crop can connect the places you see more effectively than another scenic stop.",
+      "For a gentler Bali route, make Ubud a base for a few nights and choose one main experience each day. Leave room for heat, rain and travel time, then continue towards another part of the island when you are ready for a different mood. The lasting memory need not be a perfect viewpoint. It can be the understanding that this beautiful landscape is still being made, season after season, by the communities who live within it."
+    ]
+  },
+  {
+    "slug": "kyoto-a-city-best-met-on-foot",
+    "country": "japan",
+    "category": "Culture",
+    "title": "Kyoto, a city best met on foot",
+    "standfirst": "Temple roofs, hillside lanes and small pauses: an invitation to discover Japan through the texture of one remarkable city.",
+    "image": "/images/journal/japan.jpg",
+    "imageAlt": "A vermilion pagoda and autumn foliage at Kiyomizu-dera in Kyoto",
+    "published": "2026-10-05",
+    "readTime": "3 min",
+    "body": [
+      "Kyoto invites a different kind of ambition: see fewer places, but give them more of your attention. A roofline above a hillside lane, the colour of a temple against the trees, a quiet pause over tea—each can hold a whole morning if the route leaves room for it. Japan’s former capital is a compelling beginning for a journey shaped by curiosity rather than a checklist.",
+      "Higashiyama is a natural place to start. Its streets link traditional townscape with major temples, including Kiyomizu-dera. The approach is part of the experience, with changes in level, small shops and views between buildings. Walk with comfortable shoes and realistic expectations: these are celebrated places, and even an early visit may be busy.",
+      "Choose one temple or garden as the centre of the day and resist making every stop equally important. Then follow the interest it opens up. That might mean looking more closely at architecture, learning about tea, or arranging a craft experience with a host who can explain the work. Confirm access and any reservations ahead of time; opening patterns and visitor rules differ between places.",
+      "In Gion and nearby neighbourhoods, the streets are also places where people live and work. Respect signs, private lanes and photography restrictions, and give residents and working performers space. A discreet approach leaves room for an experience that feels personal without treating someone else’s daily life as a spectacle.",
+      "Autumn colour and spring blossom can be beautiful, but their timing changes and popular periods bring demand. Kyoto also rewards a visit shaped around food, gardens or craft rather than a seasonal photograph. Give the city several nights if possible, with time for a slower afternoon after a busy morning. This is Japan as an invitation: begin with one city, find what moves you, and let the next chapter follow from there."
+    ]
+  }
+,
   {
     "slug": "when-to-travel-south-korea",
     "country": "south-korea",
@@ -1686,7 +1796,7 @@ export const articles:Article[]=[
     "category": "Routes",
     "title": "A slower route through northern Vietnam",
     "standfirst": "Beyond Hanoi, limestone valleys, village markets and mountain roads make a compelling case for travelling overland.",
-    "image": "https://images.unsplash.com/photo-1509030450996-dd1a26dda07a?auto=format&fit=crop&w=1500&q=84",
+    "image": "/images/journal/northern-vietnam.jpg",
     "published": "2026-08-04",
     "readTime": "8 min",
     "body": [
