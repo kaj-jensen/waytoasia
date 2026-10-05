@@ -64,17 +64,6 @@ const estimateCopy:Record<Locale,{eyebrow:string;total:string;basis:string;night
 };
 const estimateDetailsLabel:Record<Locale,string>={en:'What this estimate covers',da:'Hvad prisoverslaget omfatter',es:'Qué incluye esta estimación',it:'Cosa comprende la stima',fr:'Ce que comprend cette estimation',nl:'Wat deze indicatie omvat',hu:'Mit tartalmaz a becslés',sv:'Vad uppskattningen omfattar',no:'Hva estimatet omfatter'};
 
-const agentIntro:Record<Locale,string>={
-  en:'Tell the agent what matters. It can design a tailor-made route anywhere in Asia; Way to Asia journeys are optional inspiration, not a limit.',
-  da:'Fortæl agenten, hvad der betyder mest. Den kan skabe en skræddersyet rute overalt i Asien; Way to Asia-rejser er inspiration, ikke en begrænsning.',
-  es:'Cuéntale al agente qué es importante. Puede diseñar una ruta a medida por cualquier lugar de Asia; los viajes de Way to Asia son inspiración, no un límite.',
-  it:'Racconta all’agente cosa conta per te. Può creare un itinerario su misura ovunque in Asia; i viaggi Way to Asia sono ispirazione, non un limite.',
-  fr:'Indiquez à l’agent ce qui compte. Il peut créer un itinéraire sur mesure partout en Asie ; les voyages Way to Asia sont une inspiration, pas une limite.',
-  nl:'Vertel de agent wat belangrijk is. Die kan overal in Azië een reis op maat ontwerpen; Way to Asia-reizen zijn inspiratie, geen beperking.',
-  hu:'Mondja el az ügynöknek, mi fontos. Személyre szabott útvonalat készíthet Ázsia bármely részére; a Way to Asia utak inspirációt adnak, nem korlátoznak.',
-  sv:'Berätta för agenten vad som är viktigt. Den kan skapa en skräddarsydd rutt var som helst i Asien; Way to Asia-resor är inspiration, inte en begränsning.',
-  no:'Fortell agenten hva som betyr mest. Den kan lage en skreddersydd rute hvor som helst i Asia; Way to Asia-reiser er inspirasjon, ikke en begrensning.',
-};
 
 const routeDetailCopy:Record<Locale,{highlights:string;onward:string;travellers:string;sourceNote:string}>={
   en:{highlights:'Ideas for these days',onward:'Next leg',travellers:'What travellers consistently mention',sourceNote:'Current forum and review signals · Open the sources and judge them for yourself'},
@@ -133,7 +122,7 @@ const recommendedChoices=(suggestion:TripSuggestion,budget:TripPlannerBudget):Bu
 });
 
 export default function TripPlanner({locale='en'}:{locale?:Locale}){
-  const c:Record<string,string>={...(copy[locale]??copy.en),intro:agentIntro[locale]??agentIntro.en};
+  const c:Record<string,string>=copy[locale]??copy.en;
   const a=agentCopy[locale]??agentCopy.en;
   const routeCopy=routeDetailCopy[locale]??routeDetailCopy.en;
   const [suggestion,setSuggestion]=useState<TripSuggestion|null>(null);
