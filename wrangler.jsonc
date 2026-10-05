@@ -13,7 +13,8 @@
     "ACCESS_AUD": "5691bfcb79f1088fc8a29470a7393a1e703bc23eeb2208aaacf1cb02ebac26ab",
     "ACCESS_REQUIRE_MFA": "cloudflare",
     "DASHBOARD_CAPTURE": "true",
-    "EMAIL_SEND_ENABLED": "false"
+    "EMAIL_SEND_ENABLED": "true",
+    "REPLY_DOMAIN": "venipxa.resend.app"
   },
   "d1_databases": [
     {

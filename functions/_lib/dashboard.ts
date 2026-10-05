@@ -9,6 +9,7 @@ export interface DashboardEnv {
   LOCAL_ACCESS_JWK?: string;
   DASHBOARD_CAPTURE?: string;
   RESEND_API_KEY?: string;
+  RESEND_RECEIVING_API_KEY?: string;
   RESEND_WEBHOOK_SECRET?: string;
   REPLY_DOMAIN?: string;
   EMAIL_SEND_ENABLED?: string;
