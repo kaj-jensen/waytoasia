@@ -31,3 +31,5 @@ The existing northern Vietnam route story now uses a geographically relevant Mu 
 ## Demonstration team portrait
 
 Maya Chen sample profile: Dziana Hasanbekava / [Pexels photograph 7626623](https://www.pexels.com/photo/smiling-asian-woman-looking-at-camera-7626623/), free under the [Pexels License](https://www.pexels.com/license/). Stored at `public/images/team/maya-sample-portrait.jpg`. This remains a labelled demonstration profile, not a photograph of an actual employee.
+
+Sofia Lind sample profile: Maryia Plashchynskaya / [Pexels photograph 8539848](https://www.pexels.com/photo/woman-in-white-shirt-smiling-8539848/), free under the [Pexels License](https://www.pexels.com/license/). Stored at `public/images/team/sofia-sample-portrait.jpg`. Used only for this labelled demonstration profile.
