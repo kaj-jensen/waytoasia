@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {customerEmail,hashToken,randomToken,renderManagePage,renderProposalPage,validToken,type ProposalRow,type StoredProposalPayload} from '../functions/_lib/proposals';
+import {plannedStayNights,hotelSourceMatches,customerEmail,hashToken,randomToken,renderManagePage,renderProposalPage,validToken,type ProposalRow,type StoredProposalPayload} from '../functions/_lib/proposals';
 import {onRequest as applySiteMiddleware} from '../functions/_middleware';
 
 const payload:StoredProposalPayload={
@@ -73,3 +73,27 @@ test('the direct Pages hostname cannot become a public alternate entrance',async
   assert.equal(response.headers.get('cache-control'),'no-store');
   assert.equal(continued,false);
 });
+
+ test('dated route allocates eleven overnight stays and excludes departure day',()=>{
+ const p=structuredClone(payload);p.profile.travelStartDate='2026-11-07';p.profile.travelEndDate='2026-11-18';
+ p.suggestion.route=[{days:'Days 1–4'},{days:'Days 5–7'},{days:'Days 8–12'}];
+ p.suggestion.hotelStays=[{nights:4},{nights:3},{nights:5}];
+ assert.deepEqual(plannedStayNights(p),[4,3,4]);
+ p.suggestion.route=[{days:'Days 1–4'},{days:'Days 6–7'},{days:'Days 8–12'}];
+ assert.deepEqual(plannedStayNights(p),[4,3,5]);
+ });
+ test('generic or mismatched hotel research cannot become a property link',()=>{
+ assert.equal(hotelSourceMatches('Nine Tree Premier Hotel Myeongdong 2',{title:'Best hotels in Seongnam',url:'https://www.booking.com/fourstars/city/kr/songnam.html'}),false);
+ assert.equal(hotelSourceMatches('Nine Tree Premier Hotel Myeongdong 2',{title:'Nine Tree Premier Hotel Myeongdong 2',url:'https://example.com/property'}),true);
+ });
+ test('scope is explicit, safely escaped, and editable by the consultant',()=>{
+ const p=structuredClone(payload);
+ let html=renderProposalPage({...row,payload_json:JSON.stringify(p)},'a'.repeat(43),'');
+ assert.match(html,/What your proposal covers/);assert.match(html,/No services have yet been confirmed/);
+ assert.match(html,/Meals and breakfast/);assert.match(html,/No exclusions have yet been confirmed/);
+ p.builderChoices.serviceScope={included:['Breakfast <daily>'],excluded:['International flights'],pending:['Airport transfers']};
+ html=renderProposalPage({...row,payload_json:JSON.stringify(p)},'a'.repeat(43),'');
+ assert.match(html,/Breakfast &lt;daily&gt;/);assert.match(html,/International flights/);assert.match(html,/Airport transfers/);
+ assert.doesNotMatch(html,/No services have yet been confirmed/);
+ assert.match(renderManagePage({...row,payload_json:JSON.stringify(p)},'b'.repeat(43),false),/name="services_included"/);
+ });

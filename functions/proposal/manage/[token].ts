@@ -37,6 +37,8 @@ export const onRequestPost=async({params,env,request}:PageContext):Promise<Respo
     return {...stop,days,place,plan,focus:plan};
   });
   if(route.length<2||route.some(stop=>!stop.days||!stop.place||!stop.plan))return new Response('Every route chapter needs days, place and plan.',{status:400});
+  const serviceScope=Object.fromEntries(['included','excluded','pending'].map(key=>[key,clean(form.get(`services_${key}`),6000).split(/\r?\n/).map(v=>v.trim().slice(0,300)).filter(Boolean).slice(0,30)]));
+  if(['included','excluded','pending'].some(key=>form.has(`services_${key}`)))payload.builderChoices={...payload.builderChoices,serviceScope};
   payload.suggestion={...payload.suggestion,title,summary,route};
   const update=env.PROPOSALS_DB.prepare('UPDATE proposals SET title = ?, summary = ?, estimated_price = ?, consultant_note = ?, payload_json = ?, status = ?, updated_at = ? WHERE id = ?').bind(title,summary,estimatedPrice,consultantNote,JSON.stringify(payload),status,new Date().toISOString(),row.id);
   if(env.DASHBOARD_CAPTURE==='true'){
