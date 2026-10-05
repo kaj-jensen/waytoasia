@@ -30,3 +30,14 @@ test('all supported locale UI dictionaries are complete',()=>{
 test('many repeated stops are retained rather than visually collapsed',()=>{
  const route=resolveRoute(Array.from({length:24},(_,i)=>({place:i%2?'Japan: Kyoto':'Japan: Tokyo'})));const svg=routeMap(route,copy);assert.match(svg,/data-index="24"/);assert.doesNotMatch(svg,/NaN|Infinity/);
 });
+
+ test('South Korea compound chapters include every named place in the overview',()=>{
+ const route=resolveRoute([{place:'South Korea: Seoul'},{place:'South Korea: Sokcho, Seoraksan & Gangneung'},{place:'South Korea: Jeju City & Seogwipo, Jeju Island'}],['south-korea']);
+ assert.ok(route.every(p=>p.coordinates&&!p.issue));
+ assert.deepEqual(route[1].waypoints?.map(p=>p.label),['Sokcho','Seoraksan','Gangneung']);
+ assert.deepEqual(route[2].waypoints?.map(p=>p.label),['Jeju City','Seogwipo']);
+ const svg=routeMap(route,copy);
+ for(const name of ['Seoul','Sokcho','Seoraksan','Gangneung','Jeju City','Seogwipo'])assert.ok(svg.includes(`<title>${name}</title>`));
+ assert.equal(resolveRoute([{place:'Jeju City & Seogwipo'}],['south-korea'])[0].waypoints?.length,2);
+ assert.match(svg,/2a/);assert.match(svg,/3b/);assert.doesNotMatch(svg,/NaN|Infinity/);
+ });
