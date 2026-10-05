@@ -27,3 +27,7 @@ Six exclusive editorial photographs, downloaded from their source pages on 5 Oct
 | japan | Satvik | https://unsplash.com/photos/a-vibrant-pagoda-surrounded-by-autumn-foliage-tl20W4HpLKA | /images/journal/japan.jpg |
 
 The existing northern Vietnam route story now uses a geographically relevant Mu Cang Chai landscape by Lukáš Konvica: https://unsplash.com/photos/terraced-rice-fields-with-mountains-and-clouds-at-sunset-cgmvDZnIHAI (Unsplash License), stored at `/images/journal/northern-vietnam.jpg`.
+
+## Demonstration team portrait
+
+Maya Chen sample profile: Dziana Hasanbekava / [Pexels photograph 7626623](https://www.pexels.com/photo/smiling-asian-woman-looking-at-camera-7626623/), free under the [Pexels License](https://www.pexels.com/license/). Stored at `public/images/team/maya-sample-portrait.jpg`. This remains a labelled demonstration profile, not a photograph of an actual employee.
