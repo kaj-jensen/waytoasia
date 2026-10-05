@@ -9,7 +9,7 @@ export async function onRequest({request,env}:Context):Promise<Response>{
     if(!['GET','POST'].includes(request.method))return json({error:'Method not allowed'},405);
     const url=new URL(request.url),path=url.pathname.replace(/^\/(?:staff|dashboard)\/?/,'');
     if(request.method==='GET'&&!path)return new Response(renderDashboard(staff),{headers:{...privateHeaders(),'Content-Type':'text/html; charset=utf-8'}});
-    if(request.method==='GET'&&path==='api/me')return json({staff,permissions:permissions(staff),emailSending:env.EMAIL_SEND_ENABLED==='true'&&Boolean(env.RESEND_API_KEY&&env.REPLY_DOMAIN),attachments:Boolean(env.PRIVATE_ATTACHMENTS)});
+    if(request.method==='GET'&&path==='api/me')return json({staff,permissions:permissions(staff),emailSending:env.EMAIL_SEND_ENABLED==='true'&&Boolean(env.RESEND_API_KEY&&env.REPLY_DOMAIN&&env.RESEND_WEBHOOK_SECRET&&env.RESEND_RECEIVING_API_KEY),attachments:Boolean(env.PRIVATE_ATTACHMENTS)});
     if(request.method==='GET'&&path.startsWith('attachments/')){
       const row=await env.PROPOSALS_DB.prepare('SELECT * FROM attachments WHERE id=?').bind(path.slice(12)).first<{object_key:string;filename:string}>();
       if(!row||!env.PRIVATE_ATTACHMENTS)return json({error:'Attachment unavailable'},404);
@@ -120,7 +120,7 @@ async function post(path:string,input:Record<string,unknown>,env:DashboardEnv,st
     ]);return json({ok:true});
   }
   if(action==='send'){
-    if(env.EMAIL_SEND_ENABLED!=='true'||!env.RESEND_API_KEY||!env.REPLY_DOMAIN)fail('Email sending is disabled until preview verification and receiving-domain setup.',503);
+    if(env.EMAIL_SEND_ENABLED!=='true'||!env.RESEND_API_KEY||!env.REPLY_DOMAIN||!env.RESEND_WEBHOOK_SECRET||!env.RESEND_RECEIVING_API_KEY)fail('Email sending is disabled until preview verification and receiving-domain setup.',503);
     const subject=clean(input.subject,250),body=clean(input.body,20000),key=clean(input.key,80),reply=clean(input.replyTo,80);
     if(!subject||!body||!/^[-a-zA-Z0-9]{16,80}$/.test(key))fail('Subject, message and idempotency key required');
     const activity=`send-${id}-${key}`;
@@ -144,7 +144,7 @@ async function post(path:string,input:Record<string,unknown>,env:DashboardEnv,st
   if(action==='delete-client'){
     requireAdmin(staff);if(input.confirm!==enquiry!.email)fail('Confirm deletion with the client email');
     const links=await db.prepare('SELECT p.legacy_id FROM enquiry_proposals p JOIN enquiries e ON e.id=p.enquiry_id WHERE e.client_id=? AND p.legacy_id IS NOT NULL').bind(enquiry!.client_id).all<{legacy_id:string}>();
-    const files=await db.prepare('SELECT t.object_key FROM attachments t JOIN activities a ON a.id=t.activity_id JOIN enquiries e ON e.id=a.enquiry_id WHERE e.client_id=?').bind(enquiry!.client_id).all<{object_key:string}>();
+    const files=await db.prepare("SELECT t.object_key FROM attachments t JOIN activities a ON a.id=t.activity_id JOIN enquiries e ON e.id=a.enquiry_id WHERE e.client_id=? AND t.object_key NOT LIKE 'blocked/%'").bind(enquiry!.client_id).all<{object_key:string}>();
     // Remove private objects first; failed deletions leave database records available for retry.
     if(files.results.length&&!env.PRIVATE_ATTACHMENTS)fail('Attachment storage unavailable',503);
     for(const file of files.results)await env.PRIVATE_ATTACHMENTS!.delete(file.object_key);
