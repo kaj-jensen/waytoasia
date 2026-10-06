@@ -1,6 +1,6 @@
 interface PagesContext {
   request: Request;
-  next(): Promise<Response>;
+  next(input?: Request): Promise<Response>;
 }
 
 interface HtmlElement {
@@ -31,12 +31,31 @@ export const onRequest = async (context: PagesContext): Promise<Response> => {
     });
   }
 
-  const response = await context.next();
+  // HTML receives a fresh CSP nonce, so a 304 cannot safely reuse an older body.
+  // Keep conditional caching for images, scripts, styles and API responses.
+  const isDocument = ['GET', 'HEAD'].includes(context.request.method)
+    && !requestUrl.pathname.startsWith('/api/')
+    && (context.request.headers.get('sec-fetch-dest') === 'document'
+      || context.request.headers.get('accept')?.includes('text/html')
+      || !/\.[^/]+$/.test(requestUrl.pathname)
+      || requestUrl.pathname.endsWith('.html'));
+  let forwarded: Request | undefined;
+  if (isDocument) {
+    forwarded = new Request(context.request);
+    forwarded.headers.delete('if-none-match');
+    forwarded.headers.delete('if-modified-since');
+  }
+  const response = await context.next(forwarded);
   const contentType = response.headers.get('content-type') || '';
   if (!contentType.includes('text/html')) return response;
 
   const nonce = createNonce();
   const headers = new Headers(response.headers);
+  headers.delete('etag');
+  headers.delete('last-modified');
+  if (!/\b(?:private|no-store)\b/i.test(headers.get('cache-control') || '')) {
+    headers.set('cache-control', 'public, max-age=0, must-revalidate');
+  }
   const policy = headers.get('content-security-policy');
   if (policy) {
     headers.set(
@@ -50,6 +69,8 @@ export const onRequest = async (context: PagesContext): Promise<Response> => {
     statusText: response.statusText,
     headers,
   });
+
+  if (!securedResponse.body) return securedResponse;
 
   return new HTMLRewriter()
     .on('script', {element: (element) => element.setAttribute('nonce', nonce)})

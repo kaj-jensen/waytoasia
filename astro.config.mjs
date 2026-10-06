@@ -5,7 +5,7 @@ import sitemap from '@astrojs/sitemap';
 export default defineConfig({
   site: 'https://waytoasia.com',
   output: 'static',
-  integrations: [react(), sitemap()],
+  integrations: [react(), sitemap({filter: page => !['/', '/privacy/'].includes(new URL(page).pathname)})],
   build: { format: 'directory' },
-  prefetch: { prefetchAll: true, defaultStrategy: 'viewport' },
+  prefetch: { prefetchAll: true, defaultStrategy: 'hover' },
 });

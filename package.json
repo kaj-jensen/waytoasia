@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "build": "npm run check:translations && astro check && astro build && node scripts/localize-built-html.mjs && node scripts/check-rendered-translations.mjs && node scripts/harden-csp.mjs",
+    "build": "npm run check:translations && astro check && astro build && node scripts/localize-built-html.mjs && node scripts/check-rendered-translations.mjs && node scripts/harden-csp.mjs && node scripts/check-built-seo.mjs",
     "preview": "astro preview",
     "lint": "eslint .",
     "typecheck": "astro check",
@@ -19,7 +19,8 @@
     "cf:deploy": "wrangler pages deploy dist --project-name waytoasia",
     "check:translations": "node scripts/check-translations.mjs",
     "test:dashboard": "node --import tsx --test tests/dashboard/dashboard.test.ts",
-    "preview:dashboard": "mkdir -p .wrangler && node --import tsx scripts/dashboard-preview.ts"
+    "preview:dashboard": "mkdir -p .wrangler && node --import tsx scripts/dashboard-preview.ts",
+    "test:content": "node --import tsx --test tests/content-identifiers.test.ts tests/page-security.test.ts"
   },
   "dependencies": {
     "@astrojs/react": "latest",

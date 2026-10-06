@@ -9,7 +9,8 @@ test('journal country navigation and six new illustrated stories work',async({pa
   await expect(group).toBeVisible();
   const story=group.locator('.story').first();
   await story.scrollIntoViewIfNeeded();
-  await expect(story.locator('img')).toHaveAttribute('src',`/images/journal/${country}.jpg`);
+  await expect(story.locator('img')).toHaveAttribute('src',new RegExp(`^/images/journal/responsive/${country}-[0-9]+\\.webp$`));
+  await expect(story.locator('img')).toHaveAttribute('srcset',new RegExp(`${country}-480\\.webp 480w`));
   expect(await story.locator('img').evaluate((image:HTMLImageElement)=>image.complete&&image.naturalWidth>0)).toBeTruthy();
   const href=await story.getAttribute('href');
   await page.goto(href!);

@@ -1,13 +1,13 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 ---
-<BaseLayout title="Page not found — Way to Asia" description="The requested Way to Asia page could not be found." locale="en" path="/404">
-  <main class="not-found">
+<BaseLayout title="Page not found — Way to Asia" description="The requested Way to Asia page could not be found." locale="en" path="/404" noindex>
+  <section class="not-found">
     <p class="eyebrow">404</p>
     <h1>This path has wandered.</h1>
     <p>The page you requested could not be found. Return to the journey overview and continue exploring.</p>
     <a class="btn" href="/en/">Return home ↗</a>
-  </main>
+  </section>
 </BaseLayout>
 
 <style>
