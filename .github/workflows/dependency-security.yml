@@ -1,0 +1,56 @@
+name: Dependency security
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "45 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-security-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Install locked dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=low
+      - name: Audit build and development dependencies
+        run: |
+          node --input-type=module <<'NODE'
+          import { spawnSync } from 'node:child_process';
+          const result = spawnSync('npm', ['audit', '--json'], { encoding: 'utf8' });
+          if (result.error) throw result.error;
+          let audit;
+          try { audit = JSON.parse(result.stdout); } catch { throw new Error('Audit did not return valid JSON'); }
+          if (audit.error || !audit.metadata || !audit.vulnerabilities) throw new Error('Audit service failed');
+          const advisories = Object.values(audit.vulnerabilities).flatMap(v => v.via.filter(v => typeof v === 'object'));
+          // These exact unpatched advisories are confined to Lighthouse tooling.
+          // The separate production audit has no exceptions.
+          const known = new Set([
+            'extract-zip|https://github.com/advisories/GHSA-jmr9-qjv8-65gv',
+            'extract-zip|https://github.com/advisories/GHSA-7pqw-9j4j-h8q3',
+            'sprintf-js|https://github.com/advisories/GHSA-hp3w-g68c-fv3c',
+          ]);
+          const newFindings = advisories.filter(a => !known.has(`${a.name}|${a.url}`));
+          for (const a of newFindings) console.error(`::error::${a.name}: ${a.severity} - ${a.url}`);
+          for (const a of advisories.filter(a => known.has(`${a.name}|${a.url}`))) {
+            console.log(`::warning::Known unpatched Lighthouse tooling advisory: ${a.name} - ${a.url}`);
+          }
+          if (newFindings.length || (result.status !== 0 && !advisories.length)) process.exit(1);
+          console.log('No new dependency advisories.');
+          NODE
