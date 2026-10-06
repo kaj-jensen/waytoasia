@@ -47,3 +47,9 @@ test('public proposal hostname isolates private website pages without breaking p
   assert.equal(called,true);assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'private, no-store');
  }
 });
+
+
+test('Pages default hostname redirects cannot change the destination host',async()=>{
+ const response=await onRequest({request:new Request('https://waytoasia.pages.dev//external.invalid/?lang=en'),next:async()=>{throw new Error('Default host must redirect');}});
+ assert.equal(response.status,308);assert.equal(response.headers.get('location'),'https://waytoasia.com//external.invalid/?lang=en');
+});

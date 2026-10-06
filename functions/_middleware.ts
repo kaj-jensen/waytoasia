@@ -21,7 +21,9 @@ const createNonce = (): string => {
 export const onRequest = async (context: PagesContext): Promise<Response> => {
   const requestUrl = new URL(context.request.url);
   if (requestUrl.hostname === 'waytoasia.pages.dev') {
-    const destination = new URL(`${requestUrl.pathname}${requestUrl.search}`, 'https://waytoasia.com');
+    const destination = new URL('https://waytoasia.com');
+    destination.pathname = requestUrl.pathname;
+    destination.search = requestUrl.search;
     return new Response(null, {
       status: 308,
       headers: {
