@@ -21,7 +21,9 @@ const createNonce = (): string => {
 export const onRequest = async (context: PagesContext): Promise<Response> => {
   const requestUrl = new URL(context.request.url);
   if (requestUrl.hostname === 'waytoasia.pages.dev') {
-    const destination = new URL(`${requestUrl.pathname}${requestUrl.search}`, 'https://waytoasia.com');
+    const destination = new URL('https://waytoasia.com');
+    destination.pathname = requestUrl.pathname;
+    destination.search = requestUrl.search;
     return new Response(null, {
       status: 308,
       headers: {
@@ -29,6 +31,23 @@ export const onRequest = async (context: PagesContext): Promise<Response> => {
         'cache-control': 'no-store',
       },
     });
+  }
+
+  // The public proposal alias must not expose the private pre-launch website.
+  const proposalRoute = requestUrl.pathname.startsWith('/proposal/')
+    || requestUrl.pathname.startsWith('/api/proposals/');
+  const proposalAsset = requestUrl.pathname === '/proposal.css'
+    || requestUrl.pathname === '/proposal.js'
+    || requestUrl.pathname.startsWith('/images/');
+  if (requestUrl.hostname === 'proposal.waytoasia.com' && !proposalRoute && !proposalAsset) {
+    const headers = {'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow'};
+    if (!['GET', 'HEAD'].includes(context.request.method)) return new Response(null, {status: 404, headers});
+    const destination = new URL('https://waytoasia.com');
+    destination.pathname = requestUrl.pathname;
+    return new Response(null, {status: 302, headers: {
+      ...headers,
+      location: destination.toString(),
+    }});
   }
 
   // HTML receives a fresh CSP nonce, so a 304 cannot safely reuse an older body.
