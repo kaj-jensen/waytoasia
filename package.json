@@ -20,7 +20,7 @@
     "check:translations": "node scripts/check-translations.mjs",
     "test:dashboard": "node --import tsx --test tests/dashboard/dashboard.test.ts",
     "preview:dashboard": "mkdir -p .wrangler && node --import tsx scripts/dashboard-preview.ts",
-    "test:content": "node --import tsx --test tests/content-identifiers.test.ts"
+    "test:content": "node --import tsx --test tests/content-identifiers.test.ts tests/page-security.test.ts"
   },
   "dependencies": {
     "@astrojs/react": "latest",
