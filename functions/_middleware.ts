@@ -31,6 +31,21 @@ export const onRequest = async (context: PagesContext): Promise<Response> => {
     });
   }
 
+  // The public proposal alias must not expose the private pre-launch website.
+  const proposalRoute = requestUrl.pathname.startsWith('/proposal/')
+    || requestUrl.pathname.startsWith('/api/proposals/');
+  const proposalAsset = requestUrl.pathname === '/proposal.css'
+    || requestUrl.pathname === '/proposal.js'
+    || requestUrl.pathname.startsWith('/images/');
+  if (requestUrl.hostname === 'proposal.waytoasia.com' && !proposalRoute && !proposalAsset) {
+    const headers = {'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow'};
+    if (!['GET', 'HEAD'].includes(context.request.method)) return new Response(null, {status: 404, headers});
+    return new Response(null, {status: 302, headers: {
+      ...headers,
+      location: new URL(requestUrl.pathname, 'https://waytoasia.com').toString(),
+    }});
+  }
+
   // HTML receives a fresh CSP nonce, so a 304 cannot safely reuse an older body.
   // Keep conditional caching for images, scripts, styles and API responses.
   const isDocument = ['GET', 'HEAD'].includes(context.request.method)
