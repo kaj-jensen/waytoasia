@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import {parse} from 'parse5';
 import catalog from '../src/content/translations.generated.json' with {type:'json'};
 
 for(const locale of Object.keys(catalog)){
@@ -49,8 +50,28 @@ for(const file of files){
   const pattern=new RegExp(`(?<![\\p{L}\\p{N}_])(?:${sources.join('|')})(?![\\p{L}\\p{N}_])`,'gu');
   const translate=value=>value.replace(pattern,match=>replacements.get(match));
   html=html.replace(/(<script\b[\s\S]*?<\/script>|<style\b[\s\S]*?<\/style>)|>([^<]+)</gi,(_match,protectedBlock,text)=>protectedBlock??`>${translate(text)}<`);
-  html=html.replace(/\b(aria-label|title|placeholder|alt|content)=("[^"]*"|'[^']*')/gi,(_match,name,quoted)=>`${name}=${quoted[0]}${translate(quoted.slice(1,-1))}${quoted[0]}`);
+  html=html.replace(/\b(aria-label|title|placeholder|alt|content)=("[^"]*"|'[^']*')/gi,(_match,name,quoted)=>name==='content'&&/^https?:\/\//.test(quoted.slice(1,-1))?`${name}=${quoted}`:`${name}=${quoted[0]}${translate(quoted.slice(1,-1))}${quoted[0]}`);
   protectedNames.forEach((block,index)=>{html=html.replace(`__WTA_PROTECTED_${index}__`,block)});
+  // Structured page metadata must describe the final reviewed, translated HTML.
+  // Update only human-facing fields; identifiers, URLs and schema keys stay intact.
+  let title='',description='',heading='';
+  function metadata(node){
+    const attr=name=>node.attrs?.find(attribute=>attribute.name===name)?.value;
+    const text=node=>node.value??(node.childNodes??[]).map(text).join('');
+    if(node.tagName==='title')title=text(node);
+    if(node.tagName==='h1')heading=text(node);
+    if(node.tagName==='meta'&&attr('name')==='description')description=attr('content');
+    for(const child of node.childNodes??[])metadata(child);
+  }
+  metadata(parse(html));
+  html=html.replace(/(<script\b[^>]*\btype="application\/ld\+json"[^>]*>)([\s\S]*?)(<\/script>)/gi,(_match,start,body,end)=>{
+    const data=JSON.parse(body);
+    for(const entity of data['@graph']??[]){
+      if(entity['@type']==='WebPage'){entity.name=title;entity.description=description;}
+    }
+    if(data['@type']==='BlogPosting'){data.headline=heading;data.description=description;}
+    return start+JSON.stringify(data).replaceAll('<','\\u003c')+end;
+  });
   await fs.writeFile(file,html);
 }
 console.log(`Localized ${files.length} built HTML pages across nine languages.`);

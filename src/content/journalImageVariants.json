@@ -1,0 +1,184 @@
+{
+  "/images/journal/china.jpg": {
+    "width": 1800,
+    "height": 1200,
+    "variants": [
+      {
+        "src": "/images/journal/responsive/china-480.webp",
+        "width": 480,
+        "height": 320
+      },
+      {
+        "src": "/images/journal/responsive/china-768.webp",
+        "width": 768,
+        "height": 512
+      },
+      {
+        "src": "/images/journal/responsive/china-1200.webp",
+        "width": 1200,
+        "height": 800
+      },
+      {
+        "src": "/images/journal/responsive/china-1600.webp",
+        "width": 1600,
+        "height": 1067
+      }
+    ]
+  },
+  "/images/journal/indonesia.jpg": {
+    "width": 1800,
+    "height": 2700,
+    "variants": [
+      {
+        "src": "/images/journal/responsive/indonesia-480.webp",
+        "width": 480,
+        "height": 720
+      },
+      {
+        "src": "/images/journal/responsive/indonesia-768.webp",
+        "width": 768,
+        "height": 1152
+      },
+      {
+        "src": "/images/journal/responsive/indonesia-1200.webp",
+        "width": 1200,
+        "height": 1800
+      },
+      {
+        "src": "/images/journal/responsive/indonesia-1600.webp",
+        "width": 1600,
+        "height": 2400
+      }
+    ]
+  },
+  "/images/journal/japan.jpg": {
+    "width": 1800,
+    "height": 3200,
+    "variants": [
+      {
+        "src": "/images/journal/responsive/japan-480.webp",
+        "width": 480,
+        "height": 853
+      },
+      {
+        "src": "/images/journal/responsive/japan-768.webp",
+        "width": 768,
+        "height": 1365
+      },
+      {
+        "src": "/images/journal/responsive/japan-1200.webp",
+        "width": 1200,
+        "height": 2133
+      },
+      {
+        "src": "/images/journal/responsive/japan-1600.webp",
+        "width": 1600,
+        "height": 2844
+      }
+    ]
+  },
+  "/images/journal/northern-vietnam.jpg": {
+    "width": 1800,
+    "height": 2700,
+    "variants": [
+      {
+        "src": "/images/journal/responsive/northern-vietnam-480.webp",
+        "width": 480,
+        "height": 720
+      },
+      {
+        "src": "/images/journal/responsive/northern-vietnam-768.webp",
+        "width": 768,
+        "height": 1152
+      },
+      {
+        "src": "/images/journal/responsive/northern-vietnam-1200.webp",
+        "width": 1200,
+        "height": 1800
+      },
+      {
+        "src": "/images/journal/responsive/northern-vietnam-1600.webp",
+        "width": 1600,
+        "height": 2400
+      }
+    ]
+  },
+  "/images/journal/south-korea.jpg": {
+    "width": 1800,
+    "height": 2700,
+    "variants": [
+      {
+        "src": "/images/journal/responsive/south-korea-480.webp",
+        "width": 480,
+        "height": 720
+      },
+      {
+        "src": "/images/journal/responsive/south-korea-768.webp",
+        "width": 768,
+        "height": 1152
+      },
+      {
+        "src": "/images/journal/responsive/south-korea-1200.webp",
+        "width": 1200,
+        "height": 1800
+      },
+      {
+        "src": "/images/journal/responsive/south-korea-1600.webp",
+        "width": 1600,
+        "height": 2400
+      }
+    ]
+  },
+  "/images/journal/thailand.jpg": {
+    "width": 1800,
+    "height": 1200,
+    "variants": [
+      {
+        "src": "/images/journal/responsive/thailand-480.webp",
+        "width": 480,
+        "height": 320
+      },
+      {
+        "src": "/images/journal/responsive/thailand-768.webp",
+        "width": 768,
+        "height": 512
+      },
+      {
+        "src": "/images/journal/responsive/thailand-1200.webp",
+        "width": 1200,
+        "height": 800
+      },
+      {
+        "src": "/images/journal/responsive/thailand-1600.webp",
+        "width": 1600,
+        "height": 1067
+      }
+    ]
+  },
+  "/images/journal/vietnam.jpg": {
+    "width": 1800,
+    "height": 2700,
+    "variants": [
+      {
+        "src": "/images/journal/responsive/vietnam-480.webp",
+        "width": 480,
+        "height": 720
+      },
+      {
+        "src": "/images/journal/responsive/vietnam-768.webp",
+        "width": 768,
+        "height": 1152
+      },
+      {
+        "src": "/images/journal/responsive/vietnam-1200.webp",
+        "width": 1200,
+        "height": 1800
+      },
+      {
+        "src": "/images/journal/responsive/vietnam-1600.webp",
+        "width": 1600,
+        "height": 2400
+      }
+    ]
+  }
+}

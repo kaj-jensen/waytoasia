@@ -2,8 +2,8 @@
 import BaseLayout from '../../../../layouts/BaseLayout.astro';
 import TourProduct from '../../../../components/TourProduct.astro';
 import {countries,tours,type Country,type Tour} from '../../../../content/data';
-import {locales,type Locale} from '../../../../i18n';
+import {locales,tr,type Locale} from '../../../../i18n';
 export function getStaticPaths(){return locales.flatMap(locale=>tours.map(tour=>({params:{locale,country:tour.country,slug:tour.slug},props:{locale,tour,country:countries.find(c=>c.slug===tour.country)!}})))}
 const {locale,tour,country}=Astro.props as {locale:Locale;tour:Tour;country:Country};
 ---
-<BaseLayout title={`${tour.name} — Way to Asia`} description={tour.teaser} {locale} path={`/${country.slug}/tours/${tour.slug}`} image={tour.image}><TourProduct {tour} {country} {locale}/></BaseLayout>
+<BaseLayout title={`${tr(locale,tour.name)} — Way to Asia`} description={tour.teaser} {locale} path={`/${country.slug}/tours/${tour.slug}`} image={tour.image}><TourProduct {tour} {country} {locale}/></BaseLayout>
