@@ -36,7 +36,7 @@ test('conditional HTML reloads get matching fresh nonces while asset caching and
 
 
 test('public proposal hostname isolates private website pages without breaking proposal routes or assets',async()=>{
- for(const path of ['/', '/en/', '/en/inspiration/', '/staff/', '/sitemap-index.xml', '/api/trip-suggestion']){
+ for(const path of ['/', '/en/', '/en/inspiration/', '/staff/', '/sitemap-index.xml', '/api/trip-suggestion', '//external.invalid/']){
   const response=await onRequest({request:new Request(`https://proposal.waytoasia.com${path}?private=value`),next:async()=>{throw new Error('Private website must not be served on public alias');}});
   assert.equal(response.status,302);assert.equal(response.headers.get('location'),`https://waytoasia.com${path}`);assert.equal(response.headers.get('cache-control'),'no-store');
  }

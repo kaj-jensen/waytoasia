@@ -40,9 +40,11 @@ export const onRequest = async (context: PagesContext): Promise<Response> => {
   if (requestUrl.hostname === 'proposal.waytoasia.com' && !proposalRoute && !proposalAsset) {
     const headers = {'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow'};
     if (!['GET', 'HEAD'].includes(context.request.method)) return new Response(null, {status: 404, headers});
+    const destination = new URL('https://waytoasia.com');
+    destination.pathname = requestUrl.pathname;
     return new Response(null, {status: 302, headers: {
       ...headers,
-      location: new URL(requestUrl.pathname, 'https://waytoasia.com').toString(),
+      location: destination.toString(),
     }});
   }
 
