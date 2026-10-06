@@ -4,14 +4,14 @@ import type {Locale} from '../i18n';
 const {locale}=Astro.props as {locale:Locale};
 const copy:Record<Locale,{text:string;accept:string;decline:string}>={
   en:{text:'We use optional analytics to understand how visitors use Way to Asia and improve the journeys we present.',accept:'Allow analytics',decline:'No thanks'},
-  es:{text:'Usamos analítica opcional para comprender cómo se utiliza Way to Asia y mejorar los viajes que presentamos.',accept:'Permitir analítica',decline:'No, gracias'},
-  it:{text:'Usiamo strumenti analitici facoltativi per capire come viene usato Way to Asia e migliorare i viaggi presentati.',accept:'Consenti analisi',decline:'No, grazie'},
+  es:{text:'Usamos estadísticas opcionales para entender cómo se utiliza Way to Asia y mejorar los viajes que presentamos.',accept:'Permitir estadísticas',decline:'No, gracias'},
+  it:{text:'Usiamo statistiche facoltative per capire come viene usato Way to Asia e migliorare i viaggi presentati.',accept:'Consenti statistiche',decline:'No, grazie'},
   fr:{text:'Nous utilisons des données analytiques facultatives pour comprendre l’usage de Way to Asia et améliorer nos voyages.',accept:'Autoriser les statistiques',decline:'Non merci'},
-  nl:{text:'We gebruiken optionele analytics om te begrijpen hoe Way to Asia wordt gebruikt en onze reizen te verbeteren.',accept:'Analytics toestaan',decline:'Nee, bedankt'},
+  nl:{text:'We gebruiken optionele statistieken om te begrijpen hoe Way to Asia wordt gebruikt en onze reizen te verbeteren.',accept:'Statistieken toestaan',decline:'Nee, bedankt'},
   hu:{text:'Opcionális statisztikai sütiket használunk, hogy megértsük a Way to Asia weboldalának használatát és javítsuk szolgáltatásainkat.',accept:'Statisztikai sütik engedélyezése',decline:'Köszönöm, nem'},
-  sv:{text:'Vi använder valfri analys för att förstå hur Way to Asia används och förbättra resorna vi presenterar.',accept:'Tillåt analys',decline:'Nej tack'},
+  sv:{text:'Vi använder valfri statistik för att förstå hur Way to Asia används och förbättra resorna vi presenterar.',accept:'Tillåt statistik',decline:'Nej tack'},
   da:{text:'Vi bruger valgfri statistik til at forstå, hvordan Way to Asia bruges, og forbedre de rejser, vi præsenterer.',accept:'Tillad statistik',decline:'Nej tak'},
-  no:{text:'Vi bruker valgfri analyse for å forstå hvordan Way to Asia brukes og forbedre reisene vi presenterer.',accept:'Tillat analyse',decline:'Nei takk'},
+  no:{text:'Vi bruker valgfri statistikk for å forstå hvordan Way to Asia brukes og forbedre reisene vi presenterer.',accept:'Tillat statistikk',decline:'Nei takk'},
 };
 ---
 <aside class="analytics-consent" data-analytics-consent data-measurement-id="G-4B6XP1G9FN" hidden aria-label="Analytics preferences">

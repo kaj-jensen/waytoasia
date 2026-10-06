@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import {expect,test} from '@playwright/test';
 
 const suggestion={id:'test-suggestion',generatedAt:'2026-09-24T00:00:00.000Z',title:'Thailand at a thoughtful pace',summary:'Here is a food-led 12-day Thailand route with four nights in Bangkok, four in the north and a quiet four-night coastal finish, moving Bangkok → Chiang Mai → the southern coast.',recommendedDuration:'12 days / 11 nights',route:[{days:'Days 1–4',place:'Thailand: Bangkok',focus:'Use one riverside base for neighbourhood markets, old-city temples and an introduction to regional Thai cooking.',highlights:['Morning at a local market','Thonburi canals and kitchens'],onwardTravel:'Fly or take the overnight train north to Chiang Mai.'},{days:'Days 5–8',place:'Thailand: Chiang Mai',focus:'Slow down for northern food traditions, craft communities and a full day outside the city.',highlights:['Northern cooking session','Lanna craft district'],onwardTravel:'Fly south, then continue by road or boat to the season-matched coast.'},{days:'Days 9–12',place:'Thailand: Southern coast',focus:'Finish with one coastal base and enough unscheduled time for weather-led island or mainland outings.',highlights:['Half-day coastal outing','Two unhurried beach days'],onwardTravel:''}],hotelStays:[{place:'Bangkok',nights:4,options:[{id:'bangkok-a',name:'Riva Surya Bangkok',area:'Riverside',standard:'Luxury',whyFit:'A practical riverside base with character.',roomGuidance:'Request a 30 m² Riva Room or larger.',reviewSignal:'Guests repeatedly praise the location and service.',sources:[{title:'Hotel reviews',url:'https://www.tripadvisor.com/example-hotel',domain:'tripadvisor.com'}]},{id:'bangkok-b',name:'Eastin Grand Hotel Sathorn',area:'Sathorn',standard:'Comfort',whyFit:'Direct transport access and a full-service feel.',roomGuidance:'Request a Superior Sky room or larger.',reviewSignal:'Reviews often mention the pool and transport access.',sources:[{title:'Hotel reviews',url:'https://www.booking.com/example-hotel',domain:'booking.com'}]}]}],dayPlans:[{day:1,place:'Bangkok',theme:'Ease into Bangkok through food or heritage',options:[{id:'day-1-food',name:'Bangrak tasting walk',type:'Culinary',description:'A guided neighbourhood tasting route through family-run kitchens.',whyFit:'A gentle first-day introduction for food-focused travellers.',interestTags:['food'],sources:[{title:'Experience reviews',url:'https://www.tripadvisor.com/example-tour',domain:'tripadvisor.com'}]},{id:'day-1-history',name:'Old Bangkok riverside heritage',type:'History',description:'Explore riverside temples and historic lanes with a local guide.',whyFit:'Adds context without overloading arrival day.',interestTags:['history'],sources:[{title:'Experience reviews',url:'https://www.getyourguide.com/example-tour',domain:'getyourguide.com'}]}]}],fitReasons:['Balances food and local culture.','Keeps the requested pace comfortable.'],practicalNotes:['Choose the Andaman or Gulf coast only after the travel month is known.','Compare the Bangkok–Chiang Mai sleeper with a flight based on comfort and available time.','For a slower route, keep all four northern nights and remove one Bangkok excursion rather than changing hotels again.'],travellerResearch:'not-connected',travellerInsights:[],closing:'Would you like to choose a coast, slow the route, or add a specific food experience?',availability:'not-connected',pricing:'illustrative-only',priceEstimate:{currency:'EUR',totalLow:9800,totalHigh:13200,adults:2,children:0,standard:'Comfort',basis:'public-listed-plus-buffer',hotelNights:11,hotelStays:3,plannedExperiences:6,regionalTravelLegs:2,sourceDomains:['booking.com','getyourguide.com'],planningUpliftLow:15,planningUpliftHigh:20},matchedJourneys:[{slug:'northern-table-southern-sea',name:'Northern Table, Southern Sea',country:'thailand',duration:11,href:'/en/thailand/tours/northern-table-southern-sea',prices:{USD:5400,EUR:4950,DKK:36900,SEK:55300,NOK:57600,HUF:1940000}}]};
@@ -17,7 +18,7 @@ test('trip planner creates a clearly unbooked itinerary suggestion',async({page}
   await page.getByLabel('Date flexibility').selectOption('3');
   await page.getByLabel('Departure airport or city').fill('Copenhagen (CPH)');
   await page.getByRole('button',{name:/Create my trip idea/}).click();
-  await expect(page.getByRole('heading',{name:'We’re cooking up your journey'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'We’re putting your journey together'})).toBeVisible();
   await expect(page.getByText('Keep this page open — your itinerary will appear here automatically.')).toBeVisible();
   await expect(page.getByRole('heading',{name:suggestion.title})).toBeVisible();
   await expect(page.getByText('Ideas only · No live availability or confirmed prices yet')).toBeVisible();
@@ -93,4 +94,54 @@ test('agent plans beyond the catalogue and revises the complete journey',async({
   await expect(page.getByRole('alert')).toHaveCount(0);
   expect(receivedDestination).toBe('Japan and Taiwan');
   expect(receivedRefinement).toBe('Use fewer cities and add more nature.');
+});
+
+for(const locale of ['da','sv','no','es','it','fr','nl','hu']){
+ test(`${locale}: generated journey choices and handoff stay localized`,async({page})=>{
+  const catalog=JSON.parse(fs.readFileSync(`src/content/editorial/${locale}.json`,'utf8'));
+  const text=(source:string,variables:Record<string,string|number>={})=>Object.entries(variables).reduce((value,[key,replacement])=>value.replaceAll(`{${key}}`,String(replacement)),catalog[source]??source);
+  let submitted:Record<string,unknown>={};
+  await page.route('**/api/trip-suggestion',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({suggestion})}));
+  await page.route('**/api/trip-enquiry',route=>{submitted=route.request().postDataJSON();return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,proposalUrl:'/proposal/test-localized-plan'})})});
+  await page.setViewportSize({width:390,height:844});
+  await page.goto(`/${locale}/trip-planner/`);
+  await page.locator('astro-island').evaluate(async node=>{while(node.hasAttribute('ssr'))await new Promise(resolve=>setTimeout(resolve,25));});
+  await page.locator('[name="travelStartDate"]').fill('2027-03-10');
+  await page.locator('[name="travelEndDate"]').fill('2027-03-21');
+  await page.locator('[name="departureAirport"]').fill('Copenhagen');
+  await page.locator('[name="interests"][value="food"]').check();
+  await page.locator('.trip-planner button[type="submit"]').click();
+  await expect(page.getByRole('heading',{name:text('Build this journey around you')})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Build this journey around you'})).toHaveCount(0);
+  await expect(page.locator('.stay-choice legend')).toContainText(text('{count} nights',{count:4}));
+  await expect(page.locator('.day-choice legend')).toContainText(text('Day {day}',{day:1}));
+  await page.getByLabel(`${text('Write my own idea for this day')} — ${text('Day {day}',{day:1})}`).fill('Personal choice');
+  await expect(page.locator('.handoff-includes')).toContainText(text('Your {count} hotel and day decisions',{count:2}));
+  await expect(page.locator('.matches')).not.toContainText('Northern Table, Southern Sea');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.locator('#consultant-request [name="name"]').fill('Test Traveller');
+  await page.locator('#consultant-request [name="email"]').fill('test@example.com');
+  await page.locator('#consultant-request [name="consent"]').check();
+  await page.locator('#consultant-request button[type="submit"]').click();
+  await expect(page.getByRole('link',{name:text('View my private journey')+' ↗'})).toBeVisible();
+  expect(submitted.locale).toBe(locale);
+  expect((submitted.builderChoices as {dayNotes:Record<string,string>}).dayNotes['day-1']).toBe('Personal choice');
+ });
+}
+
+test('localized planner does not expose English backend or network errors',async({page})=>{
+ await page.route('**/api/trip-suggestion',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Upstream request failed'})}));
+ await page.goto('/fr/trip-planner/');
+ await page.locator('astro-island').evaluate(async node=>{while(node.hasAttribute('ssr'))await new Promise(resolve=>setTimeout(resolve,25));});
+ await page.locator('[name="travelStartDate"]').fill('2027-03-10');
+ await page.locator('[name="travelEndDate"]').fill('2027-03-21');
+  await page.locator('[name="departureAirport"]').fill('Copenhagen');
+ await page.locator('[name="interests"][value="food"]').check();
+ await page.locator('.trip-planner button[type="submit"]').click();
+ await expect(page.getByRole('alert')).toContainText('Nous n’avons pas pu préparer');
+ await expect(page.getByRole('alert')).not.toContainText('Upstream request failed');
+ await page.route('**/api/trip-suggestion',route=>route.abort('failed'));
+ await page.locator('.trip-planner button[type="submit"]').click();
+ await expect(page.getByRole('alert')).toContainText('Impossible de créer la proposition.');
+ await expect(page.getByRole('alert')).not.toContainText('Failed to fetch');
 });

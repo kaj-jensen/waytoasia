@@ -1,0 +1,16 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import {privacyCopy} from '../../content/privacyCopy';
+import {locales,localizeContent,localizedPath,tr,type Locale} from '../../i18n';
+export function getStaticPaths(){return locales.map(locale=>({params:{locale},props:{locale}}))}
+const {locale}=Astro.props as {locale:Locale};
+const policy=localizeContent(locale,privacyCopy);
+---
+<BaseLayout title={`${tr(locale,'Privacy')} — Way to Asia`} description={policy.description} {locale} path="/privacy">
+ <article class="privacy-policy shell"><h1>{tr(locale,'Privacy')}</h1><p class="updated">{policy.updated}</p><p>{policy.intro}</p>
+ <h2>{tr(locale,'Enquiries and communications')}</h2><p>{policy.staff}</p>
+ <h2>{tr(locale,'Service providers')}</h2><p>{policy.providers}</p>
+ <h2>{tr(locale,'Your choices')}</h2><p>{policy.choicesBefore} <a href={localizedPath(locale,'/contact')}>{tr(locale,'contact page')}</a>{locale==='hu'?' ':''}{policy.choicesAfter}</p>
+ <h2>{tr(locale,'Analytics')}</h2><p>{policy.analytics}</p></article>
+</BaseLayout>
+<style>.privacy-policy{max-width:800px;padding-top:6rem;padding-bottom:2.5rem}.privacy-policy h1{font-size:clamp(2rem,5vw,3rem);margin-bottom:.6rem}.privacy-policy h2{font-size:1.45rem;margin:1.5rem 0 .6rem}.privacy-policy p{line-height:1.7;margin:.7rem 0}.privacy-policy .updated{font-size:.8rem;color:#52615b}.privacy-policy a{text-decoration:underline;text-underline-offset:3px;color:#8b3425}</style>

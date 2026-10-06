@@ -47,3 +47,20 @@ for(const locale of locales.filter(l=>l!=='en')){
   await expect(page.locator('[data-review]')).toContainText(interestText);
  });
 }
+
+test('privacy links retain the selected language and all policies are translated',async({page})=>{
+ await page.addInitScript(()=>localStorage.setItem('wta-analytics-consent','denied'));
+ await page.setViewportSize({width:390,height:844});
+ for(const locale of locales){
+  await page.goto(`/${locale}/`);
+  const privacy=page.locator(`footer a[href="/${locale}/privacy"]`);
+  await expect(privacy).toBeAttached();
+  await privacy.click();
+  await expect(page).toHaveURL(new RegExp(`/${locale}/privacy/?$`));
+  await expect(page.locator('html')).toHaveAttribute('lang',locale);
+  await expect(page.locator('main h1')).toBeVisible();
+  await expect(page.locator('.privacy-policy a')).toHaveAttribute('href',`/${locale}/contact`);
+  if(locale!=='en')await expect(page.locator('.privacy-policy')).not.toContainText('When you contact Way to Asia');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ }
+});
