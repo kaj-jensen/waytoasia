@@ -39,12 +39,17 @@ jobs:
           try { audit = JSON.parse(result.stdout); } catch { throw new Error('Audit did not return valid JSON'); }
           if (audit.error || !audit.metadata || !audit.vulnerabilities) throw new Error('Audit service failed');
           const advisories = Object.values(audit.vulnerabilities).flatMap(v => v.via.filter(v => typeof v === 'object'));
-          const known = 'https://github.com/advisories/GHSA-vfj7-8cjw-p6xm';
-          const allowed = false;
-          const newFindings = advisories.filter(a => !(allowed && a.name === 'braces' && a.url === known));
+          // These exact unpatched advisories are confined to Lighthouse tooling.
+          // The separate production audit has no exceptions.
+          const known = new Set([
+            'extract-zip|https://github.com/advisories/GHSA-jmr9-qjv8-65gv',
+            'extract-zip|https://github.com/advisories/GHSA-7pqw-9j4j-h8q3',
+            'sprintf-js|https://github.com/advisories/GHSA-hp3w-g68c-fv3c',
+          ]);
+          const newFindings = advisories.filter(a => !known.has(`${a.name}|${a.url}`));
           for (const a of newFindings) console.error(`::error::${a.name}: ${a.severity} - ${a.url}`);
-          if (allowed && advisories.some(a => a.name === 'braces' && a.url === known)) {
-            console.log('::warning::Known unpatched braces advisory remains in build/lint tooling: GHSA-vfj7-8cjw-p6xm. Production audit is checked separately without exceptions.');
+          for (const a of advisories.filter(a => known.has(`${a.name}|${a.url}`))) {
+            console.log(`::warning::Known unpatched Lighthouse tooling advisory: ${a.name} - ${a.url}`);
           }
           if (newFindings.length || (result.status !== 0 && !advisories.length)) process.exit(1);
           console.log('No new dependency advisories.');
