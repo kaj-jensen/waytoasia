@@ -98,7 +98,7 @@ test('agent plans beyond the catalogue and revises the complete journey',async({
 
 for(const locale of ['da','sv','no','es','it','fr','nl','hu']){
  test(`${locale}: generated journey choices and handoff stay localized`,async({page})=>{
-  const catalog=JSON.parse(fs.readFileSync(`src/content/editorial/${locale}.json`,'utf8'));
+  const catalog={...JSON.parse(fs.readFileSync('src/content/translations.generated.json','utf8'))[locale],...JSON.parse(fs.readFileSync(`src/content/editorial/${locale}.json`,'utf8'))};
   const text=(source:string,variables:Record<string,string|number>={})=>Object.entries(variables).reduce((value,[key,replacement])=>value.replaceAll(`{${key}}`,String(replacement)),catalog[source]??source);
   let submitted:Record<string,unknown>={};
   await page.route('**/api/trip-suggestion',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({suggestion})}));
@@ -106,6 +106,7 @@ for(const locale of ['da','sv','no','es','it','fr','nl','hu']){
   await page.setViewportSize({width:390,height:844});
   await page.goto(`/${locale}/trip-planner/`);
   await page.locator('astro-island').evaluate(async node=>{while(node.hasAttribute('ssr'))await new Promise(resolve=>setTimeout(resolve,25));});
+  for(const country of ['China','South Korea','Thailand','Vietnam','Indonesia'])await expect(page.getByLabel(text(country),{exact:true})).toBeVisible();
   await page.locator('[name="travelStartDate"]').fill('2027-03-10');
   await page.locator('[name="travelEndDate"]').fill('2027-03-21');
   await page.locator('[name="departureAirport"]').fill('Copenhagen');
