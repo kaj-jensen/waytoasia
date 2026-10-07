@@ -11,6 +11,7 @@ createServer((req,res)=>{
  }
  if(req.method==='POST'){res.writeHead(303,{Location:`/?response=${url.searchParams.get('response')||'approved'}`});res.end();return;}
  const variant=url.searchParams.get('variant'),p=structuredClone(payload);const r={...row,locale:url.searchParams.get('locale')||'sv'};
+ if(variant==='japan'){p.profile.destinations=['japan'];p.suggestion.route=['Tokyo','Hakone','Kyoto'].map((place,i)=>({place:`Japan: ${place}`,nights:[3,1,3][i]}));p.suggestion.hotelStays=[];r.title='Japan map preview';}
  if(variant==='missing'){p.suggestion.route=[{place:'Unresolved region',days:'Day 1–2',plan:'Ask the consultant to confirm.'}];}
  if(variant==='return'){p.suggestion.route=[{place:'Japan: Tokyo'},{place:'Japan: Kyoto'},{place:'Japan: Tokyo'}];p.profile.destinations=['japan'];r.title='A return journey through Japan';}
  r.payload_json=JSON.stringify(p);res.setHeader('Content-Type','text/html');res.end(renderProposalPage(r,'A'.repeat(43),url.searchParams.get('response')||''));

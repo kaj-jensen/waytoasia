@@ -1,3 +1,5 @@
+// Natural Earth 10m Japan, public domain; nvkelso/natural-earth-vector.
+import japan from '../../src/content/geography/japan-10m.json';
 import lakes from '../../src/content/geography/lakes.json';
 import rivers from '../../src/content/geography/rivers.json';
 import {geoMercator,geoPath,geoGraticule,geoCentroid} from 'd3-geo';
@@ -6,7 +8,7 @@ import type {Topology,GeometryCollection} from 'topojson-specification';
 import topology from 'world-atlas/countries-50m.json';
 import {mapPlaces} from '../../src/content/mapCoordinates';
 
-export interface RouteLocation {index:number;place:string;label:string;coordinates:[number,number]|null;issue?:string;source?:string;waypoints?:Array<{label:string;coordinates:[number,number]}>;badge?:string}
+export interface RouteLocation {index:number;place:string;label:string;coordinates:[number,number]|null;issue?:string;source?:string;waypoints?:Array<{label:string;coordinates:[number,number]}>;badge?:string;subtitle?:string}
 const escape=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 const normalize=(s:string)=>s.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[’']/g,'').replace(/[^a-z0-9]+/g,' ').trim();
 const registry=Object.entries(mapPlaces).flatMap(([country,places])=>Object.entries(places).filter(([name,p])=>!p.note?.startsWith('Representative')&&!['Great Wall','Yunnan','Bali','Mekong','Flores','Southern islands'].includes(name)).map(([name,p])=>({country,name,key:normalize(name),coordinates:p.coordinates})));
@@ -39,7 +41,8 @@ export function resolveRoute(route:unknown,context:unknown=[]):RouteLocation[]{
   });
 }
 const world=topology as unknown as Topology<{countries:GeometryCollection}>;
-const land=feature(world,world.objects.countries).features;
+const baseLand=feature(world,world.objects.countries).features;
+const land=[...baseLand.filter(f=>String(f.id)!=='392'),...japan.features as unknown as typeof baseLand];
 type Bounds={west:number;east:number;south:number;north:number};
 function bounds(geometry:unknown):Bounds{
  const b={west:Infinity,east:-Infinity,south:Infinity,north:-Infinity};
@@ -50,7 +53,7 @@ const landBounds=new Map(land.map(f=>[f,bounds(f.geometry)]));
 const lakeBounds=new Map(lakes.features.map(f=>[f,bounds(f.geometry)]));
 const riverBounds=new Map(rivers.features.map(f=>[f,bounds(f.geometry)]));
 const cache=new Map<string,string>();
-export const MAP_STYLE_VERSION='natural-earth-brochure-v3';
+export const MAP_STYLE_VERSION='natural-earth-brochure-v4';
 export function routeMap(locations:RouteLocation[],copy:{title:string;illustrative:string;detail:string;unavailable:string}):string{
   const key=JSON.stringify([MAP_STYLE_VERSION,locations,copy]);if(cache.has(key))return cache.get(key)!;
   const plotted=locations.flatMap(p=>p.waypoints?p.waypoints.map((w,i)=>({...p,...w,waypoints:undefined,badge:`${p.index+1}${String.fromCharCode(97+i)}`})):[p]);
@@ -70,7 +73,7 @@ function projection(stops:RouteLocation[],width:number,height:number){
   const coordinates=stops.map(p=>p.coordinates!);const lon=coordinates.map(p=>p[0]),lat=coordinates.map(p=>p[1]);
   // Use a local extent even for a single point / identical return stops.
   if(Math.max(...lon)-Math.min(...lon)<.03&&Math.max(...lat)-Math.min(...lat)<.03)coordinates.push([lon[0]-.15,lat[0]-.15],[lon[0]+.15,lat[0]+.15]);
-  return geoMercator().rotate([-lon[0],0]).fitExtent([[width*.18,70],[width*.78,height-72]],{type:'MultiPoint',coordinates}).clipExtent([[0,0],[width,height]]);
+  return geoMercator().rotate([-lon[0],0]).fitExtent([[width*.15,height*.15],[width*.85,height*.85]],{type:'MultiPoint',coordinates}).clipExtent([[0,0],[width,height]]);
 }
 function renderPanel(stops:RouteLocation[],width:number,height:number,id:number,detail:boolean,copy:{title:string;illustrative:string;detail:string}){
   const project=projection(stops,width,height),path=geoPath(project).digits(1);const anchors=stops.map(p=>({...p,xy:project(p.coordinates!)!}));
@@ -80,20 +83,30 @@ function renderPanel(stops:RouteLocation[],width:number,height:number,id:number,
   const lakePaths=lakes.features.filter(f=>intersects(lakeBounds.get(f)!)).map(f=>`<path d="${path(f as unknown as Parameters<typeof path>[0])||''}" class="map-lake"/>`).join('');
   const water=path({type:'FeatureCollection',features:rivers.features.filter(f=>intersects(riverBounds.get(f)!))} as unknown as Parameters<typeof path>[0])||'';
   const contextOccupied:Array<[number,number]>=[];
-  const contextLabels=detail?'':registry.filter(p=>!stops.some(s=>s.label===p.name)).flatMap(p=>{const xy=project(p.coordinates);if(!xy||xy[0]<40||xy[0]>width-100||xy[1]<30||xy[1]>height-35||anchors.some(a=>Math.hypot(a.xy[0]-xy[0],a.xy[1]-xy[1])<65))return [];if(contextOccupied.some(p=>Math.hypot(p[0]-xy[0],p[1]-xy[1])<85))return [];contextOccupied.push(xy as [number,number]);return [`<g class="map-context"><circle cx="${xy[0]}" cy="${xy[1]}" r="2"/><text x="${xy[0]+6}" y="${xy[1]+4}">${escape(p.name)}</text></g>`]}).slice(0,12).join('');
+  const contextLabels=detail?'':[{name:'Mt. Fuji',coordinates:[138.7274,35.3606] as [number,number]},{name:'Lake Biwa',coordinates:[136.08,35.25] as [number,number]},{name:'Osaka',coordinates:[135.5023,34.6937] as [number,number]},...registry].filter(p=>!stops.some(s=>s.label===p.name)).flatMap(p=>{const xy=project(p.coordinates);if(!xy||xy[0]<40||xy[0]>width-100||xy[1]<30||xy[1]>height-35||anchors.some(a=>Math.hypot(a.xy[0]-xy[0],a.xy[1]-xy[1])<22))return [];if(contextOccupied.some(p=>Math.hypot(p[0]-xy[0],p[1]-xy[1])<45))return [];contextOccupied.push(xy as [number,number]);return [`<g class="map-context"><circle cx="${xy[0]}" cy="${xy[1]}" r="2"/><text x="${xy[0]+6}" y="${xy[1]-12}">${escape(p.name)}</text></g>`]}).slice(0,12).join('');
   const countryLabels=visibleLand.flatMap(f=>{const xy=project(geoCentroid(f));if(!xy||xy[0]<30||xy[0]>width-90||xy[1]<40||xy[1]>height-30)return [];return [`<text x="${xy[0]}" y="${xy[1]}" class="map-country">${escape(String((f.properties as {name?:string})?.name||''))}</text>`]}).join('');
-  const lines=anchors.slice(0,-1).map((p,i)=>{const q=anchors[i+1];if(q.index!==p.index&&q.index!==p.index+1)return '';return `<path d="M${p.xy.join(',')}L${q.xy.join(',')}" class="map-route" marker-end="url(#arrow-${id})"/>`;}).join('');
-  const occupied:Array<[number,number,number,number]>=[];
+  const lines=anchors.slice(0,-1).map((p,i)=>{
+    const q=anchors[i+1];if(q.index!==p.index&&q.index!==p.index+1)return '';
+    const dx=q.xy[0]-p.xy[0],dy=q.xy[1]-p.xy[1],length=Math.hypot(dx,dy);
+    if(length<24)return '';
+    const ux=dx/length,uy=dy/length,bend=Math.min(32,length*.12);
+    const start=[p.xy[0]+ux*13,p.xy[1]+uy*13],end=[q.xy[0]-ux*13,q.xy[1]-uy*13];
+    const control=[(start[0]+end[0])/2-uy*bend,(start[1]+end[1])/2+ux*bend];
+    const midpoint=[(start[0]+2*control[0]+end[0])/4,(start[1]+2*control[1]+end[1])/4];
+    return `<path d="M${start.join(',')}Q${control.join(',')} ${end.join(',')}" class="map-route"/><path d="M-4,-3L0,0L-4,3" transform="translate(${midpoint.join(' ')}) rotate(${Math.atan2(dy,dx)*180/Math.PI})" class="map-chevron"/>`;
+  }).join('');
+  const occupied:Array<[number,number,number,number]>=[...anchors.map(p=>[p.xy[0]-14,p.xy[1]-14,p.xy[0]+14,p.xy[1]+14] as [number,number,number,number]),...contextOccupied.map(([x,y])=>[x,y-25,x+75,y-5] as [number,number,number,number])];
   const labels=anchors.map(p=>{
-    const [x,y]=p.xy;const maxLabelChars=Math.floor((width-68)/7);const displayLabel=p.label.length>maxLabelChars?p.label.slice(0,maxLabelChars-1)+'…':p.label;const labelWidth=Math.min(width-30,displayLabel.length*7+38);let best:[number,number]=[15,15],score=Infinity;
-    for(let row=0;row<Math.floor((height-40)/32);row++)for(const lx of [Math.min(width-labelWidth-15,x+22),Math.max(15,x-labelWidth-22)]){
-      const ly=34+row*32;const collisions=occupied.filter(b=>lx<b[2]&&lx+labelWidth>b[0]&&ly-15<b[3]&&ly+10>b[1]).length;
-      const cost=collisions*100000+Math.hypot(lx-x,ly-y);if(cost<score){score=cost;best=[lx,ly];}
+    const [x,y]=p.xy;const maxLabelChars=Math.floor((width-68)/7);const displayLabel=p.label.length>maxLabelChars?p.label.slice(0,maxLabelChars-1)+'…':p.label;const labelWidth=Math.min(width-30,Math.max(displayLabel.length*7,(p.subtitle?.length||0)*6)+12);let best:[number,number]=[15,15],score=Infinity;
+    for(const ly of [y+4,y-28,y+36,...Array.from({length:Math.floor((height-40)/32)},(_,row)=>34+row*32)].filter(v=>v>=25&&v<height-30))for(const lx of [Math.min(width-labelWidth-15,x+22),Math.max(15,x-labelWidth-22)]){
+      const collisions=occupied.filter(b=>lx<b[2]&&lx+labelWidth>b[0]&&ly-15<b[3]&&ly+(p.subtitle?25:10)>b[1]).length;
+      const cost=collisions*100000+Math.hypot(lx+labelWidth/2-x,ly-y);if(cost<score){score=cost;best=[lx,ly];}
     }
-    const [lx,ly]=best;occupied.push([lx,ly-15,lx+labelWidth,ly+10]);
-    // Badges may move to readable labels; leader lines retain exact geographic anchors.
-    return `<g class="map-stop" data-index="${p.index+1}" data-longitude="${p.coordinates![0]}" data-latitude="${p.coordinates![1]}"><circle cx="${x}" cy="${y}" r="3"/><path d="M${x},${y}L${lx+10},${ly-4}" class="map-leader"/><rect x="${lx-3}" y="${ly-18}" width="${labelWidth}" height="28" rx="14" class="map-label-bg"/><circle cx="${lx+10}" cy="${ly-4}" r="11" class="map-pin"/><text x="${lx+10}" y="${ly}" text-anchor="middle" class="map-number">${p.badge||p.index+1}</text><text x="${lx+27}" y="${ly}" class="map-label">${escape(displayLabel)}</text><title>${escape(p.label)}</title></g>`;
+    const [lx,ly]=best;occupied.push([lx,ly-15,lx+labelWidth,ly+(p.subtitle?25:10)]);
+    const near=Math.abs(ly-y)<20;
+    return `<a href="#destination-${p.index}" class="map-stop" data-index="${p.index+1}" data-longitude="${p.coordinates![0]}" data-latitude="${p.coordinates![1]}">${near?'':`<path d="M${x},${y}L${lx+labelWidth/2},${ly-4}" class="map-leader"/>`}<rect x="${lx-3}" y="${ly-18}" width="${labelWidth}" height="${p.subtitle?40:28}" rx="6" class="map-label-bg"/><circle cx="${x}" cy="${y}" r="11" class="map-pin"/><text x="${x}" y="${y+4}" text-anchor="middle" class="map-number">${p.badge||p.index+1}</text><text x="${lx+3}" y="${ly}" class="map-label">${escape(displayLabel)}</text>${p.subtitle?`<text x="${lx+3}" y="${ly+15}" class="map-subtitle">${escape(p.subtitle)}</text>`:''}<title>${escape(p.label)}</title></a>`;
+
   }).join('');
   const title=detail?copy.detail:copy.title;
-  return `<figure class="map-panel ${detail?'map-detail':'map-main'}"><svg viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="map-title-${id} map-desc-${id}"><title id="map-title-${id}">${escape(title)}</title><desc id="map-desc-${id}">${escape(stops.map(p=>`${p.badge||p.index+1}. ${p.label}`).join(' → '))}. ${escape(copy.illustrative)}</desc><defs><marker id="arrow-${id}" viewBox="0 0 10 10" refX="15" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10" fill="#a34e35"/></marker></defs><rect width="${width}" height="${height}" fill="#dae8e5"/>${visibleLand.map(f=>`<path d="${path(f)||''}" class="map-land"/>`).join('')}<path d="${path(geoGraticule().step([5,5])())}" class="map-grid"/><path d="${water}" class="map-water"/>${lakePaths}${countryLabels}${contextLabels}${lines}${labels}<text x="18" y="${height-18}" class="map-compass">N ↑</text></svg>${detail?`<figcaption>${escape(copy.detail)} · ${escape(stops.map(p=>p.label).join(' / '))}</figcaption>`:''}</figure>`;
+  return `<figure class="map-panel ${detail?'map-detail':'map-main'}"><svg viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="map-title-${id} map-desc-${id}"><title id="map-title-${id}">${escape(title)}</title><desc id="map-desc-${id}">${escape(stops.map(p=>`${p.badge||p.index+1}. ${p.label}`).join(' → '))}. ${escape(copy.illustrative)}</desc><rect width="${width}" height="${height}" fill="#cbdfe3"/>${visibleLand.map(f=>`<path d="${path(f)||''}" class="map-land"/>`).join('')}<path d="${path(geoGraticule().step([5,5])())}" class="map-grid"/><path d="${water}" class="map-water"/>${lakePaths}${countryLabels}${contextLabels}${lines}${labels}<text x="18" y="${height-18}" class="map-compass">N ↑</text></svg>${detail?`<figcaption>${escape(copy.detail)} · ${escape(stops.map(p=>p.label).join(' / '))}</figcaption>`:''}</figure>`;
 }

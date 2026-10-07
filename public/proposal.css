@@ -39,3 +39,6 @@
 .selected-hotel-photo{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:3px;margin:0 0 16px}.selected-hotel-card{min-width:0;overflow:hidden}.programme-hotel-photo{display:block;width:100%;max-height:190px;aspect-ratio:16/10;object-fit:cover;border-radius:3px;margin:12px 0 16px}.selected-hotel-photo[hidden],.programme-hotel-photo[hidden]{display:none}@media print{.selected-hotel-photo,.programme-hotel-photo{max-height:140px}}
 
 .chapter-hotel-photo{aspect-ratio:16/9;max-height:260px}
+
+/* Proposal route: geographic pins, quiet labels and midpoint direction. */
+.map-chevron{fill:none;stroke:#a34e35;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.map-subtitle{font:11px sans-serif;fill:#52635d}.map-stop:hover .map-pin,.map-stop:focus .map-pin{fill:#a34e35}.map-stop:focus{outline:none}.map-stop:focus .map-label-bg{stroke:#a34e35;stroke-width:2}.overview-transfer{font-size:12px;line-height:1.5;color:#52635d;margin:8px 0}.map-caption{font-size:12px;color:#52635d}

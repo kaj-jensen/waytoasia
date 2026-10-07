@@ -51,3 +51,15 @@ test('Japan proposal includes Hakone and both consecutive route connections',()=
  assert.match(svg,/1\. Tokyo → 2\. Hakone → 3\. Kyoto/);
  assert.equal((svg.match(/class="map-route"/g)||[]).length,4);
 });
+
+test('proposal route uses curved legs with midpoint direction and linked geographic pins',()=>{
+ const stops=resolveRoute([{place:'Japan: Tokyo'},{place:'Japan: Hakone'},{place:'Japan: Kyoto'}]);
+ stops[0].subtitle='3 nights';
+ const svg=routeMap(stops,copy);
+ assert.match(svg,/Q[^"]+" class="map-route"/);
+ assert.match(svg,/class="map-chevron"/);
+ assert.doesNotMatch(svg,/marker-end/);
+ assert.match(svg,/href="#destination-0"/);
+ assert.match(svg,/3 nights/);
+ assert.match(svg,/Mt\. Fuji/);
+});
