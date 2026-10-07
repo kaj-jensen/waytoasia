@@ -22,3 +22,6 @@
 
 /finance.css
   Cache-Control: no-cache, must-revalidate
+
+/supplier-check.js
+  Cache-Control: no-cache, must-revalidate

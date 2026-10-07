@@ -28,7 +28,7 @@ export const onRequestPost=async({request,env}:PagesContext):Promise<Response>=>
 
   try{
     const adapter=createHbxSandboxAdapter({credentials:hbxCredentialsFromEnv(env),baseUrl:env.HBX_API_BASE_URL});
-    const signal=AbortSignal.timeout(15_000);
+    const signal=AbortSignal.timeout(30_000);
     const [hotelResult,activityResult]=await Promise.allSettled([
       adapter.search({vertical:'accommodation',requestId:`${requestId}-hotel`,locale:query.locale,currency:query.currency,travellerCountry:sourceMarket,party,destination:{name:gateway.name,supplierCode:gateway.destinationCode},checkIn:query.checkIn,checkOut,rooms:[{adults:query.adults,childAges:query.childAges}]},signal),
       adapter.search({vertical:'activity',requestId:`${requestId}-activity`,locale:query.locale,currency:query.currency,travellerCountry:sourceMarket,party,destination:{name:gateway.name,supplierCode:gateway.destinationCode},from:query.checkIn,to:activityTo,interests:[]},signal),

@@ -149,7 +149,7 @@ function activityOffers(raw:unknown,query:ActivitySearch):SupplierOffer[]{
           cancellation:cancellationTerms(rate.cancellationPolicies,asString(currency,query.currency)),retrievedAt:retrievedAt(),
           expiresAt:new Date(Date.now()+30*60*1000).toISOString(),recheckRequired:true,
           imageUrl:contentImage(content),
-          attributes:{imageSources:asArray(asObject(content.media).images).flatMap(value=>asArray(asObject(value).urls).map(url=>{try{const u=new URL(asString(asObject(url).resource));return u.origin+u.pathname}catch{return ''}})).filter(Boolean).slice(0,3),modality:asString(modality.name),activityType:asString(activity.type),description:asString(content.description).replace(/<[^>]*>/g,'').slice(0,1200)},
+          attributes:{contentFields:Object.keys(content).join(','),imageSources:asArray(asObject(content.media).images).flatMap(value=>asArray(asObject(value).urls).map(url=>{try{const u=new URL(asString(asObject(url).resource));return u.origin+u.pathname}catch{return ''}})).filter(Boolean).slice(0,3),modality:asString(modality.name),activityType:asString(activity.type),description:asString(content.description).replace(/<[^>]*>/g,'').slice(0,1200)},
         });
       }
     }
