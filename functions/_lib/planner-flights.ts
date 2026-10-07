@@ -38,6 +38,7 @@ export async function planFlights(token:string|undefined,profile:{departureAirpo
   const results=await Promise.allSettled([...dates.map(day=>searchSerpFlights(serpKey,{origin,destination,date:day,adults,children},fetcher)),searchSerpFlights(serpKey,{origin:returnOrigin,destination:origin,date:profile.travelEndDate!,adults,children},fetcher)]);
   const inbound=results.at(-1)!;const home=inbound.status==='fulfilled'?inbound.value:[];
   const out=results.slice(0,-1).flatMap(r=>r.status==='fulfilled'?r.value:[]).filter(s=>s.at(-1)!.arrival.slice(0,10)===profile.travelStartDate);
+  if(!out.length||!home.length)console.warn('Flight schedule search returned no complete journey',{searches:results.map(r=>r.status==='fulfilled'?{status:'complete',count:r.value.length}:{status:'failed'}),outboundMatches:out.length,homeboundMatches:home.length});
   const duration=(s:import('./duffel').FlightSegment[])=>s.reduce((n,v)=>n+Number(v.duration.match(/^PT(\d+)M$/)?.[1]||100000),0);
   out.sort((a,b)=>a.length-b.length||duration(a)-duration(b));home.sort((a,b)=>a.length-b.length||duration(a)-duration(b));
   const offers:FlightItinerary[]=out.slice(0,3).flatMap((slice,i)=>home.length?[{source:'serpapi-google-flights' as const,offerId:`serpapi-${crypto.randomUUID()}`,retrievedAt:new Date().toISOString(),slices:[slice,home[Math.min(i,home.length-1)]],transfers}]:[]);

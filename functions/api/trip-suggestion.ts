@@ -273,9 +273,11 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
     if (!suggestion) throw new Error('Model response did not match the trip suggestion contract.');
     // Pricing and flight searches use the completed route and can run independently.
     generationStage='supplier';
-    const supplierPlanning=enrichWithHotelbeds(env,profile,suggestion);
-    const flightPlanning=planFlights(env.DUFFEL_TEST_TOKEN,profile,suggestion.route,env.SERPAPI_API_KEY);
-    const supplierSuggestion=await supplierPlanning;
+    // Complete the bounded flight searches before Hotelbeds starts its content
+    // requests, so those requests cannot exhaust the Worker's connection slots
+    // while the flight provider's timeout is running.
+    const flightPlanning=await planFlights(env.DUFFEL_TEST_TOKEN,profile,suggestion.route,env.SERPAPI_API_KEY);
+    const supplierSuggestion=await enrichWithHotelbeds(env,profile,suggestion);
     const supplierSelectionsChanged=supplierSuggestion.hotelStays.some(stay=>stay.options.some(option=>option.supplierQuote?.provider==='Hotelbeds'))||supplierSuggestion.dayPlans.some(day=>day.options.some(option=>option.supplierProductId));
     let priceEstimate;
     if(!supplierSelectionsChanged&&(env.TAVILY_API_KEY||travellerResearch.length)){
@@ -297,7 +299,7 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
       }
     }
     // Public benchmarks were researched for the original choices, not replacement supplier products.
-    suggestion={...supplierSuggestion,...(!supplierSelectionsChanged&&priceEstimate?{priceEstimate}:{}),flightPlanning:await flightPlanning};
+    suggestion={...supplierSuggestion,...(!supplierSelectionsChanged&&priceEstimate?{priceEstimate}:{}),flightPlanning};
     if(supplierSelectionsChanged)delete suggestion.priceEstimate;
     return json({suggestion,requestId});
   } catch (error) {
