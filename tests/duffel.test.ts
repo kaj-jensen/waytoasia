@@ -51,3 +51,11 @@ test('departure date searches overlap and keep valid offers if one request fails
  };
  try{const result=await planFlights('duffel_test_example',{departureAirport:'CPH',travelStartDate:'2027-02-11',travelEndDate:'2027-02-24',adults:2,children:0},[{place:'Bangkok'}]);assert.equal(calls,2);assert.equal(result.status,'test-results');}finally{globalThis.fetch=original}
 });
+
+test('renders every connecting flight, layover and stop within a flight',()=>{
+ const base=offer.slices[0].segments[0];
+ const f=normaliseOffer({...offer,slices:[{segments:[{...base,origin:{iata_code:'CPH'},destination:{iata_code:'LHR',city_name:'London',time_zone:'Europe/London'},departing_at:'2027-02-10T08:00:00',arriving_at:'2027-02-10T09:00:00',marketing_carrier_flight_number:'801'},{...base,origin:{iata_code:'LHR',time_zone:'Europe/London'},destination:{iata_code:'HAN'},departing_at:'2027-02-10T11:30:00',arriving_at:'2027-02-11T06:00:00',marketing_carrier_flight_number:'901',stops:[{airport:{iata_code:'BKK',city_name:'Bangkok'},arriving_at:'2027-02-11T03:00:00',departing_at:'2027-02-11T04:00:00',duration:'PT1H'}]}]}]});
+ const html=renderFlights(f);
+ for(const expected of ['ZZ 801','ZZ 901','Connection: London (LHR)','09:00','11:30','2h 30m','Stop during this flight: Bangkok (BKK)','03:00','04:00','1h 0m'])assert.ok(html.includes(expected),expected);
+ assert.equal(f.slices[0][1].stops?.length,1);
+});
