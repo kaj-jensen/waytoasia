@@ -26,3 +26,11 @@
 @media(max-width:640px){.programme-day>header{padding:16px;gap:12px}.programme-day h3{font-size:20px}.programme-day .day-number{min-width:75px}.programme-columns{grid-template-columns:1fr}.programme-columns>section{padding:18px}.programme-columns>section+section{border-left:0;border-top:1px solid var(--line)}}
 
 .chapter-services{display:grid;grid-template-columns:1fr 1.4fr;gap:16px;margin:22px 0}.chapter-services>section{padding:20px;border:1px solid var(--line);background:var(--white);border-radius:4px}.chapter-services h4,.chapter-highlights h4{margin:0 0 12px;font-size:15px;color:var(--red)}.chapter-services strong{display:block;font:20px/1.4 Georgia,serif}.chapter-services p{margin:8px 0 12px;font-size:13px}.chapter-services small{font-size:11px;color:var(--muted)}.chapter-services ul{display:block;margin:0 0 12px;padding:0;list-style:none}.chapter-services li{display:flex;gap:12px;border-bottom:1px solid var(--line);padding:9px 0;font-size:13px}.chapter-services li span{min-width:44px;color:var(--muted)}.chapter-services li a{text-decoration:none;font-weight:600}.chapter-transfer{grid-column:1/-1}.chapter-highlights{margin:18px 0}.chapter-highlights p{font-size:12px}@media(max-width:640px){.chapter-services{grid-template-columns:1fr}.chapter-services>section{padding:18px}}
+
+/* Consistent category colours supplement the explicit text labels. */
+.proposal-view .service-hotel{--service-accent:#38634f;background:linear-gradient(125deg,#e2eee5,#f2f7ef);border-top:4px solid var(--service-accent)}
+.proposal-view .service-activity{--service-accent:#8b5b1f;background:linear-gradient(125deg,#f5e8cf,#fff7e8);border-top:4px solid var(--service-accent)}
+.proposal-view .service-transfer{--service-accent:#365f78;background:linear-gradient(125deg,#deebf2,#f0f6fa);border-top:4px solid var(--service-accent)}
+.proposal-view .chapter-services h4,.proposal-view .programme-label{color:var(--service-accent,var(--muted));font-weight:700}
+.proposal-view .service-hotel p,.proposal-view .service-activity p,.proposal-view .service-transfer p{color:#394d43}
+.proposal-view .service-hotel small,.proposal-view .service-activity small,.proposal-view .service-transfer small{color:#4c5d54}
