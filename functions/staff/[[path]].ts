@@ -1,3 +1,4 @@
+import {financeGet,financePost,financePermissions} from '../_lib/finance-api';
 import {duffelReady,searchFlights,getFlight,sampleFlight,FlightError} from '../_lib/duffel';
 import {authenticate,requireAdmin,requireEditor,requireProposalEditor,permissions,json,privateHeaders,statuses,audit,auditStatement,activityStatement,captureEnquiry,safeUrl,readBytes,type DashboardEnv,type Staff} from '../_lib/dashboard';
 import {clean,parseStoredPayload,type ProposalRow} from '../_lib/proposals';
@@ -10,7 +11,7 @@ export async function onRequest({request,env}:Context):Promise<Response>{
     if(!['GET','POST'].includes(request.method))return json({error:'Method not allowed'},405);
     const url=new URL(request.url),path=url.pathname.replace(/^\/(?:staff|dashboard)\/?/,'');
     if(request.method==='GET'&&!path)return new Response(renderDashboard(staff),{headers:{...privateHeaders(),'Content-Type':'text/html; charset=utf-8'}});
-    if(request.method==='GET'&&path==='api/me')return json({staff,permissions:permissions(staff),emailSending:env.EMAIL_SEND_ENABLED==='true'&&Boolean(env.RESEND_API_KEY&&env.REPLY_DOMAIN&&env.RESEND_WEBHOOK_SECRET&&env.RESEND_RECEIVING_API_KEY),attachments:Boolean(env.PRIVATE_ATTACHMENTS),flightTesting:duffelReady(env.DUFFEL_TEST_TOKEN)});
+    if(request.method==='GET'&&path==='api/me')return json({staff,permissions:{...permissions(staff),finance:financePermissions(staff).read,financeWrite:financePermissions(staff).write},emailSending:env.EMAIL_SEND_ENABLED==='true'&&Boolean(env.RESEND_API_KEY&&env.REPLY_DOMAIN&&env.RESEND_WEBHOOK_SECRET&&env.RESEND_RECEIVING_API_KEY),attachments:Boolean(env.PRIVATE_ATTACHMENTS),flightTesting:duffelReady(env.DUFFEL_TEST_TOKEN)});
     if(request.method==='GET'&&path.startsWith('attachments/')){
       const row=await env.PROPOSALS_DB.prepare('SELECT * FROM attachments WHERE id=?').bind(path.slice(12)).first<{object_key:string;filename:string}>();
       if(!row||!env.PRIVATE_ATTACHMENTS)return json({error:'Attachment unavailable'},404);
@@ -27,6 +28,7 @@ export async function onRequest({request,env}:Context):Promise<Response>{
   }catch(error){if(error instanceof Response)return error;if(error instanceof FlightError)return json({error:error.message},error.status);console.error('Dashboard operation failed');return json({error:'Operation could not be completed. Check configuration or retry.'},500)}
 }
 async function get(path:string,url:URL,env:DashboardEnv,staff:Staff):Promise<Response>{
+  const financial=await financeGet(path,url,env,staff);if(financial)return financial;
   const db=env.PROPOSALS_DB;
   if(path==='api/staff')return json((await db.prepare('SELECT email,name,COALESCE(access_role,role) role,enabled FROM staff_users ORDER BY name').all()).results);
   if(path==='api/audit'){requireAdmin(staff);return json((await db.prepare('SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 200').all()).results)}
@@ -76,6 +78,7 @@ async function get(path:string,url:URL,env:DashboardEnv,staff:Staff):Promise<Res
   return json({error:'Not found'},404);
 }
 async function post(path:string,input:Record<string,unknown>,env:DashboardEnv,staff:Staff):Promise<Response>{
+  const financial=await financePost(path,input,env,staff);if(financial)return financial;
   const db=env.PROPOSALS_DB,now=new Date().toISOString();
   if(path==='api/staff'){
     requireAdmin(staff);const email=clean(input.email,240).toLowerCase(),name=clean(input.name,160),role=input.role,enabled=input.enabled===true?1:0;

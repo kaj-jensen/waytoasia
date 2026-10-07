@@ -1,0 +1,21 @@
+import {test,expect} from '@playwright/test';
+test('financial workflow persists, drills down, exports and fits mobile',async({page})=>{
+ test.skip(!test.info().config.configFile?.endsWith('playwright.finance.config.ts'),'Uses the isolated synthetic dashboard server.');
+ const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
+ await page.goto('/preview-login');await page.getByRole('button',{name:'Finances',exact:true}).click();await page.getByRole('button',{name:'Open realistic demo'}).click();
+ await expect(page.getByRole('heading',{name:'Financial overview',exact:true})).toBeVisible();
+ const id=new URL(page.url()).hash.slice(9),response=await page.request.get('/dashboard/api/finance/'+id),before=await response.json();
+ await expect(page.locator('[data-drill=earnings]')).toContainText((before.actual.earnings/100).toLocaleString('en-GB',{minimumFractionDigits:2}));
+ await page.locator('[data-category=Hotels]').click();await expect(page.locator('#finance-items tbody tr')).toHaveCount(1);
+ await page.getByRole('button',{name:'8 nights · two family rooms',exact:true}).click();await expect(page.locator('#finance-dialog [type=submit]')).toBeDisabled();
+ const field=page.locator('[name=actual_otherCost]'),original=await field.inputValue();await field.fill('24.00');await page.locator('#finance-dialog [type=submit]').click();await expect(page.locator('#notice')).toHaveText('✓ Financial changes saved.');
+ await page.reload();await expect(page.getByRole('heading',{name:'Financial overview',exact:true})).toBeVisible();await page.getByRole('button',{name:'8 nights · two family rooms',exact:true}).click();await expect(page.locator('[name=actual_otherCost]')).toHaveValue('24.00');await page.locator('[name=actual_otherCost]').fill(original);await page.locator('#finance-dialog [type=submit]').click();
+ await page.getByRole('button',{name:'Record entry',exact:true}).click();await page.getByLabel('Entry type').selectOption('receipt');await page.getByLabel('Amount',{exact:true}).fill('12.50');await page.getByLabel('Reference',{exact:true}).fill('E2E TEST PAYMENT');await page.locator('#finance-dialog [type=submit]').click();await expect(page.locator('#finance-payments')).toContainText('E2E TEST PAYMENT');
+ await page.locator('#finance-payments tr').filter({hasText:'E2E TEST PAYMENT'}).filter({has:page.getByRole('button',{name:'Void',exact:true})}).last().getByRole('button',{name:'Void',exact:true}).click();await page.getByLabel('Reason').fill('Synthetic test reversal');await page.locator('#finance-dialog [type=submit]').click();
+ await page.getByRole('button',{name:'Quoted / expected',exact:true}).click();await expect(page.locator('[data-basis=quote]')).toHaveAttribute('aria-pressed','true');
+ const downloadPromise=page.waitForEvent('download');await page.getByRole('link',{name:'Export CSV'}).click();const download=await downloadPromise;expect(download.suggestedFilename()).toContain('internal-finance-quote.csv');
+ await page.screenshot({path:'/tmp/waytoasia-finance-desktop.png',fullPage:true});
+ await page.emulateMedia({media:'print'});await page.pdf({path:'/tmp/waytoasia-finance-internal.pdf',format:'A4',landscape:true,printBackground:true});await page.emulateMedia({media:'screen'});
+ await page.setViewportSize({width:390,height:844});await page.reload();await expect(page.getByRole('heading',{name:'Financial overview',exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);await page.screenshot({path:'/tmp/waytoasia-finance-mobile.png',fullPage:true});expect(errors).toEqual([]);
+});

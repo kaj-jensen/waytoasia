@@ -27,7 +27,7 @@ createServer(async(req,res)=>{
     const url=new URL(req.url||'/','http://127.0.0.1:8788');
     if(url.pathname==='/preview-login'){res.writeHead(303,{'Set-Cookie':`preview_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=3600`,Location:'/staff','Cache-Control':'no-store'});res.end();return}
     if(url.pathname==='/cdn-cgi/access/logout'){res.writeHead(303,{'Set-Cookie':'preview_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0',Location:'/staff'});res.end();return}
-    if(['/staff.js','/staff.css'].includes(url.pathname)){res.writeHead(200,{'Content-Type':url.pathname.endsWith('js')?'application/javascript':'text/css'});res.end(readFileSync(`public${url.pathname}`));return}
+    if(['/staff.js','/staff.css','/finance.js','/finance.css'].includes(url.pathname)){res.writeHead(200,{'Content-Type':url.pathname.endsWith('js')?'application/javascript':'text/css'});res.end(readFileSync(`public${url.pathname}`));return}
     if(!url.pathname.startsWith('/staff')&&!url.pathname.startsWith('/dashboard')){res.writeHead(404);res.end('Local dashboard preview');return}
     const chunks:Buffer[]=[];for await(const chunk of req){chunks.push(Buffer.from(chunk));if(chunks.reduce((n,b)=>n+b.length,0)>100000){res.writeHead(413);res.end();return}}
     const headers=new Headers();for(const [key,value] of Object.entries(req.headers)){if(value)headers.set(key,Array.isArray(value)?value.join(','):value)}

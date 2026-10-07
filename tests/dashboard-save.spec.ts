@@ -6,7 +6,7 @@ test('next steps saves show confirmation and unchanged fields stay disabled',asy
  await page.route('**/dashboard',r=>r.fulfill({contentType:'text/html',body:readFileSync(new URL('./fixtures/dashboard-save.html',import.meta.url),'utf8')}));
  await page.route('**/dashboard/api/**',r=>{
  const path=new URL(r.request().url()).pathname;
- let body:unknown={};
+ let body:unknown;
  if(path.endsWith('/me'))body={staff:{role:'admin'},permissions:{edit:true,proposals:true},emailSending:false};
  else if(path.endsWith('/staff'))body=[];
  else if(path.endsWith('/edit')){writes++;body={ok:true};}

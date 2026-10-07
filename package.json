@@ -20,7 +20,9 @@
     "check:translations": "node scripts/check-translations.mjs",
     "test:dashboard": "node --import tsx --test tests/dashboard/dashboard.test.ts tests/duffel.test.ts tests/airport-routing.test.ts",
     "preview:dashboard": "mkdir -p .wrangler && node --import tsx scripts/dashboard-preview.ts",
-    "test:content": "node --import tsx --test tests/content-identifiers.test.ts tests/page-security.test.ts"
+    "test:content": "node --import tsx --test tests/content-identifiers.test.ts tests/page-security.test.ts",
+    "test:finance": "node --import tsx --test tests/dashboard/finance.test.ts",
+    "test:finance-ui": "playwright test --config=playwright.finance.config.ts"
   },
   "dependencies": {
     "@astrojs/react": "latest",
