@@ -7,8 +7,9 @@ test('proposal flight table is styled under production-style CSP on desktop and 
  await page.setViewportSize({width,height:900});await page.goto('/flight-layout-test');
  await expect(page.locator('.flight-connection')).toContainText('2h 30m');
  const cell=page.locator('.flight-table td').first();
- await expect(cell).toHaveCSS('padding-top','15px');
+ await expect(cell).toHaveCSS('padding-top',width<700?'10px':'15px');
  await expect(page.locator('.flight-table strong').first()).toHaveCSS('display','block');
+ if(width<700){await expect(page.locator('.flight-table')).toHaveCSS('min-width','0px');const bounds=await page.locator('.flight-table td').evaluateAll(cells=>cells.map(c=>c.getBoundingClientRect()).every(r=>r.left>=0&&r.right<=innerWidth));expect(bounds).toBe(true);await expect(cell).toHaveAttribute('data-label',/./);}
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.locator('#flights').screenshot({path:`/tmp/waytoasia-proposal-flights-${width}.png`});
  }

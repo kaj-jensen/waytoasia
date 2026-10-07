@@ -1,3 +1,21 @@
 .flight-table-wrap{width:100%;margin:16px 0;overflow:auto}.flight-table{width:100%;border-collapse:collapse;font-size:14px;text-align:left;background:#fffdf8}.flight-table th{background:#eeeae2;color:#45534b;font-size:11px;text-transform:uppercase;letter-spacing:.04em}.flight-table th,.flight-table td{padding:12px 10px;border-bottom:1px solid #dcd8ce;vertical-align:top}.flight-table td strong{display:block;font-size:16px;color:#17382e}.flight-table td small{display:block;color:#5c6961;margin-top:4px}.planner-flights .hotel-options{display:block}.planner-flights .hotel-option{display:flex;margin:14px 0;padding:16px;border:1px solid #dcd8ce;border-radius:8px}.planner-flights .hotel-option>div{min-width:0;width:100%}@media(max-width:700px){.flight-table{min-width:940px}.planner-flights .hotel-option{padding:10px}}
 .flight-table{border:1px solid #cfc8ba}.flight-table th,.flight-table td{border-right:1px solid #dcd8ce}.flight-table tbody tr:nth-child(even){background:#f5f1e9}
 .flight-table .flight-connection td{background:#eae5d9;font-size:13px;padding:12px 16px;border-top:1px dashed #c6bca9}.flight-table .flight-connection strong{font-size:14px;margin-bottom:4px}.flight-source-note{font-size:13px;color:#5c6961}
+
+/* Each flight leg becomes a labelled card on small screens. */
+@media(max-width:700px){
+ .flight-table-wrap{overflow:visible;min-width:0}
+ .flight-table{display:block;min-width:0;width:100%;border:0;background:transparent}
+ .flight-table thead{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+ .flight-table tbody{display:grid;gap:12px;width:100%}
+ .flight-table tr{display:grid;grid-template-columns:minmax(0,1fr);border:1px solid #cfc8ba;border-radius:6px;background:#fffdf8;overflow:hidden}
+ .flight-table th,.flight-table td,.proposal-view .flight-table td{display:block;min-width:0;padding:10px 12px;border-right:0;overflow-wrap:anywhere}
+ .flight-table td::before{content:attr(data-label);display:block;margin-bottom:4px;font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#5c6961}
+ .flight-table td:last-child{border-bottom:0}
+ .flight-table .flight-connection{background:#eae5d9}
+ .flight-table .flight-connection td{padding:12px;line-height:1.6}
+ .flight-table .flight-connection td::before{display:none}
+ .planner-flights .hotel-option{gap:8px;align-items:flex-start}
+ .planner-flights .hotel-option>input{flex:0 0 18px;width:18px;height:18px;margin:3px 0 0}
+ .planner-flights .hotel-option>div{flex:1;width:auto;overflow-wrap:anywhere}
+}
