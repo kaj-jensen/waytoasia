@@ -95,3 +95,32 @@ The owner requested Hotelbeds as the main supplier. Journey Designer now priorit
 The configured Cloudflare account remains evaluation. Confirmed live evaluation searches returned Bangkok hotels, tours and airport transfers, with hotel and activity photos loading in the browser. The generation pipeline now gives each model request its own deadline and adequate output budget for its chunk; Bangkok–Chiang Mai generated successfully after the change. Failures return safe stage/code diagnostics, never supplier keys or rate tokens. Public benchmark calculations are skipped when supplier products replace the researched selections.
 
 Production activation is prepared but has not been performed. After Hotelbeds grants the required commercial/API approvals, place production credentials for all three categories in the existing encrypted Cloudflare bindings, set `HBX_ENVIRONMENT=production`, `HBX_PRODUCTION_APPROVED=true`, and `HBX_API_BASE_URL=https://api.hotelbeds.com`, then verify real searches and image loading before launch claims. The adapter rejects a mismatched host or unapproved production setting. Both modes remain read-only; no booking/payment endpoints are enabled. Evaluation generation is bounded to three bases and ten exact-day activity checks; production supports twelve bases and thirty-five activity days. Missing products or exhausted limits retain researched alternatives rather than inventing supplier availability.
+
+## SerpApi Google Flights pilot (October 2026)
+
+The Journey Designer supports Google Flights schedules through SerpApi when the
+Cloudflare Pages production secret `SERPAPI_API_KEY` is configured. Keep the key
+in an encrypted secret, never in `wrangler.jsonc`, Git, browser code or chat.
+No SerpApi credential was present when this pilot was prepared.
+
+The pilot searches two possible outbound dates (arrival in Asia on the brief's
+start date) and one homebound date, including different arrival and departure
+airports. This costs at most three search requests per generation. It selects
+only complete segments for the correct airports and arrival date, retains actual
+flight numbers, local clocks and supplied connection durations, and labels the
+result as separately searched one-way journeys. It does not sum fares, claim a
+return-ticket quote, reserve seats or book anything. Prices are deliberately
+omitted until tested with actual account results and party pricing semantics.
+Families require known child ages; age 12+ counts as an adult, age 2–11 as a child.
+Infant searches await explicit seating requirements and are not guessed.
+
+Without this secret the existing Duffel test connector remains available. With
+SerpApi configured, a failed or empty search returns an unavailable state rather
+than substituting sandbox flights as live results.
+
+Free plan observed at https://serpapi.com/pricing: 250 searches/month,
+50 searches/hour. No paid plan has been purchased or authorized. Signup requires
+user acceptance of terms. After secure key setup, test Copenhagen–Bangkok,
+Copenhagen–Tokyo, and Copenhagen–Bangkok / Chiang Mai–Copenhagen against Google
+Flights, including dates, all connections, family counts, mobile layout, and
+private-proposal rendering before claiming live acceptance.

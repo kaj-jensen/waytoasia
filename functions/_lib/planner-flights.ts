@@ -1,6 +1,7 @@
+import {searchSerpFlights} from './serpapi-flights';
 import {routeGateway,airportLabel,type AirportStop} from './airport-routing';
 import {duffelReady,searchFlights,type FlightItinerary} from './duffel';
-export interface PlannerFlights {status:'not-connected'|'needs-details'|'unavailable'|'test-results';offers:FlightItinerary[];issues?:string[];transfers?:Array<{place:string;airport:string;airportName?:string}>}
+export interface PlannerFlights {provider?:'serpapi';status:'not-connected'|'needs-details'|'unavailable'|'test-results'|'search-results';offers:FlightItinerary[];issues?:string[];transfers?:Array<{place:string;airport:string;airportName?:string}>}
 // Explicit airport aliases only. Ambiguous city names are left for the traveller to clarify.
 const airports:Record<string,string>={copenhagen:'CPH',københavn:'CPH',oslo:'OSL',helsinki:'HEL',amsterdam:'AMS',frankfurt:'FRA',zurich:'ZRH',zürich:'ZRH',vienna:'VIE',wien:'VIE',budapest:'BUD',bangkok:'BKK',chiangmai:'CNX',phuket:'HKT',hanoi:'HAN',hochiminhcity:'SGN',saigon:'SGN',danang:'DAD',singapore:'SIN',seoul:'ICN',busan:'PUS',jeju:'CJU',tokyo:'HND',osaka:'KIX',beijing:'PEK',shanghai:'PVG',hongkong:'HKG',bali:'DPS',denpasar:'DPS',jakarta:'CGK',manila:'MNL',kualalumpur:'KUL',taipei:'TPE'};
 export function resolveAirport(value:unknown):string {if(typeof value!=='string')return '';const explicit=value.match(/\(([A-Z]{3})\)/i);if(explicit)return explicit[1].toUpperCase();const name=value.split(':').at(-1)!.trim();const code=name.toUpperCase();if(/^[A-Z]{3}$/.test(code))return code;return airports[name.toLowerCase().replace(/[^\p{L}]/gu,'')]||'';}
@@ -18,18 +19,30 @@ export function resolveRouteAirport(value:string):{airport:string;transfer:boole
  const unique=[...new Set(candidates)];
  return unique.length===1?{airport:unique[0],transfer:false}:unique.length>1?{airport:'',transfer:false}:routeGateway({place:value},'return');
 }
-export async function planFlights(token:string|undefined,profile:{departureAirport?:string;travelStartDate?:string;travelEndDate?:string;adults:number;children:number},route:AirportStop[]):Promise<PlannerFlights>{
- const empty=(status:PlannerFlights['status']):PlannerFlights=>({status,offers:[]});
- if(!duffelReady(token))return empty('not-connected');
+export async function planFlights(token:string|undefined,profile:{departureAirport?:string;travelStartDate?:string;travelEndDate?:string;adults:number;children:number;childAges?:number[]},route:AirportStop[],serpKey?:string,fetcher:typeof fetch=fetch):Promise<PlannerFlights>{
+ const empty=(status:PlannerFlights['status']):PlannerFlights=>({status,offers:[],...(serpKey?{provider:'serpapi' as const}:{})});
+ if(!serpKey&&!duffelReady(token))return empty('not-connected');
  const pick=(stop:AirportStop|undefined,position:'arrival'|'return')=>{if(!stop)return {airport:'',transfer:false};const legacy=resolveRouteAirport(stop.place);return stop.airportCode?routeGateway(stop,position):legacy.airport?routeGateway({...stop,airportCode:legacy.airport,airportTransfer:legacy.transfer},position):routeGateway(stop,position);};
  const first=pick(route[0],'arrival'),last=pick(route.at(-1),'return');
  const origin=resolveAirport(profile.departureAirport)||routeGateway({place:profile.departureAirport||''},'arrival').airport,destination=first.airport,returnOrigin=last.airport;
  const transfers=[...(first.transfer?[{place:route[0].place,airport:destination,airportName:airportLabel(destination)}]:[]),...(last.transfer?[{place:route.at(-1)!.place,airport:returnOrigin,airportName:airportLabel(returnOrigin)}]:[])];
- const issues=[...(!origin?['departure']:[]),...(!destination?['arrival']:[]),...(!returnOrigin?['return']:[]),...(!profile.travelStartDate||!profile.travelEndDate?['dates']:[]),...(profile.children||profile.adults>9?['party']:[])];
+ const issues=[...(!origin?['departure']:[]),...(!destination?['arrival']:[]),...(!returnOrigin?['return']:[]),...(!profile.travelStartDate||!profile.travelEndDate?['dates']:[]),...((!serpKey&&profile.children)||profile.adults+profile.children>9||(serpKey&&profile.children>0&&(profile.childAges?.length!==profile.children||profile.childAges.some(age=>!Number.isInteger(age)||age<2||age>17)))?['party']:[])];
  if(issues.length)return {...empty('needs-details'),issues};
  // The brief specifies arrival in Asia. Check same-day departures and overnight travel the preceding day.
  const date=new Date(`${profile.travelStartDate}T00:00:00Z`);if(Number.isNaN(date.getTime()))return empty('needs-details');date.setUTCDate(date.getUTCDate()-1);
  const dates=[date.toISOString().slice(0,10),profile.travelStartDate!].filter(v=>v>=new Date().toISOString().slice(0,10));
+ if(serpKey){
+  const adults=profile.adults+(profile.childAges??[]).filter(age=>age>=12).length,children=(profile.childAges??[]).filter(age=>age<12).length;
+  // Bounded pilot: two possible outbound dates plus one homebound search.
+  // Independent one-way searches never create a combined fare or ticket claim.
+  const results=await Promise.allSettled([...dates.map(day=>searchSerpFlights(serpKey,{origin,destination,date:day,adults,children},fetcher)),searchSerpFlights(serpKey,{origin:returnOrigin,destination:origin,date:profile.travelEndDate!,adults,children},fetcher)]);
+  const inbound=results.at(-1)!;const home=inbound.status==='fulfilled'?inbound.value:[];
+  const out=results.slice(0,-1).flatMap(r=>r.status==='fulfilled'?r.value:[]).filter(s=>s.at(-1)!.arrival.slice(0,10)===profile.travelStartDate);
+  const duration=(s:import('./duffel').FlightSegment[])=>s.reduce((n,v)=>n+Number(v.duration.match(/^PT(\d+)M$/)?.[1]||100000),0);
+  out.sort((a,b)=>a.length-b.length||duration(a)-duration(b));home.sort((a,b)=>a.length-b.length||duration(a)-duration(b));
+  const offers:FlightItinerary[]=out.slice(0,3).flatMap((slice,i)=>home.length?[{source:'serpapi-google-flights' as const,offerId:`serpapi-${crypto.randomUUID()}`,retrievedAt:new Date().toISOString(),slices:[slice,home[Math.min(i,home.length-1)]],transfers}]:[]);
+  return offers.length?{status:'search-results',provider:'serpapi',offers,transfers}:empty('unavailable');
+ }
  try{
   // Search both departure dates concurrently; one failed search must not discard the other's offers.
   const results=await Promise.allSettled(dates.map(departure=>searchFlights(token,{origin,destination,returnOrigin,departure,returnDate:profile.travelEndDate,adults:profile.adults,cabin:'economy'})));
