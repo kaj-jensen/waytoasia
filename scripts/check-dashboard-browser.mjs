@@ -7,9 +7,15 @@ try{
     const context=await browser.newContext({viewport});const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
     await page.goto('http://127.0.0.1:8788/preview-login');await page.locator('.enquiry').first().waitFor();assert.ok(await page.locator('.enquiry').count()>=3);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-    const alex=page.locator('.enquiry').filter({hasText:'Awaiting client'}).first();await alex.click();await page.locator('#edit-form').waitFor();assert.equal(await page.locator('.proposal').count(),2);assert.ok(await page.locator('.timeline-item.note').first().textContent());assert.equal(await page.locator('#send-form button').isDisabled(),true);
+    const alex=page.locator('.enquiry').filter({hasText:'Awaiting client'}).first();await alex.click();await page.locator('#edit-form').waitFor();assert.ok(await page.locator('.proposal').count()>=2);assert.ok(await page.locator('.timeline-item.note').first().textContent());assert.equal(await page.locator('#send-form button').isDisabled(),true);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     await page.screenshot({path:`/tmp/waytoasia-dashboard-${viewport.width}.png`,fullPage:true});
+    await page.locator('#flight-sample').click();await page.getByRole('button',{name:'Save this itinerary'}).waitFor();
+    await page.getByRole('button',{name:'Save this itinerary'}).click();await page.getByRole('button',{name:'Remove saved flight itinerary'}).waitFor();
+    assert.ok(await page.locator('.flight-panel').textContent().then(t=>t.includes('CPH → BKK')));
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    await page.screenshot({path:`/tmp/waytoasia-flights-${viewport.width}.png`,fullPage:true});
+    await page.getByRole('button',{name:'Remove saved flight itinerary'}).click();await page.getByText('No flight itinerary saved.',{exact:true}).waitFor();
     const note=`Browser verification note ${viewport.width} ${Date.now()}`;await page.locator('#note-form textarea').fill(note);await page.locator('#note-form button').click();await page.getByText(note,{exact:true}).waitFor();
     await page.locator('#show-queue').click();await page.locator('[data-assign]').waitFor();await page.locator('#show-team').click();await page.locator('#team-form').waitFor();assert.deepEqual(await page.locator('#team-form select option').allTextContents(),['Administrator','Sales','Back-Office','Finance','View only']);
     await page.locator('[data-edit-user]').first().click();assert.equal(await page.locator('#team-form [name=email]').getAttribute('readonly'),'');

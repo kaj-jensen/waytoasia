@@ -1,5 +1,6 @@
+import {duffelReady,searchFlights,getFlight,sampleFlight,FlightError} from '../_lib/duffel';
 import {authenticate,requireAdmin,requireEditor,requireProposalEditor,permissions,json,privateHeaders,statuses,audit,auditStatement,activityStatement,captureEnquiry,safeUrl,readBytes,type DashboardEnv,type Staff} from '../_lib/dashboard';
-import {clean} from '../_lib/proposals';
+import {clean,parseStoredPayload,type ProposalRow} from '../_lib/proposals';
 import {renderDashboard} from '../_lib/dashboard-view';
 interface Context {request:Request;env:DashboardEnv}
 const fail=(message:string,status=400)=>{throw json({error:message},status)};
@@ -9,7 +10,7 @@ export async function onRequest({request,env}:Context):Promise<Response>{
     if(!['GET','POST'].includes(request.method))return json({error:'Method not allowed'},405);
     const url=new URL(request.url),path=url.pathname.replace(/^\/(?:staff|dashboard)\/?/,'');
     if(request.method==='GET'&&!path)return new Response(renderDashboard(staff),{headers:{...privateHeaders(),'Content-Type':'text/html; charset=utf-8'}});
-    if(request.method==='GET'&&path==='api/me')return json({staff,permissions:permissions(staff),emailSending:env.EMAIL_SEND_ENABLED==='true'&&Boolean(env.RESEND_API_KEY&&env.REPLY_DOMAIN&&env.RESEND_WEBHOOK_SECRET&&env.RESEND_RECEIVING_API_KEY),attachments:Boolean(env.PRIVATE_ATTACHMENTS)});
+    if(request.method==='GET'&&path==='api/me')return json({staff,permissions:permissions(staff),emailSending:env.EMAIL_SEND_ENABLED==='true'&&Boolean(env.RESEND_API_KEY&&env.REPLY_DOMAIN&&env.RESEND_WEBHOOK_SECRET&&env.RESEND_RECEIVING_API_KEY),attachments:Boolean(env.PRIVATE_ATTACHMENTS),flightTesting:duffelReady(env.DUFFEL_TEST_TOKEN)});
     if(request.method==='GET'&&path.startsWith('attachments/')){
       const row=await env.PROPOSALS_DB.prepare('SELECT * FROM attachments WHERE id=?').bind(path.slice(12)).first<{object_key:string;filename:string}>();
       if(!row||!env.PRIVATE_ATTACHMENTS)return json({error:'Attachment unavailable'},404);
@@ -23,7 +24,7 @@ export async function onRequest({request,env}:Context):Promise<Response>{
     const text=new TextDecoder().decode(await readBytes(request,100000));
     let input:Record<string,unknown>;try{input=JSON.parse(text);if(!input||typeof input!=='object'||Array.isArray(input))throw 0}catch{return json({error:'Invalid JSON'},400)}
     return await post(path,input,env,staff);
-  }catch(error){if(error instanceof Response)return error;console.error('Dashboard operation failed');return json({error:'Operation could not be completed. Check configuration or retry.'},500)}
+  }catch(error){if(error instanceof Response)return error;if(error instanceof FlightError)return json({error:error.message},error.status);console.error('Dashboard operation failed');return json({error:'Operation could not be completed. Check configuration or retry.'},500)}
 }
 async function get(path:string,url:URL,env:DashboardEnv,staff:Staff):Promise<Response>{
   const db=env.PROPOSALS_DB;
@@ -94,10 +95,31 @@ async function post(path:string,input:Record<string,unknown>,env:DashboardEnv,st
     if(!await db.prepare('SELECT id FROM enquiries WHERE id=?').bind(enquiry).first())fail('Enquiry not found',404);
     await db.batch([db.prepare("UPDATE activities SET enquiry_id=?,unread=1 WHERE id=? AND enquiry_id IS NULL AND kind='incoming'").bind(enquiry,id),auditStatement(env,staff.email,'message.assigned',id)]);return json({ok:true});
   }
-  const match=path.match(/^api\/enquiries\/([^/]+)(?:\/(edit|note|call|proposal|send|read|delete-client))?$/);
+  const match=path.match(/^api\/enquiries\/([^/]+)(?:\/(edit|note|call|proposal|send|read|delete-client|flights-search|flights-save|flights-remove))?$/);
   if(!match)return json({error:'Not found'},404);
   const id=match[1],action=match[2];
   const enquiry=await db.prepare('SELECT e.*,c.email,c.name FROM enquiries e JOIN clients c ON c.id=e.client_id WHERE e.id=?').bind(id).first<Record<string,string>>();if(!enquiry)fail('Enquiry not found',404);
+  if(action?.startsWith('flights-')){
+    requireProposalEditor(staff);
+    if(action==='flights-search')return json({offers:input.sample===true?[sampleFlight()]:await searchFlights(env.DUFFEL_TEST_TOKEN,input)});
+    const flight=action==='flights-remove'?null:input.offerId==='sample'?sampleFlight():await getFlight(env.DUFFEL_TEST_TOKEN,input.offerId);
+    const requirements=JSON.parse(enquiry!.requirements_json||'{}');
+    if(flight)requirements.flightItinerary=flight;else delete requirements.flightItinerary;
+    const statements=[db.prepare('UPDATE enquiries SET requirements_json=?,updated_at=? WHERE id=?').bind(JSON.stringify(requirements),now,id)];
+    const proposalId=clean(input.proposalId,80);
+    if(proposalId){
+      const linked=await db.prepare("SELECT * FROM enquiry_proposals WHERE enquiry_id=? ORDER BY version DESC LIMIT 1").bind(id).first<{id:string;legacy_id:string;title:string;url:string}>();
+      if(!linked||linked.id!==proposalId||!linked.legacy_id)fail('Select the current linked journey proposal.',409);
+      const row=await db.prepare('SELECT * FROM proposals WHERE id=? AND revoked_at IS NULL AND expires_at>?').bind(linked!.legacy_id,now).first<ProposalRow>();
+      const payload=row&&parseStoredPayload(row.payload_json);if(!row||!payload)fail('Journey proposal unavailable.',404);
+      if(flight)payload!.builderChoices.flightItinerary=flight;else delete payload!.builderChoices.flightItinerary;
+      statements.push(db.prepare("UPDATE proposals SET payload_json=?,status='in_review',updated_at=? WHERE id=?").bind(JSON.stringify(payload),now,row!.id),
+        db.prepare("UPDATE enquiry_proposals SET status='Superseded' WHERE enquiry_id=?").bind(id),
+        db.prepare("INSERT INTO enquiry_proposals (id,enquiry_id,legacy_id,title,url,version,status,snapshot_json,created_at) SELECT ?,?,?,?,?,COALESCE(MAX(version),0)+1,'Draft',?,? FROM enquiry_proposals WHERE enquiry_id=?").bind(crypto.randomUUID(),id,row!.id,row!.title,linked!.url,JSON.stringify({payload,title:row!.title,summary:row!.summary,estimatedPrice:row!.estimated_price,consultantNote:row!.consultant_note,status:'in_review'}),now,id));
+    }
+    statements.push(activityStatement(env,id,'proposal',flight?`Test flight itinerary saved${proposalId?' to the linked journey proposal':''}. Flights are not booked or confirmed.`:'Test flight itinerary removed.',staff.email),auditStatement(env,staff.email,`flights.${flight?'saved':'removed'}`,id));
+    await db.batch(statements);return json({ok:true});
+  }
   if(action==='read'){await db.prepare('UPDATE activities SET unread=0 WHERE enquiry_id=?').bind(id).run();return json({ok:true})}
   if(action==='edit'){
     const status=clean(input.status,40),assigned=clean(input.assigned,240).toLowerCase(),followup=clean(input.followUp,10);

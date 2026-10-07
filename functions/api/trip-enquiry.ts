@@ -57,7 +57,7 @@ export const onRequestPost=async({request,env}:PagesContext):Promise<Response>=>
   try{
     const insert=env.PROPOSALS_DB.prepare(`INSERT INTO proposals (id,token_hash,manage_token_hash,traveller_name,traveller_email,locale,title,summary,estimated_price,consultant_note,payload_json,status,traveller_response,created_at,updated_at,expires_at,revoked_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(row.id,row.token_hash,row.manage_token_hash,row.traveller_name,row.traveller_email,row.locale,row.title,row.summary,row.estimated_price,row.consultant_note,row.payload_json,row.status,row.traveller_response,row.created_at,row.updated_at,row.expires_at,row.revoked_at);
     if(env.DASHBOARD_CAPTURE==='true'){
-      const enquiry=await captureEnquiry(env,{name,email,phone,source:'Journey Designer',message,requirements:{...profile,title,route}},{id,title,url:proposalUrl,snapshot:JSON.stringify(payload)},insert);
+      const enquiry=await captureEnquiry(env,{name,email,phone,source:'Journey Designer',message,requirements:{...profile,title,route,...(builderChoices.flightItinerary?{flightItinerary:builderChoices.flightItinerary}:{})}},{id,title,url:proposalUrl,snapshot:JSON.stringify(payload)},insert);
       reference=enquiry.reference;enquiryId=enquiry.id;
     }else await insert.run();
   }catch{

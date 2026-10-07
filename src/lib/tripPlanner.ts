@@ -124,6 +124,7 @@ export interface TripSuggestion extends Omit<TripSuggestionDraft,'matchedJourney
   availability: 'not-connected';
   pricing: 'illustrative-only';
   priceEstimate?:TripPriceEstimate;
+  flightPlanning?:import('../../functions/_lib/planner-flights').PlannerFlights;
   travellerResearch: 'live-sources'|'not-connected';
   travellerInsights: Array<{insight:string;sources:Array<{title:string;url:string;domain:string}>}>;
   hotelStays: SuggestedHotelStay[];

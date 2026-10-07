@@ -2,6 +2,7 @@ import type {D1Database, R2Bucket, D1PreparedStatement} from '@cloudflare/worker
 import {createRemoteJWKSet, importJWK, jwtVerify, type JWK} from 'jose';
 import {clean, escapeHtml} from './proposals';
 export interface DashboardEnv {
+  DUFFEL_TEST_TOKEN?: string;
   PROPOSALS_DB: D1Database;
   ACCESS_TEAM_DOMAIN?: string;
   ACCESS_AUD?: string;

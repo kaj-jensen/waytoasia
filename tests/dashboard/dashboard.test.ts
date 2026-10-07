@@ -83,6 +83,12 @@ test('Journey Designer capture is atomic, customer email archived and consultant
     const form=new FormData();for(const [key,value] of Object.entries({title:'Revised Japan journey',summary:'Revised summary',status:'in_review',route_days_0:'1–4',route_place_0:'Tokyo',route_plan_0:'City revisited',route_days_1:'5–7',route_place_1:'Kyoto',route_plan_1:'Culture revisited'}))form.set(key,value);
     const revised=await manage({env:fullEnv,params:{token:manageToken},request:new Request(`http://localhost/proposal/manage/${manageToken}`,{method:'POST',headers:{Origin:'http://localhost','Cf-Access-Jwt-Assertion':await auth.token()},body:form})});assert.equal(revised.status,303);
     const history=sqlite.prepare('SELECT * FROM enquiry_proposals ORDER BY version').all();assert.equal(history.length,2);assert.equal(history[0].status,'Superseded');assert.equal(history[0].url,history[1].url);assert.ok(String(history[0].snapshot_json).includes('Japan journey'));assert.ok(String(history[1].snapshot_json).includes('Revised Japan journey'));
+    assert.equal((await call(env,`api/enquiries/${history[1].enquiry_id}/flights-save`,{offerId:'sample',proposalId:history[1].id})).status,200);
+    const flightRow=sqlite.prepare('SELECT * FROM proposals').get()!;
+    assert.equal(JSON.parse(String(flightRow.payload_json)).builderChoices.flightItinerary.source,'sample');
+    const {renderProposalPage}=await import('../../functions/_lib/proposals');
+    assert.ok(renderProposalPage(flightRow as never,'test','').includes('Sample airline'));
+    assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM enquiry_proposals').get()!.n,3);
     const {onRequestPost:respond}=await import('../../functions/api/proposals/[token]/response');const publicToken=new URL(publicResult.proposalUrl).pathname.split('/').pop()!;
     assert.equal((await respond({env:fullEnv,params:{token:publicToken},request:new Request(`http://localhost/api/proposals/${publicToken}/response`,{method:'POST',headers:{'Content-Type':'application/json',Origin:'http://localhost'},body:JSON.stringify({action:'approve',note:'Looks great'})})})).status,303);
     assert.equal(sqlite.prepare("SELECT unread FROM activities WHERE body LIKE 'Customer approved%'").get()!.unread,1);assert.equal(sqlite.prepare('SELECT status FROM enquiry_proposals ORDER BY version DESC LIMIT 1').get()!.status,'Accepted');
@@ -143,4 +149,16 @@ test('incoming message text is captured when attachment storage is unavailable',
  const {env,sqlite}=setup();const e=await captureEnquiry(env,client);const event=JSON.stringify({type:'email.received',data:{email_id:'no-storage'}}),eventId='no-storage-event',now=new Date();const original=globalThis.fetch;
  globalThis.fetch=async(_url,init)=>{assert.equal(new Headers(init?.headers).get('Authorization'),'Bearer test-receiving');return Response.json({id:'no-storage',from:client.email,to:[`${e.reference}@replies.example.invalid`],subject:'Reply',text:'Customer reply with attachment',created_at:now.toISOString(),attachments:[{id:'file-1',filename:'plan.pdf',size:20,content_type:'application/pdf'}]})};
  try{const result=await webhook({env,request:new Request('https://preview.invalid/api/webhooks/resend',{method:'POST',body:event,headers:{'svix-id':eventId,'svix-timestamp':String(Math.floor(now.getTime()/1000)),'svix-signature':new Webhook(env.RESEND_WEBHOOK_SECRET!).sign(eventId,now,event)}})});assert.equal(result.status,200);assert.equal(sqlite.prepare("SELECT body FROM activities WHERE provider_id='no-storage'").get()!.body,'Customer reply with attachment');assert.match(String(sqlite.prepare('SELECT filename FROM attachments').get()!.filename),/Download unavailable/)}finally{globalThis.fetch=original}
+});
+
+test('flight sample persists on enquiry, can be removed, and requires proposal editor',async()=>{
+ const {env,sqlite}=setup();const e=await captureEnquiry(env,client);
+ assert.equal((await call(env,`api/enquiries/${e.id}/flights-search`,{sample:true})).status,200);
+ assert.equal((await call(env,`api/enquiries/${e.id}/flights-save`,{offerId:'sample'})).status,200);
+ let requirements=JSON.parse(String(sqlite.prepare('SELECT requirements_json FROM enquiries WHERE id=?').get(e.id)!.requirements_json));assert.equal(requirements.flightItinerary.source,'sample');
+ assert.equal((await call(env,`api/enquiries/${e.id}/flights-save`,{offerId:'sample',proposalId:'unrelated'})).status,409);
+ sqlite.prepare("UPDATE staff_users SET access_role='backoffice' WHERE email=?").run('staff@example.invalid');
+ assert.equal((await call(env,`api/enquiries/${e.id}/flights-search`,{sample:true},'staff@example.invalid')).status,403);
+ assert.equal((await call(env,`api/enquiries/${e.id}/flights-remove`,{})).status,200);
+ requirements=JSON.parse(String(sqlite.prepare('SELECT requirements_json FROM enquiries WHERE id=?').get(e.id)!.requirements_json));assert.equal(requirements.flightItinerary,undefined);
 });
