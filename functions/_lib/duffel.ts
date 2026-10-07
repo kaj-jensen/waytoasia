@@ -1,6 +1,6 @@
 import {flightTable} from './flight-display';
 export interface FlightSegment {origin:string;destination:string;departure:string;arrival:string;airline:string;flightNumber:string;duration:string;originCity?:string;originName?:string;destinationCity?:string;destinationName?:string;cabin?:string;operatingAirline?:string;originTimeZone?:string;destinationTimeZone?:string;stops?:Array<{airport:string;city:string;name:string;arrival:string;departure:string;duration:string}>}
-export interface FlightItinerary {source:'duffel-test'|'sample';offerId:string;retrievedAt:string;slices:FlightSegment[][];transfers?:Array<{place:string;airport:string;airportName?:string}>}
+export interface FlightItinerary {source:'duffel-test'|'sample';offerId:string;retrievedAt:string;totalAmount?:string;totalCurrency?:string;slices:FlightSegment[][];transfers?:Array<{place:string;airport:string;airportName?:string}>}
 export class FlightError extends Error {constructor(message:string,public status=400){super(message)}}
 export const duffelReady=(token?:string)=>Boolean(token?.startsWith('duffel_test_'));
 const record=(v:unknown):Record<string,unknown>=>v&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:{};
@@ -13,7 +13,9 @@ export function normaliseOffer(value:unknown):FlightItinerary {
    if(!/^[A-Z]{3}$/.test(leg.origin)||!/^[A-Z]{3}$/.test(leg.destination)||!/^\d{4}-\d{2}-\d{2}T/.test(leg.departure)||!/^\d{4}-\d{2}-\d{2}T/.test(leg.arrival))throw new FlightError('Flight itinerary is incomplete.',502);return leg;});
  });
  if(!slices.length)throw new FlightError('Flight itinerary is incomplete.',502);
- return {source:'duffel-test',offerId:text(offer.id),retrievedAt:new Date().toISOString(),slices};
+ const totalAmount=text(offer.total_amount),totalCurrency=text(offer.total_currency);
+ const fare=/^\d+(?:\.\d+)?$/.test(totalAmount)&&Number(totalAmount)>0&&/^[A-Z]{3}$/.test(totalCurrency)?{totalAmount,totalCurrency}:{};
+ return {source:'duffel-test',offerId:text(offer.id),retrievedAt:new Date().toISOString(),slices,...fare};
 }
 async function request(token:string|undefined,path:string,data?:unknown):Promise<Record<string,unknown>>{
  if(!duffelReady(token))throw new FlightError('Create a Duffel account and configure DUFFEL_TEST_TOKEN in Cloudflare to search test flights.',503);

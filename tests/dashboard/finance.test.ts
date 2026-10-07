@@ -50,7 +50,7 @@ test('persistent financial writes, revision conflicts, item ownership, ledger an
  res=await call(env,'/'+other.id+'/payment',{revision:0,item_id:d.items[0].id,kind:'receipt',currency:'EUR',amount:10,date:'2026-10-07'});assert.equal(res.status,400);
  const csv=await call(env,path+'/csv?basis=actual');assert.equal(csv.status,200);assert.match(await csv.text(),/INTERNAL FINANCIAL REPORT/);assert.match(csv.headers.get('Cache-Control')||'',/no-store/);
  assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM finance_history WHERE enquiry_id=?').get(e.id)!.n,4);
- const portfolio=await(await call(env,'')).json();assert.equal(portfolio.files.length,1);assert.equal(portfolio.files[0].actual.revenue,108500);
+ const portfolio=await(await call(env,'')).json();assert.equal(portfolio.files.length,2);assert.equal(portfolio.files.find((f:{enquiry_id:string})=>f.enquiry_id===e.id).actual.revenue,108500);
  // Financial foreign keys follow the existing client deletion lifecycle.
  sqlite.prepare('DELETE FROM enquiries WHERE id=?').run(e.id);assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM finance_files').get()!.n,0);
 });
@@ -75,4 +75,10 @@ test('journey import creates linked unpriced items and never overwrites saved fi
 test('catalogue enquiry prices use the selected tour and currency without inventing earnings',async()=>{
  const {env}=setup();const e=await captureEnquiry(env,{name:'Price test',email:'price@example.invalid',source:'Test',message:'Synthetic',requirements:{tour:'silk-and-courtyards',journey:'silk-and-courtyards',adults:'2',children:'0',budgetCurrency:'EUR'}});
  const d=await(await call(env,'/'+e.id)).json();assert.equal(d.tourPrice.perPerson,6600);assert.equal(d.tourPrice.partyTotal,13200);assert.equal(d.tourPrice.currency,'EUR');assert.equal(d.actual.priced,0);assert.equal(d.actual.earnings,0);assert.equal(d.items.length,0);
+});
+test('portfolio includes every enquiry without finance records and paginates beyond 200 files',async()=>{
+ const {env,sqlite}=setup(),first=await enquiry(env),clientId=sqlite.prepare('SELECT client_id FROM enquiries WHERE id=?').get(first.id)!.client_id;
+ for(let i=0;i<205;i++)sqlite.prepare('INSERT INTO enquiries (id,reference,client_id,source,requirements_json,original_message,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)').run('extra-'+String(i).padStart(3,'0'),'ALL-'+i,clientId,'Test',JSON.stringify({tour:'silk-and-courtyards',adults:2,children:0,budgetCurrency:'DKK'}),'Synthetic','2026-10-07','2026-10-07');
+ const ids:string[]=[];let cursor='';do{const page=await(await call(env,cursor?'?cursor='+cursor:'')).json();for(const f of page.files){ids.push(f.enquiry_id);assert.equal(f.actual.revenue,0);if(f.enquiry_id!==first.id){assert.equal(f.source.catalogue.partyTotal,98400);assert.equal(f.currency,'DKK')}}cursor=page.nextCursor||''}while(cursor);
+ assert.equal(ids.length,206);assert.equal(new Set(ids).size,206);
 });

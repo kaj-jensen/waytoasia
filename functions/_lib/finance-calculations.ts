@@ -1,5 +1,5 @@
 /** All values are integer minor units. FX means file-currency units per source-currency unit. */
-export const productTypes=['Flights','Hotels','Car rental','Transfers','Activities','Excursions','Insurance','Trains','Cruises','Guides','Fees','Discounts','Other'];
+export const productTypes=['Tours','Flights','Hotels','Car rental','Transfers','Activities','Excursions','Insurance','Trains','Cruises','Guides','Fees','Discounts','Other'];
 export const financeStatuses=['Draft','Quoted','Accepted','Partially booked','Fully booked','Completed','Cancelled'];
 export const paymentKinds=['invoice','credit_note','receipt','refund','supplier_payment','supplier_refund'];
 export interface Components {costCurrency:string;fxRate:string;priceBase:number;markup:number;serviceFee:number;discount:number;supplierCost:number;commission:number;otherCost:number;paymentCost:number}

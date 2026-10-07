@@ -1,49 +1,47 @@
-import {enquiryTourPrice} from './enquiry-tour-price';
+import {enquiryServices} from './enquiry-services';
 import {json,privateHeaders,auditStatement,type DashboardEnv,type Staff} from './dashboard';
-import {clean,parseStoredPayload} from './proposals';
+import {clean} from './proposals';
 import {currencyCode,minor,rate,convert,normalizeComponents,summarize,paymentSummary,productTypes,financeStatuses,paymentKinds,csvCell,digits,type FinanceItem,type Payment} from './finance-calculations';
 import type {D1PreparedStatement} from '@cloudflare/workers-types';
 export function financePermissions(staff:Staff){return {read:['admin','staff','finance','backoffice'].includes(staff.role),write:['admin','staff','finance'].includes(staff.role)}}
 interface File {enquiry_id:string;currency:string;status:string;revision:number;is_demo:number;updated_at:string;last_write:string}
 function bad(message:string,status=400):never{throw json({error:message},status)}
-const record=(v:unknown):Record<string,unknown>=>v&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:{};
-const array=(v:unknown):Record<string,unknown>[]=>Array.isArray(v)?v.map(record):[];
 const date=(v:unknown,required=false)=>{const s=clean(v,10);if(!s&&!required)return '';if(!/^\d{4}-\d{2}-\d{2}$/.test(s)||!Number.isFinite(Date.parse(s))||new Date(s).toISOString().slice(0,10)!==s)bad('Enter a valid date.');return s};
 async function load(env:DashboardEnv,id:string){
  const enquiry=await env.PROPOSALS_DB.prepare('SELECT e.*,c.name,c.email FROM enquiries e JOIN clients c ON c.id=e.client_id WHERE e.id=?').bind(id).first<Record<string,string>>();if(!enquiry)bad('Enquiry not found.',404);
- const [file,rawItems,payments,history]=await Promise.all([
+ const [file,rawItems,payments,history,proposal]=await Promise.all([
   env.PROPOSALS_DB.prepare('SELECT * FROM finance_files WHERE enquiry_id=?').bind(id).first<File>(),
   env.PROPOSALS_DB.prepare('SELECT * FROM finance_items WHERE enquiry_id=? ORDER BY created_at,id').bind(id).all<Record<string,unknown>>(),
   env.PROPOSALS_DB.prepare('SELECT * FROM finance_payments WHERE enquiry_id=? ORDER BY date DESC,created_at DESC').bind(id).all<Payment>(),
   env.PROPOSALS_DB.prepare("SELECT id,revision,action,actor,created_at,json_extract(snapshot_json,'$.currency') currency,json_extract(snapshot_json,'$.status') status,json_extract(snapshot_json,'$.quote') quote,json_extract(snapshot_json,'$.actual') actual FROM finance_history WHERE enquiry_id=? ORDER BY revision DESC LIMIT 100").bind(id).all<Record<string,unknown>>(),
+  env.PROPOSALS_DB.prepare('SELECT p.snapshot_json,q.estimated_price FROM enquiry_proposals p LEFT JOIN proposals q ON q.id=p.legacy_id WHERE p.enquiry_id=? ORDER BY p.version DESC LIMIT 1').bind(id).first<{snapshot_json:string;estimated_price:string}>(),
  ]);
  const items=rawItems.results.map(r=>({...r,quote:r.quote_json?JSON.parse(String(r.quote_json)):null,actual:r.actual_json?JSON.parse(String(r.actual_json)):null})) as unknown as FinanceItem[];
- const tourPrice=enquiryTourPrice(enquiry.requirements_json);
- const f=file||{enquiry_id:id,currency:tourPrice?.currency||'EUR',status:'Draft',revision:0,is_demo:0,updated_at:'',last_write:''};
+ const source=enquiryServices(enquiry.requirements_json,proposal?.snapshot_json,proposal?.estimated_price);
+ const tourPrice=source.catalogue;
+ const f=file||{enquiry_id:id,currency:tourPrice?.currency||source.planning?.currency||'EUR',status:'Draft',revision:0,is_demo:0,updated_at:'',last_write:''};
  const quote=summarize(items,f.currency,'quote'),actual=summarize(items,f.currency,'actual');
- return {enquiry,tourPrice,file:f,items,payments:payments.results,history:history.results.map(h=>({id:h.id,revision:h.revision,action:h.action,actor:h.actor,created_at:h.created_at,snapshot:{currency:h.currency,status:h.status,quote:JSON.parse(String(h.quote)),actual:JSON.parse(String(h.actual))}})),quote,actual,paymentQuote:paymentSummary(payments.results,quote),paymentActual:paymentSummary(payments.results,actual)};
+ return {enquiry,tourPrice,source,file:f,items,payments:payments.results,history:history.results.map(h=>({id:h.id,revision:h.revision,action:h.action,actor:h.actor,created_at:h.created_at,snapshot:{currency:h.currency,status:h.status,quote:JSON.parse(String(h.quote)),actual:JSON.parse(String(h.actual))}})),quote,actual,paymentQuote:paymentSummary(payments.results,quote),paymentActual:paymentSummary(payments.results,actual)};
 }
 async function travelCandidates(env:DashboardEnv,id:string){
- const proposal=await env.PROPOSALS_DB.prepare('SELECT snapshot_json FROM enquiry_proposals WHERE enquiry_id=? ORDER BY version DESC LIMIT 1').bind(id).first<{snapshot_json:string}>();
- const payload=proposal&&parseStoredPayload(proposal.snapshot_json);if(!payload)return [];
- const choices=payload.builderChoices,suggestion=payload.suggestion,result:{key:string;type:string;description:string;supplier:string}[]=[];
- array(suggestion.hotelStays).forEach((stay,index)=>{const choice=record(choices.hotels)[`stay-${index}`],option=array(stay.options).find(o=>o.id===choice);result.push({key:`stay-${index}`,type:'Hotels',description:`${clean(stay.place,160)} · ${clean(option?.name,180)||'Hotel to be selected'}`,supplier:clean(option?.name,180)})});
- array(suggestion.dayPlans).forEach(day=>{const option=array(day.options).find(o=>o.id===record(choices.days)[`day-${day.day}`]);if(option)result.push({key:`day-${day.day}`,type:'Activities',description:`Day ${day.day} · ${clean(option.name,180)}`,supplier:''})});
- array(suggestion.route).slice(0,-1).forEach((stop,index)=>{const option=array(stop.transferOptions).find(o=>o.id===record(choices.transfers)[`transfer-${index}`]);result.push({key:`transfer-${index}`,type:'Transfers',description:clean(option?.name,180)||clean(stop.onwardTravel,250),supplier:''})});
- const flight=record(choices.flightItinerary);if(Array.isArray(flight.slices))flight.slices.forEach((slice,index)=>{const segments=array(slice);if(segments.length)result.push({key:`flight-${index}`,type:'Flights',description:`${clean(segments[0].origin,3)} → ${clean(segments.at(-1)?.destination,3)} · test itinerary`,supplier:[...new Set(segments.map(s=>clean(s.airline,100)))].join(', ')})});
- return result.filter(r=>r.description);
+ const data=await load(env,id);
+ return data.source.services.filter(s=>!['Excluded from package','Included in package','Not selected'].includes(s.status)).map(s=>({key:s.key,type:s.type,description:s.description,supplier:s.supplier}));
 }
 export async function financeGet(path:string,url:URL,env:DashboardEnv,staff:Staff):Promise<Response|null>{
  if(!path.startsWith('api/finance'))return null;
  if(!financePermissions(staff).read)bad('Financial access is not enabled for this role.',403);
  if(path==='api/finance'){
-  const files=await env.PROPOSALS_DB.prepare('SELECT f.*,e.reference,e.assigned_to,e.requirements_json,e.created_at,c.name FROM finance_files f JOIN enquiries e ON e.id=f.enquiry_id JOIN clients c ON c.id=e.client_id ORDER BY f.updated_at DESC LIMIT 200').all<Record<string,unknown>>();
-  const [allItems,allPayments]=await Promise.all([
-   env.PROPOSALS_DB.prepare('SELECT i.* FROM finance_items i JOIN (SELECT enquiry_id FROM finance_files ORDER BY updated_at DESC LIMIT 200) f ON f.enquiry_id=i.enquiry_id').all<Record<string,unknown>>(),
-   env.PROPOSALS_DB.prepare('SELECT p.* FROM finance_payments p JOIN (SELECT enquiry_id FROM finance_files ORDER BY updated_at DESC LIMIT 200) f ON f.enquiry_id=p.enquiry_id').all<Payment>()]);
+  const cursor=url.searchParams.get('cursor')||'';
+  const files=await env.PROPOSALS_DB.prepare(`SELECT e.id enquiry_id,e.reference,e.assigned_to,e.requirements_json,e.created_at,c.name,f.currency,f.status,f.is_demo,f.updated_at,p.snapshot_json,q.estimated_price FROM enquiries e JOIN clients c ON c.id=e.client_id LEFT JOIN finance_files f ON f.enquiry_id=e.id LEFT JOIN enquiry_proposals p ON p.id=(SELECT id FROM enquiry_proposals WHERE enquiry_id=e.id ORDER BY version DESC LIMIT 1) LEFT JOIN proposals q ON q.id=p.legacy_id WHERE e.id>? ORDER BY e.id LIMIT 100`).bind(cursor).all<Record<string,unknown>>();
+  const ids=files.results.map(f=>String(f.enquiry_id)),marks=ids.map(()=>'?').join(',');
+  const [allItems,allPayments]=ids.length?await Promise.all([
+   env.PROPOSALS_DB.prepare(`SELECT * FROM finance_items WHERE enquiry_id IN (${marks})`).bind(...ids).all<Record<string,unknown>>(),
+   env.PROPOSALS_DB.prepare(`SELECT * FROM finance_payments WHERE enquiry_id IN (${marks})`).bind(...ids).all<Payment>()]):[{results:[]},{results:[]}];
   const rows=files.results.map(f=>{const items=allItems.results.filter(i=>i.enquiry_id===f.enquiry_id).map(i=>({...i,quote:i.quote_json?JSON.parse(String(i.quote_json)):null,actual:i.actual_json?JSON.parse(String(i.actual_json)):null})) as unknown as FinanceItem[];
-   const quote=summarize(items,String(f.currency),'quote'),actual=summarize(items,String(f.currency),'actual');return {...f,quote:{...quote,lines:undefined},actual:{...actual,lines:undefined},payment:paymentSummary(allPayments.results.filter(p=>p.enquiry_id===f.enquiry_id),actual)};});
-  return json({files:rows,limit:200,permissions:financePermissions(staff)});
+   const source=enquiryServices(String(f.requirements_json),String(f.snapshot_json||''),String(f.estimated_price||'')),currency=String(f.currency||source.catalogue?.currency||source.planning?.currency||'EUR');
+   const quote=summarize(items,currency,'quote'),actual=summarize(items,currency,'actual');
+   return {enquiry_id:f.enquiry_id,created_at:f.created_at,reference:f.reference,assigned_to:f.assigned_to,name:f.name,currency,status:f.status||'Not priced',is_demo:f.is_demo||0,source,quote:{...quote,lines:undefined},actual:{...actual,lines:undefined},payment:paymentSummary(allPayments.results.filter(p=>p.enquiry_id===f.enquiry_id),actual)};});
+  return json({files:rows,nextCursor:ids.length===100?ids.at(-1):null,permissions:financePermissions(staff)});
  }
  const match=path.match(/^api\/finance\/([^/]+)(?:\/(csv|candidates))?$/);if(!match)return json({error:'Not found'},404);
  const data=await load(env,match[1]);if(match[2]==='candidates')return json({items:await travelCandidates(env,match[1])});
@@ -52,6 +50,8 @@ export async function financeGet(path:string,url:URL,env:DashboardEnv,staff:Staf
   const money=(v:number)=>String(v/10**digits(c));
   const rows:unknown[][]=[['INTERNAL FINANCIAL REPORT',data.enquiry.reference,data.enquiry.name,c,basis,data.file.status],['Coverage',`${s.priced} priced / ${s.count} items`],['Summary','Revenue','Total cost','Commission','Additional costs','Gross earnings','Margin %'],['',money(s.revenue),money(s.cost),money(s.commission),money(s.additionalCost),money(s.earnings),s.margin??''],[],['Type','Item','Supplier','Status','Currency','Selling price','Supplier cost','Commission','Additional costs','Total cost','Earnings','Margin %','Original supplier currency','Original supplier cost','FX rate','Base customer price','Markup','Service fee','Discount','Payment cost','Other cost']];
   for(const item of s.lines){const v=item.values,x=item[basis];rows.push([item.product_type,item.description,item.supplier,item.status,c,v?money(v.revenue):'Unpriced',v?money(v.supplierCost):'',v?money(v.commission):'',v?money(v.additionalCost):'',v?money(v.cost):'',v?money(v.earnings):'',v?.margin??'',x?.costCurrency??'',x?x.supplierCost/10**digits(x.costCurrency):'',x?.fxRate??'',x?money(x.priceBase):'',x?money(x.markup):'',x?money(x.serviceFee):'',x?money(x.discount):'',x?money(x.paymentCost):'',x?money(x.otherCost):''])}
+  rows.push([],['SOURCE PRICES AND SERVICES — not booked amounts'],['Saved proposal price',data.source.proposalPrice],['Planning estimate',data.source.planning?.currency||'',data.source.planning?.low??'',data.source.planning?.high??''],['Service','Description','Status','Currency','Reference low','Reference high','Price basis','Details']);
+  for(const service of data.source.services)rows.push([service.type,service.description,service.status,service.price?.currency||'',service.price?.low??'',service.price?.high??'',service.price?.basis||'',service.detail]);
   rows.push([],['Payment summary','Invoiced','Paid','Outstanding against priced items','Supplier payments','Supplier balance'],['',money(p.invoiced),money(p.paid),money(p.outstanding),money(p.supplierPaid),money(p.supplierBalance)],[],['Payment kind','Date','Due date','Reference','Original currency','Original amount','FX rate',`Amount ${c}`,'Voided']);
   for(const payment of data.payments)rows.push([payment.kind,payment.date,payment.due_date,payment.reference,payment.currency,payment.amount_minor/10**digits(payment.currency),payment.fx_rate,money(payment.file_amount_minor),payment.voided?'Yes':'No']);
   await env.PROPOSALS_DB.batch([auditStatement(env,staff.email,'finance.export',match[1])]);

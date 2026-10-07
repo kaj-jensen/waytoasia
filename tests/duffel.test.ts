@@ -59,3 +59,6 @@ test('renders every connecting flight, layover and stop within a flight',()=>{
  for(const expected of ['ZZ 801','ZZ 901','Connection: London (LHR)','09:00','11:30','2h 30m','Stop during this flight: Bangkok (BKK)','03:00','04:00','1h 0m'])assert.ok(html.includes(expected),expected);
  assert.equal(f.slices[0][1].stops?.length,1);
 });
+test('test offer price is preserved once for the whole itinerary, never invented for missing offers',()=>{
+ const f=normaliseOffer({...offer,total_amount:'1234.56',total_currency:'EUR'});assert.equal(f.totalAmount,'1234.56');assert.equal(f.totalCurrency,'EUR');assert.equal(f.source,'duffel-test');assert.equal(normaliseOffer(offer).totalAmount,undefined);
+});
