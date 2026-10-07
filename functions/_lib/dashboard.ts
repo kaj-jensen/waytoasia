@@ -21,9 +21,15 @@ export const statuses=['New','In progress','Awaiting client','Proposal sent','Co
 export const json=(data:unknown,status=200)=>Response.json(data,{status,headers:privateHeaders()});
 export function privateHeaders():Record<string,string>{return {'Cache-Control':'private, no-store','X-Robots-Tag':'noindex, nofollow, noarchive','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"}}
 const keysets=new Map<string,ReturnType<typeof createRemoteJWKSet>>();
+function signInRequired(request:Request):Response{
+ const message='Your dashboard session could not be verified. Please sign in again.';
+ if(!request.headers.get('Accept')?.includes('text/html'))return json({error:message},401);
+ return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Sign in again · Way to Asia</title><link rel="stylesheet" href="/staff.css"></head><body><main><section class="panel"><h1>Sign in again</h1><p>${message}</p><p><a class="button primary" href="/cdn-cgi/access/logout">Reset sign-in session</a></p><p>After resetting, <a href="/dashboard">return to the dashboard</a> and sign in with your authorised email address.</p></section></main></body></html>`,{status:401,headers:{...privateHeaders(),'Content-Type':'text/html; charset=utf-8'}});
+}
 export async function authenticate(request:Request,env:DashboardEnv):Promise<Staff>{
   const token=request.headers.get('Cf-Access-Jwt-Assertion');
-  if(!token||!env.ACCESS_TEAM_DOMAIN||!env.ACCESS_AUD)throw new Response('Staff authentication required.',{status:401,headers:privateHeaders()});
+  if(!token||!env.ACCESS_TEAM_DOMAIN||!env.ACCESS_AUD)throw signInRequired(request);
+  let email:string;
   try{
     const issuer=`https://${env.ACCESS_TEAM_DOMAIN}`;
     let keys=keysets.get(issuer);
@@ -33,10 +39,15 @@ export async function authenticate(request:Request,env:DashboardEnv):Promise<Sta
     // Independent MFA is enforced by the dedicated Access application before issuance.
     // IdP MFA mode additionally checks its signed authentication-method claim.
     if((!['false','cloudflare'].includes(env.ACCESS_REQUIRE_MFA||'')&&(!Array.isArray(payload.amr)||!payload.amr.includes('mfa')))||typeof payload.email!=='string')throw new Error('MFA required');
-    const staff=await env.PROPOSALS_DB.prepare('SELECT email,name,COALESCE(access_role,role) role,enabled FROM staff_users WHERE email=? AND enabled=1').bind(payload.email.toLowerCase()).first<Staff>();
-    if(!staff)throw new Response('Staff access denied.',{status:403,headers:privateHeaders()});
-    return staff;
-  }catch(error){if(error instanceof Response)throw error;throw new Response('Staff authentication rejected.',{status:401,headers:privateHeaders()})}
+    email=payload.email.toLowerCase();
+  }catch(error){
+    const code=error&&typeof error==='object'&&'code' in error?String(error.code):'VERIFICATION_FAILED';
+    console.warn('Dashboard authentication failed',/^[A-Z_]+$/.test(code)?code:'VERIFICATION_FAILED');
+    throw signInRequired(request);
+  }
+  const staff=await env.PROPOSALS_DB.prepare('SELECT email,name,COALESCE(access_role,role) role,enabled FROM staff_users WHERE email=? AND enabled=1').bind(email).first<Staff>();
+  if(!staff)throw new Response('Staff access denied.',{status:403,headers:privateHeaders()});
+  return staff;
 }
 export function requireAdmin(staff:Staff){if(staff.role!=='admin')throw new Response('Administrator access required.',{status:403,headers:privateHeaders()})}
 export function auditStatement(env:DashboardEnv,actor:string,action:string,target:string){return env.PROPOSALS_DB.prepare('INSERT INTO audit_log VALUES (?,?,?,?,?)').bind(crypto.randomUUID(),actor,action,target,new Date().toISOString())}

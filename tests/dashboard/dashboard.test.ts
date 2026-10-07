@@ -162,3 +162,10 @@ test('flight sample persists on enquiry, can be removed, and requires proposal e
  assert.equal((await call(env,`api/enquiries/${e.id}/flights-remove`,{})).status,200);
  requirements=JSON.parse(String(sqlite.prepare('SELECT requirements_json FROM enquiries WHERE id=?').get(e.id)!.requirements_json));assert.equal(requirements.flightItinerary,undefined);
 });
+
+test('rejected browser sessions offer sign-in recovery without weakening authentication',async()=>{
+ const {env}=setup();
+ const response=await onRequest({env,request:new Request('http://localhost:8788/dashboard',{headers:{Accept:'text/html','Cf-Access-Jwt-Assertion':'forged'}})});
+ assert.equal(response.status,401);assert.match(response.headers.get('content-type')||'',/text\/html/);
+ const body=await response.text();assert.match(body,/Reset sign-in session/);assert.match(body,/href="\/dashboard"/);assert.doesNotMatch(body,/Staff authentication rejected/);
+});
