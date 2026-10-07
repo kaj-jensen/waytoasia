@@ -108,3 +108,12 @@ test('daily programme associates overnight stays with route chapters and exclude
  assert.match(last,/Departure day · no overnight stay/);assert.doesNotMatch(last,/Hotel Test/);
  assert.match(first,/inclusion to be confirmed/);
 });
+
+test('saved transfer choice is displayed in the matching client route chapter',()=>{
+ const p=structuredClone(payload);
+ (p.suggestion.route as Array<Record<string,unknown>>)[0].transferOptions=[{id:'bus',name:'Shared express bus to Kyoto',description:'Station-to-station travel'},{id:'private',name:'Private transfer to Kyoto',description:'Pickup arranged with consultant'}];
+ p.builderChoices.transfers={'transfer-0':'bus'};
+ const html=renderProposalPage({...row,payload_json:JSON.stringify(p)},'A'.repeat(43),'');
+ assert.match(html,/Shared express bus to Kyoto/);
+ assert.doesNotMatch(html,/Private transfer to Kyoto/);
+});

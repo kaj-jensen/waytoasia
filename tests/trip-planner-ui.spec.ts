@@ -163,3 +163,22 @@ test('AI planner carries selected test flight itinerary into the customer journe
   expect((submitted.builderChoices as {flightItinerary:{offerId:string}}).flightItinerary.offerId).toBe('off_browser');
  }
 });
+
+test('planner selects transfer preferences and saves them with the customer journey',async({page})=>{
+ const transferSuggestion={...suggestion,route:suggestion.route.map((stop,index)=>({...stop,transferOptions:index===0?[{id:'rail',mode:'train',name:'Overnight train to Chiang Mai',description:'Station-to-station travel, subject to confirmation.'},{id:'air',mode:'flight',name:'Flight to Chiang Mai',description:'Airport transfers to be arranged separately.'}]:[]}))};
+ let submitted:Record<string,unknown>={};
+ await page.route('**/api/trip-suggestion',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({suggestion:transferSuggestion})}));
+ await page.route('**/api/trip-enquiry',route=>{submitted=route.request().postDataJSON();return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,proposalUrl:'/proposal/test-transfer'})})});
+ for(const width of [1440,390]){
+ await page.setViewportSize({width,height:900});await page.goto('/en/trip-planner/');
+ await page.locator('astro-island').evaluate(async node=>{while(node.hasAttribute('ssr'))await new Promise(resolve=>setTimeout(resolve,25));});
+ await page.locator('[name="travelStartDate"]').fill('2027-03-10');await page.locator('[name="travelEndDate"]').fill('2027-03-21');await page.locator('[name="departureAirport"]').fill('Copenhagen');await page.locator('[name="interests"][value="food"]').check();await page.locator('.trip-planner button[type="submit"]').click();
+ await expect(page.getByRole('heading',{name:'Transfers between destinations'})).toBeVisible();
+ await expect(page.locator('[name="transfer-0"][value="rail"]')).toBeChecked();
+ await page.locator('[name="transfer-0"][value="air"]').check();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.locator('.planner-transfers').screenshot({path:`/tmp/waytoasia-planner-transfers-${width}.png`});
+ await page.locator('#consultant-request [name="name"]').fill('Test Traveller');await page.locator('#consultant-request [name="email"]').fill('test@example.invalid');await page.locator('#consultant-request [name="consent"]').check();await page.locator('#consultant-request button[type="submit"]').click();await expect(page.getByRole('link',{name:'View my private journey ↗'})).toBeVisible();
+ expect((submitted.builderChoices as {transfers:Record<string,string>}).transfers['transfer-0']).toBe('air');
+ }
+});
