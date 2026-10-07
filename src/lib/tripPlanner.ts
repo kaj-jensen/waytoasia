@@ -428,11 +428,19 @@ export function assessTripSuggestionQuality(value:unknown,profile:TripPlannerReq
   return issues;
 }
 
+/** Overnight dates follow contiguous route chapters; the final travel day has no overnight stay. */
+export function alignHotelStayNights(route:SuggestedRouteStop[],stays:SuggestedHotelStay[],durationDays:number):SuggestedHotelStay[]{
+ const city=(place:string)=>place.split(':').at(-1)?.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[’']/g,'').trim().toLowerCase();
+ if(!routeCoversDuration(route,durationDays)||stays.length!==route.length||stays.some((stay,index)=>city(stay.place)!==city(route[index].place)))return stays;
+ return stays.map((stay,index)=>({...stay,nights:Math.max(0,routeStopLength(route[index].days)-(index===route.length-1?1:0))}));
+}
+
 export function normalizeTripSuggestion(value: unknown, locale: string, now = new Date(), requestedDurationDays?:number, researchSources:TravellerResearchSource[]=[]): TripSuggestion | null {
   if (!value || typeof value !== 'object') return null;
   const draft = value as Record<string,unknown>;
   const route=asRoute(draft.route);
-  const hotelStays=asHotelStays(draft.hotelStays,researchSources);
+  const parsedStays=asHotelStays(draft.hotelStays,researchSources);
+  const hotelStays=requestedDurationDays?alignHotelStayNights(route,parsedStays,requestedDurationDays):parsedStays;
   const dayPlans=asDayPlans(draft.dayPlans,researchSources);
   const requestedSlugs = textArray(draft.matchedJourneySlugs,4,100);
   const matchedJourneys = requestedSlugs.flatMap(slug=>{

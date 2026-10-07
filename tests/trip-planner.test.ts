@@ -233,3 +233,12 @@ test('transfer recommendations retain selectable modes and reject unverified dur
  const route=[{days:'Days 1–5',place:'Thailand: Bangkok',plan:'Explore the old city and riverside neighbourhoods from a comfortable base.',highlights:['Wat Pho','Grand Palace'],onwardTravel:'Continue to Ayutthaya by road.',transferOptions:[{id:'private',mode:'private_transfer',name:'Private transfer',description:'A 5-hour journey.'}]},{days:'Days 6–10',place:'Thailand: Ayutthaya',plan:'Explore the historic temples and riverside communities at a relaxed pace.',highlights:['Wat Mahathat','Historical Park'],onwardTravel:'',transferOptions:[]}];
  assert.ok(assessTripSuggestionQuality({route},profile).some(issue=>issue.includes('Remove unverified journey times')));
 });
+
+test('overnight counts come from route dates, not model night arithmetic',async()=>{
+ const {alignHotelStayNights}=await import('../src/lib/tripPlanner');
+ const route=[{days:'Days 1–3',place:'Thailand: Bangkok'},{days:'Days 4–8',place:'Thailand: Chiang Mai'}] as TripSuggestion['route'];
+ const stays=[{place:'Bangkok',nights:3,options:[]},{place:'Chiang Mai',nights:5,options:[]}];
+ const aligned=alignHotelStayNights(route,stays,8);assert.deepEqual(aligned.map(stay=>stay.nights),[3,4]);assert.equal(stays[1].nights,5);
+ assert.equal(alignHotelStayNights(route,[{...stays[0],place:'Phuket'},stays[1]],8)[1].nights,5);
+ const departure=[{days:'Days 1–7',place:'Thailand: Bangkok'},{days:'Day 8',place:'Thailand: Chiang Mai'}] as TripSuggestion['route'];assert.equal(alignHotelStayNights(departure,stays,8)[1].nights,0);
+});
