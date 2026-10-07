@@ -227,3 +227,9 @@ test('sends the existing itinerary and latest request when refining',async()=>{
   assert.match(modelInput,/Spend less time in cities and add nature/);
   assert.match(modelInput,/Japan and Taiwan/);
 });
+
+test('transfer recommendations retain selectable modes and reject unverified duration claims',()=>{
+ const profile=parseTripPlannerRequest({locale:'en',destinations:['thailand'],durationDays:10,adults:2,interests:['history']})!;
+ const route=[{days:'Days 1–5',place:'Thailand: Bangkok',plan:'Explore the old city and riverside neighbourhoods from a comfortable base.',highlights:['Wat Pho','Grand Palace'],onwardTravel:'Continue to Ayutthaya by road.',transferOptions:[{id:'private',mode:'private_transfer',name:'Private transfer',description:'A 5-hour journey.'}]},{days:'Days 6–10',place:'Thailand: Ayutthaya',plan:'Explore the historic temples and riverside communities at a relaxed pace.',highlights:['Wat Mahathat','Historical Park'],onwardTravel:'',transferOptions:[]}];
+ assert.ok(assessTripSuggestionQuality({route},profile).some(issue=>issue.includes('Remove unverified journey times')));
+});

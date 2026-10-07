@@ -364,11 +364,12 @@ export function assessTripSuggestionQuality(value:unknown,profile:TripPlannerReq
   if(!routeCoversDuration(route,profile.durationDays))issues.push(`Cover Days 1–${profile.durationDays} exactly once with no gaps or overlaps.`);
   if(route.some(stop=>stop.plan.length<55||stop.plan.toLowerCase()===stop.place.toLowerCase()))issues.push('Every chapter plan must be a concrete 1–2 sentence narrative about the base, rhythm and purpose, not a label or fragment.');
   if(route.slice(0,-1).some(stop=>!stop.onwardTravel)||route.at(-1)?.onwardTravel)issues.push('Give every non-final chapter a real onward journey and leave the final onwardTravel empty.');
-  const unsupportedTravelTime=/\b(?:about|around|approximately|approx\.?|≈|~)?\s*\d+(?:[.,]\d+)?\s*(?:h|hr|hrs|hour|hours|minute|minutes|min)\b/i;
-  if(route.some(stop=>unsupportedTravelTime.test(stop.onwardTravel)))issues.push('Remove unverified journey times; describe the recommended transport and connection without a duration.');
+  const transferDescriptions=route.flatMap(stop=>(stop.transferOptions??[]).map(option=>`${option.name} ${option.description}`));
+  const unsupportedTravelTime=/\b(?:about|around|approximately|approx\.?|≈|~)?\s*\d+(?:[.,]\d+)?\s*(?:h|hr|hrs|hour|hours|minute|minutes|min)\b|\b\d+(?:[.,]\d+)?-hour\b/i;
+  if([...route.map(stop=>stop.onwardTravel),...transferDescriptions].some(copy=>unsupportedTravelTime.test(copy)))issues.push('Remove unverified journey times; describe the recommended transport and connection without a duration.');
   const practical=textArray(draft.practicalNotes,5,300);
   const scheduleClaim=/\b(?:daily|every day|several (?:times|services|departures)|multiple (?:times|services|departures)|non-?stop)\b/i;
-  if([...route.map(stop=>stop.onwardTravel),...practical].some(copy=>scheduleClaim.test(copy)))issues.push('Remove flight and ferry frequency or nonstop claims because live schedules are not connected.');
+  if([...route.map(stop=>stop.onwardTravel),...transferDescriptions,...practical].some(copy=>scheduleClaim.test(copy)))issues.push('Remove flight and ferry frequency or nonstop claims because live schedules are not connected.');
   const unjustifiedDomesticFlight=route.slice(0,-1).some((stop,index)=>{
     const next=route[index+1];
     const country=stop.place.split(':')[0].trim().toLowerCase();
