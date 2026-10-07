@@ -20,3 +20,10 @@ test('planner uses arrival date, open-jaw return airport and ranks only suitable
  globalThis.fetch=async(_url,init)=>{calls++;const data=JSON.parse(String(init?.body)).data;assert.equal(data.slices[1].origin,'CNX');const outbound={...offer.slices[0].segments[0]};const inbound={...outbound,origin:{iata_code:'CNX'},destination:{iata_code:'CPH'},departing_at:'2027-02-24T12:00:00',arriving_at:'2027-02-24T20:00:00'};return Response.json({data:{live_mode:false,offers:[{...offer,id:`off_test${calls}`,slices:[{segments:[outbound]},{segments:[inbound]}]}]}})};
  try{const profile={departureAirport:'Copenhagen',travelStartDate:'2027-02-11',travelEndDate:'2027-02-24',adults:2,children:0};const result=await planFlights('duffel_test_example',profile,[{place:'Bangkok'},{place:'Chiang Mai'}]);assert.equal(result.status,'test-results');assert.equal(calls,2);assert.equal(result.offers[0].slices[0][0].arrival.slice(0,10),profile.travelStartDate);assert.equal((await planFlights(undefined,profile,[])).status,'not-connected');assert.equal((await planFlights('duffel_test_example',{...profile,children:1},[])).status,'needs-details');}finally{globalThis.fetch=original}
 });
+
+test('readable flight table preserves local clocks and provider airport and cabin details',()=>{
+ const f=normaliseOffer({...offer,slices:[{segments:[{...offer.slices[0].segments[0],origin:{iata_code:'CPH',city_name:'Copenhagen',name:'Kastrup'},destination:{iata_code:'BKK',city_name:'Bangkok',name:'Suvarnabhumi'},passengers:[{cabin_class:'business'}]}]}]});
+ const html=renderFlights(f);
+ for(const expected of ['Copenhagen','Kastrup','Suvarnabhumi','14:00','06:00','10 Feb 2027','11 Feb 2027','Business','10h 0m','<table'])assert.ok(html.includes(expected),expected);
+ assert.ok(!html.includes('2027-02-10T'));
+});

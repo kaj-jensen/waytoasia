@@ -148,7 +148,7 @@ test('localized planner does not expose English backend or network errors',async
 });
 
 test('AI planner carries selected test flight itinerary into the customer journey',async({page})=>{
- const flight={source:'duffel-test',offerId:'off_browser',retrievedAt:'2026-10-07T00:00:00Z',slices:[[{origin:'CPH',destination:'BKK',departure:'2027-03-09T14:00:00',arrival:'2027-03-10T06:00:00',airline:'Duffel Airways',flightNumber:'ZZ 101',duration:'PT10H'}]]};
+ const flight={source:'duffel-test',offerId:'off_browser',retrievedAt:'2026-10-07T00:00:00Z',slices:[[{origin:'CPH',destination:'BKK',departure:'2027-03-09T14:00:00',arrival:'2027-03-10T06:00:00',airline:'Duffel Airways',flightNumber:'ZZ 101',duration:'PT10H',cabin:'economy'}]]};
  let submitted:Record<string,unknown>={};
  await page.route('**/api/trip-suggestion',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({suggestion:{...suggestion,flightPlanning:{status:'test-results',offers:[flight]}}})}));
  await page.route('**/api/trip-enquiry',route=>{submitted=route.request().postDataJSON();return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,proposalUrl:'/proposal/test-flight'})})});
@@ -156,7 +156,7 @@ test('AI planner carries selected test flight itinerary into the customer journe
   await page.setViewportSize({width,height:900});await page.goto('/en/trip-planner/');
   await page.locator('astro-island').evaluate(async node=>{while(node.hasAttribute('ssr'))await new Promise(resolve=>setTimeout(resolve,25));});
   await page.locator('[name="travelStartDate"]').fill('2027-03-10');await page.locator('[name="travelEndDate"]').fill('2027-03-21');await page.locator('[name="departureAirport"]').fill('Copenhagen');await page.locator('[name="interests"][value="food"]').check();await page.locator('.trip-planner button[type="submit"]').click();
-  await expect(page.getByRole('heading',{name:'Flights for your journey'})).toBeVisible();await expect(page.locator('.planner-flights')).toContainText('CPH → BKK');await expect(page.locator('[name="planner-flight"]').first()).toBeChecked();
+  await expect(page.getByRole('heading',{name:'Flights for your journey'})).toBeVisible();await expect(page.locator('.planner-flights')).toContainText('Copenhagen');await expect(page.locator('.planner-flights')).toContainText('Bangkok');await expect(page.locator('.planner-flights')).toContainText('14:00');await expect(page.locator('.planner-flights')).toContainText('Economy');await expect(page.locator('.planner-flights')).toContainText('10h 0m');await expect(page.locator('[name="planner-flight"]').first()).toBeChecked();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.locator('.planner-flights').screenshot({path:`/tmp/waytoasia-planner-flights-${width}.png`});
   await page.locator('#consultant-request [name="name"]').fill('Test Traveller');await page.locator('#consultant-request [name="email"]').fill('test@example.invalid');await page.locator('#consultant-request [name="consent"]').check();await page.locator('#consultant-request button[type="submit"]').click();await expect(page.getByRole('link',{name:'View my private journey ↗'})).toBeVisible();
