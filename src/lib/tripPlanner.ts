@@ -30,6 +30,7 @@ export interface TripPlannerRequest {
   durationDays: number;
   adults: number;
   children: number;
+  childAges?:number[];
   budget: TripPlannerBudget;
   interests: TripPlannerInterest[];
   pace: TripPlannerPace;
@@ -54,7 +55,7 @@ export interface ResearchLink {title:string;url:string;domain:string}
 
 export interface SuggestedHotelOption {
   imageUrl?:string;
-  supplierQuote?:{provider:"LiteAPI"|"Hotelbeds";mode:"sandbox";hotelId:string;checkin:string;checkout:string;amount:number;currency:string;board:string;basis:string};
+  supplierQuote?:{provider:"LiteAPI"|"Hotelbeds";mode:"sandbox"|"production";hotelId:string;checkin:string;checkout:string;amount:number;currency:string;board:string;basis:string};
   id:string;
   name:string;
   area:string;
@@ -209,11 +210,13 @@ export function parseTripPlannerRequest(value: unknown): TripPlannerRequest | nu
   const durationDays=exactDuration||integerBetween(input.durationDays,5,35,12);
   const adults = integerBetween(input.adults,1,12,2);
   const children = integerBetween(input.children,0,8,0);
+  const childAges=Array.isArray(input.childAges)?input.childAges:undefined;
+  if(input.childAges!==undefined&&(!childAges||childAges.length!==children||childAges.some(age=>!Number.isInteger(age)||age<0||age>17)))return null;
   const budget = tripPlannerBudgets.includes(input.budget as TripPlannerBudget) ? input.budget as TripPlannerBudget : 'comfort';
   const pace = tripPlannerPaces.includes(input.pace as TripPlannerPace) ? input.pace as TripPlannerPace : 'balanced';
   const notes = typeof input.notes === 'string' ? input.notes.trim().slice(0,1000) : '';
   if (!interests.length && !destinationIdeas && !notes) return null;
-  return {locale,destinations,destinationIdeas,travelStartDate,travelEndDate,dateFlexibilityDays,departureAirport,travelMonth,durationDays,adults,children,budget,interests,pace,notes};
+  return {locale,destinations,destinationIdeas,travelStartDate,travelEndDate,dateFlexibilityDays,departureAirport,travelMonth,durationDays,adults,children,...(childAges?{childAges}:{}),budget,interests,pace,notes};
 }
 
 export function tripCatalogForAgent() {

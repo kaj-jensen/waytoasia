@@ -32,12 +32,15 @@ export interface HbxSecretBindings {
   HBX_TRANSFER_API_KEY?:string;
   HBX_TRANSFER_SECRET?:string;
   HBX_API_BASE_URL?:string;
+  HBX_ENVIRONMENT?:'evaluation'|'production';
+  HBX_PRODUCTION_APPROVED?:string;
 }
 export interface HbxAdapterOptions {
   credentials:HbxCredentialSet;
   baseUrl?:string;
   fetcher?:Fetcher;
   now?:()=>number;
+  production?:boolean;
 }
 
 export class HbxSandboxError extends Error {
@@ -196,7 +199,7 @@ const language=(locale:string):string=>locale.toLowerCase().split('-')[0]||'en';
 
 export function createHbxSandboxAdapter(options:HbxAdapterOptions):SupplierSearchAdapter & {hotelContent:(productId:string,signal:AbortSignal)=>Promise<{imageUrl?:string;address:string;description:string;status?:number|string}|undefined>}{
   const base=new URL(options.baseUrl??DEFAULT_BASE_URL);
-  if(base.protocol!=='https:'||base.hostname!=='api.test.hotelbeds.com')throw new HbxSandboxError('HBX evaluation traffic must use the official HTTPS test host.');
+  if(base.protocol!=='https:'||base.hostname!==(options.production?'api.hotelbeds.com':'api.test.hotelbeds.com'))throw new HbxSandboxError('HBX evaluation traffic must use the official HTTPS test host.');
   const fetcher=options.fetcher??fetch;
   const now=options.now??(()=>Date.now());
 
@@ -228,19 +231,19 @@ export function createHbxSandboxAdapter(options:HbxAdapterOptions):SupplierSearc
       const image=images.find(i=>/^[a-z0-9/_-]+\.(jpg|jpeg|png)$/i.test(asString(i.path))&&!asString(i.path).includes('..'));
       return {status:image?200:'Supplier content has no supported image path',imageUrl:image?hbxImage(`https://photos.hotelbeds.com/giata/bigger/${image.path}`):undefined,address:asString(asObject(hotel.address).content),description:asString(asObject(hotel.description).content).replace(/<[^>]*>/g,'').slice(0,700)};
     },
-    capability:{provider:PROVIDER,verticals:['accommodation','transfer','activity'],bookingModes:['agency'],status:'sandbox-ready',searchOnly:true},
+    capability:{provider:PROVIDER,verticals:['accommodation','transfer','activity'],bookingModes:['agency'],status:options.production?'production-ready':'sandbox-ready',searchOnly:true},
     async search(query,signal):Promise<SupplierSearchResult>{
       const errors=validateSupplierSearch(query);
       if(errors.length)throw new HbxSandboxError(errors.join(' '));
       let raw:unknown;
       let offers:SupplierOffer[];
       if(query.vertical==='accommodation'){
-        if(!query.destination.supplierCode?.trim())throw new HbxSandboxError('HBX accommodation searches require a destination supplier code.');
-        raw=await request('accommodation','/hotel-api/1.0/hotels',{method:'POST',signal,body:JSON.stringify({stay:{checkIn:query.checkIn,checkOut:query.checkOut},occupancies:query.rooms.map(room=>({rooms:1,adults:room.adults,children:room.childAges.length,paxes:room.childAges.map(age=>({type:'CH',age}))})),destination:{code:query.destination.supplierCode},sourceMarket:query.travellerCountry,filter:{maxHotels:25,maxRatesPerRoom:3}})});
+        if(!query.destination.supplierCode?.trim()&&(query.destination.latitude===undefined||query.destination.longitude===undefined))throw new HbxSandboxError('HBX accommodation searches require a destination supplier code or verified coordinates.');
+        raw=await request('accommodation','/hotel-api/1.0/hotels',{method:'POST',signal,body:JSON.stringify({stay:{checkIn:query.checkIn,checkOut:query.checkOut},occupancies:query.rooms.map(room=>({rooms:1,adults:room.adults,children:room.childAges.length,paxes:room.childAges.map(age=>({type:'CH',age}))})),...(query.destination.supplierCode?{destination:{code:query.destination.supplierCode}}:{geolocation:{latitude:query.destination.latitude,longitude:query.destination.longitude,radius:10,unit:'km'}}),sourceMarket:query.travellerCountry,filter:{maxHotels:25,maxRatesPerRoom:3}})});
         offers=hotelOffers(raw,query);
       }else if(query.vertical==='activity'){
-        if(!query.destination.supplierCode?.trim())throw new HbxSandboxError('HBX activity searches require a destination supplier code.');
-        raw=await request('activity','/activity-api/3.0/activities/availability',{method:'POST',signal,body:JSON.stringify({filters:[{searchFilterItems:[{type:'destination',value:query.destination.supplierCode}]}],from:query.from,to:query.to,language:language(query.locale),paxes:[...Array.from({length:query.party.adults},()=>({age:30})),...query.party.childAges.map(age=>({age}))],pagination:{itemsPerPage:25,page:1},order:'DEFAULT'})});
+        if(!query.destination.supplierCode?.trim()&&(query.destination.latitude===undefined||query.destination.longitude===undefined))throw new HbxSandboxError('HBX activity searches require a destination supplier code or verified coordinates.');
+        raw=await request('activity','/activity-api/3.0/activities/availability',{method:'POST',signal,body:JSON.stringify({filters:[{searchFilterItems:[query.destination.supplierCode?{type:'destination',value:query.destination.supplierCode}:{type:'GPS',value:`${query.destination.latitude}, ${query.destination.longitude}`}]}],from:query.from,to:query.to,language:language(query.locale),paxes:[...Array.from({length:query.party.adults},()=>({age:30})),...query.party.childAges.map(age=>({age}))],pagination:{itemsPerPage:25,page:1},order:'DEFAULT'})});
         offers=activityOffers(raw,query);
       }else{
         const from=hbxLocation(query.pickup);const to=hbxLocation(query.dropoff);
@@ -268,4 +271,11 @@ export function createHbxSandboxAdapter(options:HbxAdapterOptions):SupplierSearc
       throw new HbxSandboxError('The selected HBX offer is no longer available; run a new search.');
     },
   };
+}
+
+/** Production must be explicitly enabled after supplier access approval. Both modes remain search-only. */
+export function createConfiguredHbxAdapter(env:HbxSecretBindings,fetcher?:Fetcher){
+ const production=env.HBX_ENVIRONMENT==='production';
+ if(production&&env.HBX_PRODUCTION_APPROVED!=='true')throw new HbxSandboxError('Hotelbeds production access has not been approved.');
+ return createHbxSandboxAdapter({credentials:hbxCredentialsFromEnv(env),baseUrl:env.HBX_API_BASE_URL??(production?'https://api.hotelbeds.com':DEFAULT_BASE_URL),production,fetcher});
 }

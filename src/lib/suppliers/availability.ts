@@ -49,7 +49,7 @@ export interface HbxAvailabilitySection {
 
 export interface HbxAvailabilityResponse {
   provider:'HBX / Hotelbeds';
-  environment:'evaluation-sandbox';
+  environment:'evaluation-sandbox'|'production';
   bookable:false;
   gateway:{id:HbxGatewayId;name:string};
   checkedAt:string;

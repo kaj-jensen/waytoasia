@@ -1,7 +1,7 @@
 import {enrichWithHotelbeds} from '../_lib/planner-hotelbeds';
 import type {HbxSecretBindings} from '../../src/lib/suppliers/hbx';
 import {planFlights} from '../_lib/planner-flights';
-import {assessTripSuggestionQuality,estimateTripPrice,hotelOptionMatchesBudget,hotelStandardForBudget,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest,tripCatalogForAgent,tripPlannerCurrencyForLocale,tripSuggestionJsonSchema,type TravellerResearchSource,type TripSuggestion} from '../../src/lib/tripPlanner';
+import {assessTripSuggestionQuality,estimateTripPrice,hotelStandardForBudget,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest,tripCatalogForAgent,tripPlannerCurrencyForLocale,tripSuggestionJsonSchema,type TravellerResearchSource,type TripSuggestion} from '../../src/lib/tripPlanner';
 
 interface Env extends HbxSecretBindings { LITEAPI_SANDBOX_KEY?:string; DUFFEL_TEST_TOKEN?:string; OPENAI_API_KEY?:string;OPENAI_MODEL?:string;TAVILY_API_KEY?:string }
 interface PagesContext {request:Request;env:Env}
@@ -275,8 +275,10 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
     generationStage='supplier';
     const supplierPlanning=enrichWithHotelbeds(env,profile,suggestion);
     const flightPlanning=planFlights(env.DUFFEL_TEST_TOKEN,profile,suggestion.route);
+    const supplierSuggestion=await supplierPlanning;
+    const supplierSelectionsChanged=supplierSuggestion.hotelStays.some(stay=>stay.options.some(option=>option.supplierQuote?.provider==='Hotelbeds'))||supplierSuggestion.dayPlans.some(day=>day.options.some(option=>option.supplierProductId));
     let priceEstimate;
-    if(env.TAVILY_API_KEY||travellerResearch.length){
+    if(!supplierSelectionsChanged&&(env.TAVILY_API_KEY||travellerResearch.length)){
       try{
         let pricingResearch=travellerResearch;
         if(env.TAVILY_API_KEY){
@@ -294,9 +296,6 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
         console.warn('Public price estimate omitted',{requestId,error:pricingError instanceof Error?pricingError.message:String(pricingError)});
       }
     }
-    suggestion={...suggestion,...(priceEstimate?{priceEstimate}:{}),hotelStays:suggestion.hotelStays.map(stay=>({...stay,options:stay.options.filter(option=>hotelOptionMatchesBudget(option,profile.budget))}))};
-    const supplierSuggestion=await supplierPlanning;
-    const supplierSelectionsChanged=supplierSuggestion.hotelStays.some(stay=>stay.options.some(option=>option.supplierQuote?.provider==='Hotelbeds'))||supplierSuggestion.dayPlans.some(day=>day.options.some(option=>option.supplierProductId));
     // Public benchmarks were researched for the original choices, not replacement supplier products.
     suggestion={...supplierSuggestion,...(!supplierSelectionsChanged&&priceEstimate?{priceEstimate}:{}),flightPlanning:await flightPlanning};
     if(supplierSelectionsChanged)delete suggestion.priceEstimate;

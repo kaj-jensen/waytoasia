@@ -1,4 +1,4 @@
-import {createHbxSandboxAdapter,hbxCredentialsFromEnv,type HbxSecretBindings} from '../../src/lib/suppliers/hbx';
+import {createConfiguredHbxAdapter,type HbxSecretBindings} from '../../src/lib/suppliers/hbx';
 import {addDays,availabilitySection,hbxGateways,parseHbxAvailabilityRequest,type HbxAvailabilityResponse,type HbxAvailabilitySection} from '../../src/lib/suppliers/availability';
 
 interface PagesContext {request:Request;env:HbxSecretBindings}
@@ -27,7 +27,7 @@ export const onRequestPost=async({request,env}:PagesContext):Promise<Response>=>
   const activityTo=addDays(query.checkIn,Math.min(query.nights-1,3));
 
   try{
-    const adapter=createHbxSandboxAdapter({credentials:hbxCredentialsFromEnv(env),baseUrl:env.HBX_API_BASE_URL});
+    const adapter=createConfiguredHbxAdapter(env);
     const signal=AbortSignal.timeout(30_000);
     const [hotelResult,activityResult]=await Promise.allSettled([
       adapter.search({vertical:'accommodation',requestId:`${requestId}-hotel`,locale:query.locale,currency:query.currency,travellerCountry:sourceMarket,party,destination:{name:gateway.name,supplierCode:gateway.destinationCode},checkIn:query.checkIn,checkOut,rooms:[{adults:query.adults,childAges:query.childAges}]},signal),
@@ -43,7 +43,7 @@ export const onRequestPost=async({request,env}:PagesContext):Promise<Response>=>
       const transferResult=await Promise.allSettled([adapter.search({vertical:'transfer',requestId:`${requestId}-transfer`,locale:query.locale,currency:query.currency,travellerCountry:sourceMarket,party,pickup:{type:'airport',name:`${gateway.name} airport`,code:gateway.airportCode},dropoff:{type:'hotel',name:hotel.title,code:hotel.productId},pickupAt:`${query.checkIn}T15:00:00${gateway.utcOffset}`,returnAt:`${checkOut}T11:00:00${gateway.utcOffset}`},signal)]);
       sections.push(availabilitySection('transfer',transferResult[0]));
     }else sections.push({vertical:'transfer',status:'skipped',offers:[],message:'Transfer search needs an HBX hotel result from the same check.'});
-    const response:HbxAvailabilityResponse={provider:'HBX / Hotelbeds',environment:'evaluation-sandbox',bookable:false,gateway:{id:gateway.id,name:gateway.name},checkedAt:new Date().toISOString(),sections};
+    const response:HbxAvailabilityResponse={provider:'HBX / Hotelbeds',environment:env.HBX_ENVIRONMENT==='production'?'production':'evaluation-sandbox',bookable:false,gateway:{id:gateway.id,name:gateway.name},checkedAt:new Date().toISOString(),sections};
     return json(response);
   }catch(error){
     console.error(JSON.stringify({message:'HBX availability orchestration failed',requestId,error:error instanceof Error?error.message:'Unknown error'}));

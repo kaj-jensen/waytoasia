@@ -73,3 +73,13 @@ test('activity availability reads nested rateDetails and supplier currency',asyn
  const result=await adapter.search({vertical:'activity',requestId:'nested',locale:'en',currency:'EUR',travellerCountry:'DK',party:{adults:2,childAges:[]},destination:{name:'Bangkok',supplierCode:'BKK'},from:'2027-02-10',to:'2027-02-10',interests:[]},new AbortController().signal);
  assert.equal(result.offers[0]?.productId,'REAL-SHAPE');assert.equal(result.offers[0]?.total.amountMinor,210000);assert.equal(result.offers[0]?.total.currency,'THB');assert.equal(result.offers[0]?.imageUrl,'https://media.activitiesbank.com/tour.jpg');
 });
+
+test('production searches require explicit approval and the exact official production host',async()=>{
+ const {createConfiguredHbxAdapter}=await import('../src/lib/suppliers/hbx');
+ const env={HBX_HOTEL_API_KEY:'h',HBX_HOTEL_SECRET:'s',HBX_ACTIVITY_API_KEY:'a',HBX_ACTIVITY_SECRET:'s',HBX_TRANSFER_API_KEY:'t',HBX_TRANSFER_SECRET:'s',HBX_ENVIRONMENT:'production' as const};
+ assert.throws(()=>createConfiguredHbxAdapter(env),/not been approved/);
+ assert.throws(()=>createConfiguredHbxAdapter({...env,HBX_PRODUCTION_APPROVED:'true',HBX_API_BASE_URL:'https://api.test.hotelbeds.com'}),/official HTTPS/);
+ let captured='';const adapter=createConfiguredHbxAdapter({...env,HBX_PRODUCTION_APPROVED:'true'},async(url)=>{captured=String(url);return Response.json({hotels:{hotels:[]}})});
+ await adapter.search({vertical:'accommodation',requestId:'approved',locale:'en',currency:'EUR',travellerCountry:'DK',party:{adults:2,childAges:[]},destination:{name:'Chiang Mai',latitude:18.7904,longitude:98.985},checkIn:'2027-02-10',checkOut:'2027-02-14',rooms:[{adults:2,childAges:[]}]},new AbortController().signal);
+ assert.equal(captured,'https://api.hotelbeds.com/hotel-api/1.0/hotels');assert.equal(adapter.capability.searchOnly,true);assert.equal(adapter.capability.status,'production-ready');
+});
