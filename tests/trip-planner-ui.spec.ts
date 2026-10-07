@@ -86,7 +86,7 @@ test('agent plans beyond the catalogue and revises the complete journey',async({
   await page.getByRole('button',{name:/Create my trip idea/}).click();
   await expect(page.getByRole('heading',{name:independent.title})).toBeVisible();
   await expect(page.getByText('Tailor-made beyond the catalogue')).toBeVisible();
-  await expect(page.getByText('International flight from Osaka to Taipei.')).toBeVisible();
+  await expect(page.getByText('International flight from Osaka to Taipei.',{exact:true})).toBeVisible();
   await page.getByPlaceholder(/Replace the final city/).fill('Use fewer cities and add more nature.');
   await page.getByRole('button',{name:/Revise my journey/}).click();
   await expect(page.getByRole('heading',{name:revised.title})).toBeVisible();

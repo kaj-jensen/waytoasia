@@ -17,9 +17,11 @@ jobs:
       - run: npm run lint
       - run: npm run test:content
       - run: npm run test:dashboard
+      - run: npm run test:finance
       - run: npm run test:proposal
       - run: npm run typecheck
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:smoke
+      - run: npm run test:finance-ui
       - run: npx lhci autorun
