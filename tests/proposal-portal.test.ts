@@ -117,3 +117,15 @@ test('saved transfer choice is displayed in the matching client route chapter',(
  assert.match(html,/Shared express bus to Kyoto/);
  assert.doesNotMatch(html,/Private transfer to Kyoto/);
 });
+
+test('selected hotel photos appear in the overview and daily programme, excluding alternatives and unsafe images',()=>{
+ const copy=structuredClone(payload);
+ copy.suggestion.hotelStays=[{place:'Tokyo',nights:4,options:[{id:'tokyo-a',name:'Hotel Test',imageUrl:'https://static.cupid.travel/hotels/123.jpg',roomGuidance:'Twin room'},{id:'tokyo-b',name:'Unselected hotel',imageUrl:'https://static.cupid.travel/hotels/456.jpg'}]}];
+ const html=renderProposalPage({...row,payload_json:JSON.stringify(copy)},'A'.repeat(43),'');
+ assert.ok(html.indexOf('id="stays"')<html.indexOf('id="itinerary"'));
+ assert.match(html,/class="selected-hotel-photo"[^>]+123.jpg/);
+ assert.match(html,/class="programme-hotel-photo"[^>]+123.jpg/);
+ assert.doesNotMatch(html,/456.jpg|Unselected hotel/);
+ copy.suggestion.hotelStays=[{place:'Tokyo',nights:4,options:[{id:'tokyo-a',name:'Hotel Test',imageUrl:'https://untrusted.example/photo.jpg'}]}];
+ assert.doesNotMatch(renderProposalPage({...row,payload_json:JSON.stringify(copy)},'A'.repeat(43),''),/untrusted.example/);
+});

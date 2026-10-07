@@ -18,3 +18,5 @@ for(const form of document.querySelectorAll('[data-response-form]')){
 }
 window.addEventListener('beforeprint',()=>document.querySelectorAll('.daily-itinerary details').forEach(d=>{d.dataset.wasOpen=String(d.open);d.open=true;}));
 window.addEventListener('afterprint',()=>document.querySelectorAll('.daily-itinerary details').forEach(d=>{d.open=d.dataset.wasOpen==='true';}));
+
+for(const image of document.querySelectorAll(".selected-hotel-photo,.programme-hotel-photo")){image.addEventListener("error",()=>{image.hidden=true;});if(image.complete&&!image.naturalWidth)image.hidden=true;}

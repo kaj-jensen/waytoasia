@@ -34,3 +34,6 @@
 .proposal-view .chapter-services h4,.proposal-view .programme-label{color:var(--service-accent,var(--muted));font-weight:700}
 .proposal-view .service-hotel p,.proposal-view .service-activity p,.proposal-view .service-transfer p{color:#394d43}
 .proposal-view .service-hotel small,.proposal-view .service-activity small,.proposal-view .service-transfer small{color:#4c5d54}
+
+/* Selected hotel photography uses the same proportions and palette as the designer. */
+.selected-hotel-photo{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:3px;margin:0 0 16px}.selected-hotel-card{min-width:0;overflow:hidden}.programme-hotel-photo{display:block;width:100%;max-height:190px;aspect-ratio:16/10;object-fit:cover;border-radius:3px;margin:12px 0 16px}.selected-hotel-photo[hidden],.programme-hotel-photo[hidden]{display:none}@media print{.selected-hotel-photo,.programme-hotel-photo{max-height:140px}}
