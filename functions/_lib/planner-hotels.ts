@@ -35,8 +35,12 @@ export function mapHotelRates(payload:unknown,profile:TripPlannerRequest,checkin
 export async function enrichHotelStays(key:string|undefined,profile:TripPlannerRequest,stays:SuggestedHotelStay[],fetcher:typeof fetch=fetch):Promise<SuggestedHotelStay[]>{
  if(!key?.startsWith('sand_'))return stays;
  if(!/^\d{4}-\d{2}-\d{2}$/.test(profile.travelStartDate)||!Number.isFinite(Date.parse(profile.travelStartDate))||profile.children>0||profile.adults<1||profile.adults>8)return stays.map(stay=>({...stay,supplierNote:"Researched recommendations. Demo rates need exact dates and an adult-only party of up to eight; family rooms require child ages."}));
+ const availableNights=Math.round((Date.parse(profile.travelEndDate)-Date.parse(profile.travelStartDate))/86400000);
+ if(!Number.isInteger(availableNights)||availableNights<stays.length)return stays;
+ let remaining=availableNights;
+ const datedStays=stays.map((stay,index)=>{const nights=index===stays.length-1?remaining:Math.max(1,Math.min(stay.nights,remaining-(stays.length-index-1)));remaining-=nights;return {...stay,nights}});
  let offset=0;
- const requests=stays.map(stay=>{const start=new Date(`${profile.travelStartDate}T12:00:00Z`);start.setUTCDate(start.getUTCDate()+offset);offset+=stay.nights;const end=new Date(start);end.setUTCDate(end.getUTCDate()+stay.nights);return {stay,checkin:start.toISOString().slice(0,10),checkout:end.toISOString().slice(0,10)}});
+ const requests=datedStays.map(stay=>{const start=new Date(`${profile.travelStartDate}T12:00:00Z`);start.setUTCDate(start.getUTCDate()+offset);offset+=stay.nights;const end=new Date(start);end.setUTCDate(end.getUTCDate()+stay.nights);return {stay,checkin:start.toISOString().slice(0,10),checkout:end.toISOString().slice(0,10)}});
  const output:SuggestedHotelStay[]=[];
  // Two searches at a time keep this request below the sandbox rate limit.
  for(let i=0;i<requests.length;i+=2){output.push(...await Promise.all(requests.slice(i,i+2).map(async({stay,checkin,checkout})=>{
