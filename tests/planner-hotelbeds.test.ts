@@ -16,7 +16,8 @@ test('uses exact Hotelbeds products for hotels, airport transfers and tours with
   if(path.includes('/activity-api/'))return Response.json({activities:[{activityCode:'tour-123',name:'Bangkok Park Walk',content:{description:'Guided park walk',media:{images:[{urls:[{sizeType:'LARGE',resource:'https://photos.hotelbeds.com/tour-123.jpg'}]}]}},modalities:[{code:'walk',name:'Morning walk',currency:'EUR',amountsFrom:[{amount:25}]}]}]});
   throw Error('Unexpected endpoint '+path);
  };
- const result=await enrichWithHotelbeds(env,profile,suggestion(),fetcher);
+ const composite=suggestion();composite.hotelStays[0].place='Thailand: Bangkok & Ayutthaya';composite.hotelStays[0].options=[{name:'Eastin Bangkok Hotel',area:'Bangkok'} as never,{name:'Amara Bangkok',area:'Silom'} as never];
+ const result=await enrichWithHotelbeds(env,profile,composite,fetcher);
  assert.equal(calls.length,6);assert.equal(result.hotelStays[0].options[0].supplierQuote?.provider,'Hotelbeds');
  assert.match(result.hotelStays[0].options[0].imageUrl!,/000123a_hb_f_001/);
  assert.equal(result.dayPlans[0].options[0].supplierProductId,'tour-123');assert.match(result.dayPlans[0].options[0].imageUrl!,/tour-123/);
@@ -37,6 +38,9 @@ test('accepts supplied family ages and curated coordinates, without guessing com
  assert.equal(hotelbedsLocation('Thailand: Chiang Mai',['thailand'])?.latitude,18.7904);
  assert.equal(hotelbedsLocation('Japan: Tokyo',[])?.longitude,139.6917);
  assert.equal(hotelbedsLocation('Hanoi & Ninh Binh',['vietnam']),undefined);
+ assert.equal(hotelbedsLocation('Thailand: Bangkok & Ayutthaya',['thailand'],['Eastin Bangkok Sathorn','Amara Bangkok Hotel'])?.name,'Bangkok');
+ assert.equal(hotelbedsLocation('Northern Thailand: Chiang Mai & Surrounds',['thailand'],['Yaang Come Village Chiang Mai','Chiang Mai Old City'])?.name,'Chiang Mai');
+ assert.equal(hotelbedsLocation('Bangkok & Ayutthaya',['thailand'],['Bangkok hotel','Ayutthaya hotel']),undefined);
  assert.equal(parseTripPlannerRequest({...profile,children:2,childAges:[7]}),null);
  assert.equal(parseTripPlannerRequest({...profile,children:1,childAges:[18]}),null);
  const family=parseTripPlannerRequest({...profile,children:1,childAges:[7]})!;let received=false;

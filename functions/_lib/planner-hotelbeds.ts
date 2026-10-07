@@ -25,7 +25,7 @@ export async function enrichWithHotelbeds(env:HbxSecretBindings,profile:TripPlan
  for(const stay of result.hotelStays){
   const checkIn=addDays(profile.travelStartDate,offset),checkOut=addDays(checkIn,stay.nights);offset+=stay.nights;
   if(stay.nights===0){stay.options=[];stay.supplierNote='No overnight stay is needed on the departure day.';continue;}
-  const gateway=hotelbedsLocation(stay.place,profile.destinations);
+  const gateway=hotelbedsLocation(stay.place,profile.destinations,stay.options.map(o=>`${o.name} ${o.area}`));
   if(!gateway||searches>=(production?12:3)){stay.supplierNote='Researched recommendations. Hotelbeds destination coverage has not been verified for this stop.';continue;}
   searches++;
   const destination={name:gateway.name,supplierCode:gateway.destinationCode,latitude:gateway.latitude,longitude:gateway.longitude};
