@@ -37,6 +37,7 @@ export const onRequest = async (context: PagesContext): Promise<Response> => {
   const proposalRoute = requestUrl.pathname.startsWith('/proposal/')
     || requestUrl.pathname.startsWith('/api/proposals/');
   const proposalAsset = requestUrl.pathname === '/proposal.css'
+    || requestUrl.pathname === '/flights.css'
     || requestUrl.pathname === '/proposal.js'
     || requestUrl.pathname.startsWith('/images/');
   if (requestUrl.hostname === 'proposal.waytoasia.com' && !proposalRoute && !proposalAsset) {

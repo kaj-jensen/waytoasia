@@ -42,7 +42,7 @@ test('public proposal hostname isolates private website pages without breaking p
  }
  const blocked=await onRequest({request:new Request('https://proposal.waytoasia.com/api/trip-suggestion',{method:'POST',body:'sensitive'}),next:async()=>{throw new Error('Unexpected website API dispatch');}});
  assert.equal(blocked.status,404);assert.equal(blocked.headers.has('location'),false);
- for(const path of ['/proposal/example', '/proposal/manage/example', '/api/proposals/example/response', '/proposal.css', '/proposal.js', '/images/proposals/beijing.jpg']){
+ for(const path of ['/proposal/example', '/proposal/manage/example', '/api/proposals/example/response', '/proposal.css', '/flights.css', '/proposal.js', '/images/proposals/beijing.jpg']){
   let called=false;const response=await onRequest({request:new Request(`https://proposal.waytoasia.com${path}`),next:async()=>{called=true;return new Response('fixture',{headers:{'content-type':'text/plain','cache-control':'private, no-store'}});}});
   assert.equal(called,true);assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'private, no-store');
  }
