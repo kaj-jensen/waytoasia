@@ -1,3 +1,4 @@
+import {routeGateway,type AirportStop} from './airport-routing';
 import {duffelReady,searchFlights,type FlightItinerary} from './duffel';
 export interface PlannerFlights {status:'not-connected'|'needs-details'|'unavailable'|'test-results';offers:FlightItinerary[];issues?:string[];transfers?:Array<{place:string;airport:string}>}
 // Explicit airport aliases only. Ambiguous city names are left for the traveller to clarify.
@@ -9,19 +10,20 @@ export function resolveRouteAirport(value:string):{airport:string;transfer:boole
  const exact=resolveAirport(value);if(exact)return {airport:exact,transfer:false};
  const name=value.split(':').at(-1)!.toLowerCase().normalize('NFD').replace(/\p{M}/gu,'');
  const compact=name.replace(/[^\p{L}]/gu,'');
- for(const [place,airport] of Object.entries(gateways))if(compact===place)return {airport,transfer:true};
+ for(const [place,airport] of Object.entries(gateways))if(compact===place||name.includes(place.replace('mekongdelta','mekong delta')))return {airport,transfer:true};
  const candidates=Object.entries(airports).filter(([alias])=>{
   const words=alias==='hochiminhcity'?'ho chi minh city':alias==='chiangmai'?'chiang mai':alias==='danang'?'da nang':alias==='hongkong'?'hong kong':alias==='kualalumpur'?'kuala lumpur':alias;
   return new RegExp(`(^|[^\\p{L}])${words}([^\\p{L}]|$)`,'u').test(name);
  }).map(([,airport])=>airport);
  const unique=[...new Set(candidates)];
- return {airport:unique.length===1?unique[0]:'',transfer:false};
+ return unique.length===1?{airport:unique[0],transfer:false}:unique.length>1?{airport:'',transfer:false}:routeGateway({place:value},'return');
 }
-export async function planFlights(token:string|undefined,profile:{departureAirport?:string;travelStartDate?:string;travelEndDate?:string;adults:number;children:number},route:Array<{place:string}>):Promise<PlannerFlights>{
+export async function planFlights(token:string|undefined,profile:{departureAirport?:string;travelStartDate?:string;travelEndDate?:string;adults:number;children:number},route:AirportStop[]):Promise<PlannerFlights>{
  const empty=(status:PlannerFlights['status']):PlannerFlights=>({status,offers:[]});
  if(!duffelReady(token))return empty('not-connected');
- const first=resolveRouteAirport(route[0]?.place||''),last=resolveRouteAirport(route.at(-1)?.place||'');
- const origin=resolveAirport(profile.departureAirport),destination=first.airport,returnOrigin=last.airport;
+ const pick=(stop:AirportStop|undefined,position:'arrival'|'return')=>{if(!stop)return {airport:'',transfer:false};const legacy=resolveRouteAirport(stop.place);return stop.airportCode?routeGateway(stop,position):legacy.airport?legacy:routeGateway(stop,position);};
+ const first=pick(route[0],'arrival'),last=pick(route.at(-1),'return');
+ const origin=resolveAirport(profile.departureAirport)||routeGateway({place:profile.departureAirport||''},'arrival').airport,destination=first.airport,returnOrigin=last.airport;
  const transfers=[...(first.transfer?[{place:route[0].place,airport:destination}]:[]),...(last.transfer?[{place:route.at(-1)!.place,airport:returnOrigin}]:[])];
  const issues=[...(!origin?['departure']:[]),...(!destination?['arrival']:[]),...(!returnOrigin?['return']:[]),...(!profile.travelStartDate||!profile.travelEndDate?['dates']:[]),...(profile.children||profile.adults>9?['party']:[])];
  if(issues.length)return {...empty('needs-details'),issues};
