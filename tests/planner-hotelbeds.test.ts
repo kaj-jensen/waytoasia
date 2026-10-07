@@ -41,6 +41,7 @@ test('accepts supplied family ages and curated coordinates, without guessing com
  assert.equal(hotelbedsLocation('Thailand: Bangkok & Ayutthaya',['thailand'],['Eastin Bangkok Sathorn','Amara Bangkok Hotel'])?.name,'Bangkok');
  assert.equal(hotelbedsLocation('Bangkok & Ayutthaya',[],['Eastin Bangkok Sathorn','Amara Bangkok Hotel'])?.name,'Bangkok');
  assert.equal(hotelbedsLocation('Bangkok',[])?.id,'bangkok');
+ assert.equal(hotelbedsLocation('Bangkok & Ayutthaya',[],['Eastin Grand Hotel Sathorn Sathorn district','Amara Bangkok Hotel Silom'])?.id,'bangkok');
  assert.equal(hotelbedsLocation('Northern Thailand: Chiang Mai & Surrounds',['thailand'],['Yaang Come Village Chiang Mai','Chiang Mai Old City'])?.name,'Chiang Mai');
  assert.equal(hotelbedsLocation('Bangkok & Ayutthaya',['thailand'],['Bangkok hotel','Ayutthaya hotel']),undefined);
  assert.equal(parseTripPlannerRequest({...profile,children:2,childAges:[7]}),null);
