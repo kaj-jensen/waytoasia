@@ -45,10 +45,12 @@ test('existing tour enquiry automatically shows its published DKK price and hone
  const {database}=await import('./dashboard/support');const {sqlite}=database('.wrangler/dashboard-preview.sqlite');
  const id=crypto.randomUUID(),now=new Date().toISOString(),e={id};
  sqlite.prepare('INSERT INTO clients VALUES (?,?,?,?,?)').run(id,`catalogue-${id}@example.invalid`,'Published tour price test','',now);
- sqlite.prepare('INSERT INTO enquiries (id,reference,client_id,source,requirements_json,original_message,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)').run(id,'TEST-'+id,id,'Synthetic test',JSON.stringify({tour:'silk-and-courtyards',adults:'2',children:'0',budgetCurrency:'DKK'}),'Synthetic price verification',now,now);sqlite.close();
+ sqlite.prepare('INSERT INTO enquiries (id,reference,client_id,source,requirements_json,original_message,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)').run(id,'TEST-'+id,id,'Synthetic test',JSON.stringify({title:'Mr',departureDate:'2026-12-07',tour:'silk-and-courtyards',adults:'2',children:'0',budgetCurrency:'DKK'}),'Synthetic price verification',now,now);sqlite.close();
  await page.goto('/preview-login');await page.goto('/dashboard#'+e.id);
  await expect(page.locator('#enquiry-finance-summary')).toContainText('98,400');
  await expect(page.getByRole('heading',{name:'Published tour programme'})).toBeVisible();
+ await expect(page.locator('.quoted-trip h2')).toHaveText('Silk & Courtyards');
+ await expect(page.locator('.trip-facts')).toContainText('2026-12-07');
  await page.getByRole('tab',{name:'Finance',exact:true}).click();
  await expect(page.locator('#enquiry-finances .finance-published')).toContainText('DKK 49,200.00');
  await expect(page.locator('#enquiry-finances .finance-kpi').first()).toContainText('DKK 98,400.00');
