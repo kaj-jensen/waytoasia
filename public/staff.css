@@ -5,3 +5,5 @@
 .user-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap}.user-row>div{flex:1;min-width:180px;overflow-wrap:anywhere}
 
 .flight-panel{grid-column:1 / -1;min-width:0}.flight-panel p{overflow-wrap:anywhere}
+
+#edit-form button:disabled{background:#e3e8e4;color:#738078;border-color:#cdd5ce;cursor:default;opacity:1}.save-feedback{min-height:1.4em;margin:12px 0 0;font-size:14px;font-weight:600;color:#245440}
