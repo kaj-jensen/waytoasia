@@ -80,6 +80,7 @@ export interface SupplierOffer {
   expiresAt?: string;
   recheckRequired: true;
   sourceUrl?: string;
+  imageUrl?: string;
   attributes: Record<string,string|number|boolean|string[]>;
 }
 

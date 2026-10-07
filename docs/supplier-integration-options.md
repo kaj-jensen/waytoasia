@@ -77,3 +77,11 @@ Short-lived rate keys and offer tokens are not durable product identifiers. Stor
 ## Implemented HBX safety boundary
 
 The server-side adapter in `src/lib/suppliers/hbx.ts` is locked to `https://api.test.hotelbeds.com`, signs requests with Web Crypto and accepts only allowlisted search/check-rate endpoints. It has no booking, cancellation, profile or live-host methods. Real credentials belong in Cloudflare Pages secrets; `.dev.vars.example` contains names only and `.dev.vars` is ignored by Git.
+
+## Journey Designer evaluation integration — 7 October 2026
+
+Journey Designer now queries Hotelbeds hotel, activity and airport-transfer searches. It retains exact supplier product IDs and displays supplier images where returned; hotels use the matching hotel-content record. Selected tour images and airport transfers carry into the private proposal. No booking endpoints are called and no traveller identity is sent.
+
+The initial evaluation covers verified Bangkok, Hanoi, Beijing, Seoul and Bali gateways, with a maximum of three supported bases per generation and one activity date per base. Unmapped places, unavailable responses, family parties without child ages, and inconsistent overnight dates retain researched suggestions with an explanation. Hotel rates use one room and the Denmark source market for testing. Airport transfers use a clearly labelled provisional pickup time and the first offered hotel; a consultant must confirm the actual chosen hotel and flight.
+
+All offers remain evaluation results. Binding credentials is not proof of successful supplier authentication or production availability. Commercial access and full destination coverage remain outstanding. Public itinerary totals are omitted when supplier products replace the researched selections, because those estimates refer to different products.

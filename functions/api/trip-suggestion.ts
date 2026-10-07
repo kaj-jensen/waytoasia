@@ -1,8 +1,9 @@
-import {enrichHotelStays} from '../_lib/planner-hotels';
+import {enrichWithHotelbeds} from '../_lib/planner-hotelbeds';
+import type {HbxSecretBindings} from '../../src/lib/suppliers/hbx';
 import {planFlights} from '../_lib/planner-flights';
 import {assessTripSuggestionQuality,estimateTripPrice,hotelOptionMatchesBudget,hotelStandardForBudget,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest,tripCatalogForAgent,tripPlannerCurrencyForLocale,tripSuggestionJsonSchema,type TravellerResearchSource,type TripSuggestion} from '../../src/lib/tripPlanner';
 
-interface Env { LITEAPI_SANDBOX_KEY?:string; DUFFEL_TEST_TOKEN?:string; OPENAI_API_KEY?:string;OPENAI_MODEL?:string;TAVILY_API_KEY?:string }
+interface Env extends HbxSecretBindings { LITEAPI_SANDBOX_KEY?:string; DUFFEL_TEST_TOKEN?:string; OPENAI_API_KEY?:string;OPENAI_MODEL?:string;TAVILY_API_KEY?:string }
 interface PagesContext {request:Request;env:Env}
 
 const json = (body: unknown, status = 200, extraHeaders: Record<string,string> = {}) => Response.json(body,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...extraHeaders}});
@@ -269,7 +270,7 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
     if(qualityIssues.length)console.warn('Trip suggestion retained after repair with quality advisories',{requestId,qualityIssues});
     if (!suggestion) throw new Error('Model response did not match the trip suggestion contract.');
     // Pricing and flight searches use the completed route and can run independently.
-    const hotelPlanning=enrichHotelStays(env.LITEAPI_SANDBOX_KEY,profile,suggestion.hotelStays);
+    const supplierPlanning=enrichWithHotelbeds(env,profile,suggestion);
     const flightPlanning=planFlights(env.DUFFEL_TEST_TOKEN,profile,suggestion.route);
     let priceEstimate;
     if(env.TAVILY_API_KEY||travellerResearch.length){
@@ -291,7 +292,11 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
       }
     }
     suggestion={...suggestion,...(priceEstimate?{priceEstimate}:{}),hotelStays:suggestion.hotelStays.map(stay=>({...stay,options:stay.options.filter(option=>hotelOptionMatchesBudget(option,profile.budget))}))};
-    suggestion={...suggestion,hotelStays:await hotelPlanning,flightPlanning:await flightPlanning};
+    const supplierSuggestion=await supplierPlanning;
+    const supplierSelectionsChanged=supplierSuggestion.hotelStays.some(stay=>stay.options.some(option=>option.supplierQuote?.provider==='Hotelbeds'))||supplierSuggestion.dayPlans.some(day=>day.options.some(option=>option.supplierProductId));
+    // Public benchmarks were researched for the original choices, not replacement supplier products.
+    suggestion={...supplierSuggestion,...(!supplierSelectionsChanged&&priceEstimate?{priceEstimate}:{}),flightPlanning:await flightPlanning};
+    if(supplierSelectionsChanged)delete suggestion.priceEstimate;
     return json({suggestion,requestId});
   } catch (error) {
     const message=error instanceof Error ? error.message : 'Unknown error';

@@ -54,7 +54,7 @@ export interface ResearchLink {title:string;url:string;domain:string}
 
 export interface SuggestedHotelOption {
   imageUrl?:string;
-  supplierQuote?:{provider:"LiteAPI";mode:"sandbox";hotelId:string;checkin:string;checkout:string;amount:number;currency:string;board:string;basis:string};
+  supplierQuote?:{provider:"LiteAPI"|"Hotelbeds";mode:"sandbox";hotelId:string;checkin:string;checkout:string;amount:number;currency:string;board:string;basis:string};
   id:string;
   name:string;
   area:string;
@@ -76,6 +76,9 @@ export interface SuggestedHotelStay {
 }
 
 export interface SuggestedDayOption {
+  imageUrl?:string;
+  supplierProductId?:string;
+  supplierNote?:string;
   id:string;
   name:string;
   type:string;
@@ -131,6 +134,8 @@ export interface TripSuggestion extends Omit<TripSuggestionDraft,'matchedJourney
   availability: 'not-connected';
   pricing: 'illustrative-only';
   priceEstimate?:TripPriceEstimate;
+  airportTransfers?:Array<{place:string;hotel:string;date:string;offers:Array<{productId:string;name:string;description:string;imageUrl?:string;amount:number;currency:string}>}>;
+  supplierPlanningNote?:string;
   flightPlanning?:import('../../functions/_lib/planner-flights').PlannerFlights;
   travellerResearch: 'live-sources'|'not-connected';
   travellerInsights: Array<{insight:string;sources:Array<{title:string;url:string;domain:string}>}>;

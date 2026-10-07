@@ -83,6 +83,20 @@ const cancellationTerms=(raw:unknown,currency:string):CancellationTerm[]=>asArra
 const money=(amount:unknown,currency:unknown,fallback:string):Money=>({amountMinor:toMinor(amount),currency:asString(currency,fallback)});
 const retrievedAt=()=>new Date().toISOString();
 
+export function hbxImage(value:unknown):string|undefined{
+  try{const u=new URL(asString(value));return u.protocol==='https:'&&!u.username&&!u.password&&(u.hostname==='hotelbeds.com'||u.hostname.endsWith('.hotelbeds.com'))?u.href:undefined}catch{return undefined}
+}
+function contentImage(content:unknown):string|undefined{
+ const c=asObject(content),media=asObject(c.media);
+ for(const raw of [...asArray(media.images),...asArray(c.images)]){
+  const image=asObject(raw);
+  const urls=asArray(image.urls).map(asObject);
+  const ordered=[...urls.filter(u=>u.sizeType==='LARGE'),...urls.filter(u=>u.sizeType==='MEDIUM'),...urls];
+  for(const candidate of [image.url,...ordered.map(u=>u.resource)]){const url=hbxImage(candidate);if(url)return url;}
+ }
+ return undefined;
+}
+
 function hotelOffers(raw:unknown,query:AccommodationSearch):SupplierOffer[]{
   const root=asObject(raw);
   const hotelsNode=asObject(root.hotels);
@@ -120,7 +134,7 @@ function activityOffers(raw:unknown,query:ActivitySearch):SupplierOffer[]{
     const activity=asObject(activityValue);
     for(const modalityValue of asArray(activity.modalities)){
       const modality=asObject(modalityValue);
-      for(const rateValue of asArray(modality.rates)){
+      for(const rateValue of (asArray(modality.rates).length?asArray(modality.rates):[{...asObject(asArray(modality.amountsFrom)[0]),amountFrom:asObject(asArray(modality.amountsFrom)[0]).amount??modality.amountFrom,rateKey:`availability-${activity.code??activity.activityCode}-${modality.code??modality.name}`}])){
         const rate=asObject(rateValue);
         const rateKey=asString(rate.rateKey);
         if(!rateKey)continue;
@@ -133,7 +147,8 @@ function activityOffers(raw:unknown,query:ActivitySearch):SupplierOffer[]{
           total:money(amount,currency,query.currency),bookingMode:'agency',
           cancellation:cancellationTerms(rate.cancellationPolicies,asString(currency,query.currency)),retrievedAt:retrievedAt(),
           expiresAt:new Date(Date.now()+30*60*1000).toISOString(),recheckRequired:true,
-          attributes:{modality:asString(modality.name),activityType:asString(activity.type)},
+          imageUrl:contentImage(content),
+          attributes:{modality:asString(modality.name),activityType:asString(activity.type),description:asString(content.description).replace(/<[^>]*>/g,'').slice(0,1200)},
         });
       }
     }
@@ -159,6 +174,7 @@ function transferOffers(raw:unknown,query:TransferSearch):SupplierOffer[]{
       total:money(price.totalAmount,currency,query.currency),bookingMode:'agency' as const,
       cancellation:cancellationTerms(service.cancellationPolicies,currency),retrievedAt:retrievedAt(),
       recheckRequired:true as const,
+      imageUrl:contentImage(service.content),
       attributes:{vehicle:vehicleName,category:categoryName,direction:asString(service.direction)},
     }];
   });
@@ -177,7 +193,7 @@ const hbxLocation=(location:TransferLocation):{type:string;code:string}=>{
 const localDateTime=(value:string):string=>value.replace(/(?:Z|[+-]\d{2}:\d{2})$/,'').slice(0,19);
 const language=(locale:string):string=>locale.toLowerCase().split('-')[0]||'en';
 
-export function createHbxSandboxAdapter(options:HbxAdapterOptions):SupplierSearchAdapter{
+export function createHbxSandboxAdapter(options:HbxAdapterOptions):SupplierSearchAdapter & {hotelContent:(productId:string,signal:AbortSignal)=>Promise<{imageUrl?:string;address:string;description:string}|undefined>}{
   const base=new URL(options.baseUrl??DEFAULT_BASE_URL);
   if(base.protocol!=='https:'||base.hostname!=='api.test.hotelbeds.com')throw new HbxSandboxError('HBX evaluation traffic must use the official HTTPS test host.');
   const fetcher=options.fetcher??fetch;
@@ -199,6 +215,18 @@ export function createHbxSandboxAdapter(options:HbxAdapterOptions):SupplierSearc
   };
 
   return {
+    async hotelContent(productId:string,signal:AbortSignal){
+      if(!/^\d+$/.test(productId))return undefined;
+      const credentials=options.credentials.accommodation;
+      const signature=await createHbxSignature(credentials.apiKey,credentials.secret,Math.floor(now()/1000));
+      const response=await fetcher(new URL(`/hotel-content-api/1.0/hotels/${productId}/details?language=ENG&useSecondaryLanguage=true`,base),{headers:{Accept:'application/json','Api-key':credentials.apiKey,'X-Signature':signature},signal});
+      if(!response.ok)return undefined;
+      const body=asObject(await response.json()),hotel=asObject(body.hotel);
+      if(String(hotel.code)!==productId)return undefined;
+      const images=asArray(hotel.images).map(asObject).sort((a,b)=>(asNumber(a.visualOrder)??999)-(asNumber(b.visualOrder)??999));
+      const image=images.find(i=>/^\d{2}\/[^?]+\.(jpg|jpeg|png)$/i.test(asString(i.path))&&!asString(i.path).includes('..'));
+      return {imageUrl:image?hbxImage(`https://photos.hotelbeds.com/giata/bigger/${image.path}`):undefined,address:asString(asObject(hotel.address).content),description:asString(asObject(hotel.description).content).replace(/<[^>]*>/g,'').slice(0,700)};
+    },
     capability:{provider:PROVIDER,verticals:['accommodation','transfer','activity'],bookingModes:['agency'],status:'sandbox-ready',searchOnly:true},
     async search(query,signal):Promise<SupplierSearchResult>{
       const errors=validateSupplierSearch(query);
