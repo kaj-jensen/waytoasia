@@ -33,6 +33,10 @@ export const onRequestPost=async({request,env}:PagesContext):Promise<Response>=>
       adapter.search({vertical:'accommodation',requestId:`${requestId}-hotel`,locale:query.locale,currency:query.currency,travellerCountry:sourceMarket,party,destination:{name:gateway.name,supplierCode:gateway.destinationCode},checkIn:query.checkIn,checkOut,rooms:[{adults:query.adults,childAges:query.childAges}]},signal),
       adapter.search({vertical:'activity',requestId:`${requestId}-activity`,locale:query.locale,currency:query.currency,travellerCountry:sourceMarket,party,destination:{name:gateway.name,supplierCode:gateway.destinationCode},from:query.checkIn,to:activityTo,interests:[]},signal),
     ]);
+    if(hotelResult.status==='fulfilled'&&hotelResult.value.offers[0]?.productId){
+      const first=hotelResult.value.offers[0];
+      try{const content=await adapter.hotelContent(first.productId,signal);for(const offer of hotelResult.value.offers)if(offer.productId===first.productId)offer.imageUrl=content?.imageUrl;}catch{/* Keep rates available when images fail. */}
+    }
     const sections:HbxAvailabilitySection[]=[availabilitySection('accommodation',hotelResult),availabilitySection('activity',activityResult)];
     if(hotelResult.status==='fulfilled'&&hotelResult.value.offers[0]?.productId){
       const hotel=hotelResult.value.offers[0];

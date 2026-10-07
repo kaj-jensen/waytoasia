@@ -31,6 +31,7 @@ export interface HbxAvailabilityRequest {
 }
 
 export interface HbxAvailabilityOffer {
+  imageUrl?:string;
   title:string;
   summary:string;
   total:Money;
@@ -86,6 +87,7 @@ export function parseHbxAvailabilityRequest(value:unknown,now=new Date()):HbxAva
 
 export function publicAvailabilityOffer(offer:SupplierOffer):HbxAvailabilityOffer{
   return {
+    imageUrl:offer.imageUrl,
     title:offer.title,
     summary:offer.summary,
     total:offer.total,

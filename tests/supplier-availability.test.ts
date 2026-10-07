@@ -23,6 +23,7 @@ test('orchestrates three read-only HBX checks and strips rate keys from the resp
   globalThis.fetch=async(input)=>{
     const url=String(input);calls.push(url);
     if(url.endsWith('/hotel-api/1.0/hotels'))return Response.json({hotels:{currency:'EUR',hotels:[{code:321,name:'Bangkok Test Hotel',categoryName:'4 STARS',rooms:[{name:'River room',rates:[{rateKey:'secret-hotel-rate',net:'500',boardName:'BREAKFAST',cancellationPolicies:[]}]}]}]}});
+    if(url.includes('/hotel-content-api/1.0/hotels/321/details'))return Response.json({hotel:{code:321,images:[{path:'03/00321/00321a_hb_a_001.jpg',visualOrder:1}]}});
     if(url.endsWith('/activity-api/3.0/activities/availability'))return Response.json({activities:[{activityCode:'ACT-1',content:{name:'Bangkok food walk'},modalities:[{name:'Evening tour',currency:'EUR',rates:[{rateKey:'secret-activity-rate',amountFrom:40,cancellationPolicies:[]}]}]}]});
     if(url.includes('/transfer-api/1.0/availability/'))return Response.json({services:[{serviceId:'T-1',vehicle:{name:'Car'},category:{name:'Standard'},price:{totalAmount:30,currencyId:'EUR'},rateKey:'secret-transfer-rate',cancellationPolicies:[]}]});
     return Response.json({}, {status:404});
@@ -34,11 +35,12 @@ test('orchestrates three read-only HBX checks and strips rate keys from the resp
     const body=await response.json() as Record<string,unknown>;
     assert.equal(body.bookable,false);
     assert.equal(body.environment,'evaluation-sandbox');
-    assert.equal(calls.length,3);
-    assert.match(calls[2],/from\/IATA\/BKK\/to\/ATLAS\/321/);
+    assert.equal(calls.length,4);
+    assert.match(calls[3],/from\/IATA\/BKK\/to\/ATLAS\/321/);
     const serialized=JSON.stringify(body);
     assert.doesNotMatch(serialized,/secret-(?:hotel|activity|transfer)-rate/);
     assert.match(serialized,/Bangkok Test Hotel/);
+    assert.match(serialized,/photos.hotelbeds.com/);
     assert.match(serialized,/Bangkok food walk/);
   }finally{globalThis.fetch=originalFetch}
 });

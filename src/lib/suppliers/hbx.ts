@@ -134,12 +134,13 @@ function activityOffers(raw:unknown,query:ActivitySearch):SupplierOffer[]{
     const activity=asObject(activityValue);
     for(const modalityValue of asArray(activity.modalities)){
       const modality=asObject(modalityValue);
-      for(const rateValue of (asArray(modality.rates).length?asArray(modality.rates):[{...asObject(asArray(modality.amountsFrom)[0]),amountFrom:asObject(asArray(modality.amountsFrom)[0]).amount??modality.amountFrom,rateKey:`availability-${activity.code??activity.activityCode}-${modality.code??modality.name}`}])){
+      const rates=asArray(modality.rates).flatMap(value=>{const rate=asObject(value);const details=asArray(rate.rateDetails);return details.length?details.map(detail=>({...rate,...asObject(detail)})):[rate]});
+      for(const rateValue of (rates.length?rates:[{...asObject(asArray(modality.amountsFrom)[0]),amountFrom:asObject(asArray(modality.amountsFrom)[0]).amount??modality.amountFrom,rateKey:`availability-${activity.code??activity.activityCode}-${modality.code??modality.name}`}])){
         const rate=asObject(rateValue);
-        const rateKey=asString(rate.rateKey);
+        const rateKey=asString(rate.rateKey,asString(rate.ratekey));
         if(!rateKey)continue;
-        const amount=rate.amountFrom??rate.amount??modality.amountFrom;
-        const currency=rate.currency??modality.currency??root.currency;
+        const amount=asObject(rate.totalAmount).amount??rate.amountFrom??rate.amount??modality.amountFrom;
+        const currency=rate.currency??modality.currency??activity.currency??root.currency;
         const content=asObject(activity.content);
         offers.push({
           provider:PROVIDER,vertical:'activity',offerId:rateKey,productId:asString(activity.code,asString(activity.activityCode)),
