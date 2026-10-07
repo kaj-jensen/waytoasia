@@ -92,6 +92,17 @@ test('Journey Designer capture is atomic, customer email archived and consultant
     const {onRequestPost:respond}=await import('../../functions/api/proposals/[token]/response');const publicToken=new URL(publicResult.proposalUrl).pathname.split('/').pop()!;
     assert.equal((await respond({env:fullEnv,params:{token:publicToken},request:new Request(`http://localhost/api/proposals/${publicToken}/response`,{method:'POST',headers:{'Content-Type':'application/json',Origin:'http://localhost'},body:JSON.stringify({action:'approve',note:'Looks great'})})})).status,303);
     assert.equal(sqlite.prepare("SELECT unread FROM activities WHERE body LIKE 'Customer approved%'").get()!.unread,1);assert.equal(sqlite.prepare('SELECT status FROM enquiry_proposals ORDER BY version DESC LIMIT 1').get()!.status,'Accepted');
+    const approvedStatus='Customer approved — awaiting confirmation';
+    const fileId=history[1].enquiry_id;
+    const detail=await(await call(env,`api/enquiries/${fileId}`)).json() as {enquiry:{status:string}};
+    assert.equal(detail.enquiry.status,approvedStatus);
+    const filtered=await(await call(env,`api/enquiries?status=${encodeURIComponent(approvedStatus)}`)).json() as {rows:{id:string}[]};
+    assert.equal(filtered.rows.length,1);assert.equal(filtered.rows[0].id,fileId);
+    assert.equal((await call(env,`api/enquiries/${fileId}/edit`,{status:approvedStatus,assigned:'staff@example.invalid'})).status,200);
+    assert.equal((await call(env,`api/enquiries/${fileId}/edit`,{status:'Confirmed'})).status,200);
+    assert.equal(sqlite.prepare('SELECT status FROM enquiries WHERE id=?').get(fileId as string)!.status,'Confirmed');
+    assert.equal(sqlite.prepare('SELECT customer_approved_at FROM enquiries WHERE id=?').get(fileId as string)!.customer_approved_at,null);
+
   }finally{globalThis.fetch=original}
 });
 
