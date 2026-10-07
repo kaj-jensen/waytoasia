@@ -35,7 +35,7 @@ export const onRequestPost=async({request,env}:PagesContext):Promise<Response>=>
     ]);
     if(hotelResult.status==='fulfilled'&&hotelResult.value.offers[0]?.productId){
       const first=hotelResult.value.offers[0];
-      try{const content=await adapter.hotelContent(first.productId,signal);for(const offer of hotelResult.value.offers)if(offer.productId===first.productId)offer.imageUrl=content?.imageUrl;}catch{/* Keep rates available when images fail. */}
+      try{const content=await adapter.hotelContent(first.productId,signal);for(const offer of hotelResult.value.offers)if(offer.productId===first.productId){offer.imageUrl=content?.imageUrl;offer.attributes.imageContentStatus=content?.status??'Content received';}}catch{/* Keep rates available when images fail. */}
     }
     const sections:HbxAvailabilitySection[]=[availabilitySection('accommodation',hotelResult),availabilitySection('activity',activityResult)];
     if(hotelResult.status==='fulfilled'&&hotelResult.value.offers[0]?.productId){

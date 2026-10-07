@@ -149,7 +149,7 @@ function activityOffers(raw:unknown,query:ActivitySearch):SupplierOffer[]{
           cancellation:cancellationTerms(rate.cancellationPolicies,asString(currency,query.currency)),retrievedAt:retrievedAt(),
           expiresAt:new Date(Date.now()+30*60*1000).toISOString(),recheckRequired:true,
           imageUrl:contentImage(content),
-          attributes:{modality:asString(modality.name),activityType:asString(activity.type),description:asString(content.description).replace(/<[^>]*>/g,'').slice(0,1200)},
+          attributes:{imageSources:asArray(asObject(content.media).images).flatMap(value=>asArray(asObject(value).urls).map(url=>{try{const u=new URL(asString(asObject(url).resource));return u.origin+u.pathname}catch{return ''}})).filter(Boolean).slice(0,3),modality:asString(modality.name),activityType:asString(activity.type),description:asString(content.description).replace(/<[^>]*>/g,'').slice(0,1200)},
         });
       }
     }
@@ -194,7 +194,7 @@ const hbxLocation=(location:TransferLocation):{type:string;code:string}=>{
 const localDateTime=(value:string):string=>value.replace(/(?:Z|[+-]\d{2}:\d{2})$/,'').slice(0,19);
 const language=(locale:string):string=>locale.toLowerCase().split('-')[0]||'en';
 
-export function createHbxSandboxAdapter(options:HbxAdapterOptions):SupplierSearchAdapter & {hotelContent:(productId:string,signal:AbortSignal)=>Promise<{imageUrl?:string;address:string;description:string}|undefined>}{
+export function createHbxSandboxAdapter(options:HbxAdapterOptions):SupplierSearchAdapter & {hotelContent:(productId:string,signal:AbortSignal)=>Promise<{imageUrl?:string;address:string;description:string;status?:number}|undefined>}{
   const base=new URL(options.baseUrl??DEFAULT_BASE_URL);
   if(base.protocol!=='https:'||base.hostname!=='api.test.hotelbeds.com')throw new HbxSandboxError('HBX evaluation traffic must use the official HTTPS test host.');
   const fetcher=options.fetcher??fetch;
@@ -221,7 +221,7 @@ export function createHbxSandboxAdapter(options:HbxAdapterOptions):SupplierSearc
       const credentials=options.credentials.accommodation;
       const signature=await createHbxSignature(credentials.apiKey,credentials.secret,Math.floor(now()/1000));
       const response=await fetcher(new URL(`/hotel-content-api/1.0/hotels/${productId}/details?language=ENG&useSecondaryLanguage=true`,base),{headers:{Accept:'application/json','Api-key':credentials.apiKey,'X-Signature':signature},signal});
-      if(!response.ok)return undefined;
+      if(!response.ok)return {address:'',description:'',status:response.status};
       const body=asObject(await response.json()),hotel=asObject(body.hotel);
       if(String(hotel.code)!==productId)return undefined;
       const images=asArray(hotel.images).map(asObject).sort((a,b)=>(asNumber(a.visualOrder)??999)-(asNumber(b.visualOrder)??999));
