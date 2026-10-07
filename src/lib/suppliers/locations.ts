@@ -6,7 +6,7 @@ const points=Object.entries(mapPlaces).flatMap(([country,places])=>Object.entrie
 points.push({id:'japan:Tokyo',country:'japan',name:'Tokyo',longitude:139.6917,latitude:35.6895},{id:'japan:Hakone',country:'japan',name:'Hakone',longitude:139.1,latitude:35.233333},{id:'japan:Kyoto',country:'japan',name:'Kyoto',longitude:135.7681,latitude:35.0116});
 /** Exact city names only: combined itinerary chapters need a consultant to resolve their overnight base. */
 export function hotelbedsLocation(place:string,countries:string[],overnightEvidence:string[]=[]):HbxLocation|undefined{
- const city=key(place.split(':').at(-1)||'');const explicit=place.includes(':')?key(place.split(':')[0]):'';
+ const city=key(place.split(':').at(-1)||'').replace(/\s+(?:&|and)\s+(?:surrounds|surroundings|environs)$/,'');const explicit=place.includes(':')?key(place.split(':')[0]):'';
  const gateway=Object.values(hbxGateways).find(g=>key(g.name)===city&&(countries.includes(g.country)||key(g.country.replaceAll('-',' '))===explicit));if(gateway)return gateway;
  const matches=points.filter(p=>key(p.name)===city&&(countries.includes(p.country)||key(p.country.replaceAll('-',' '))===explicit));if(matches.length===1)return matches[0];
  // A chapter can include day trips. Resolve its base only when the proposed hotels identify
