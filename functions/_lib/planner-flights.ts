@@ -29,8 +29,9 @@ export async function planFlights(token:string|undefined,profile:{departureAirpo
  const date=new Date(`${profile.travelStartDate}T00:00:00Z`);if(Number.isNaN(date.getTime()))return empty('needs-details');date.setUTCDate(date.getUTCDate()-1);
  const dates=[date.toISOString().slice(0,10),profile.travelStartDate!].filter(v=>v>=new Date().toISOString().slice(0,10));
  try{
-  const offers:FlightItinerary[]=[];
-  for(const departure of dates){offers.push(...await searchFlights(token,{origin,destination,returnOrigin,departure,returnDate:profile.travelEndDate,adults:profile.adults,cabin:'economy'}));}
+  // Search both departure dates concurrently; one failed search must not discard the other's offers.
+  const results=await Promise.allSettled(dates.map(departure=>searchFlights(token,{origin,destination,returnOrigin,departure,returnDate:profile.travelEndDate,adults:profile.adults,cabin:'economy'})));
+  const offers=results.flatMap(result=>result.status==='fulfilled'?result.value:[]);
   const matched=offers.filter(f=>f.slices.length===2&&f.slices[0][0].origin===origin&&f.slices[0].at(-1)?.destination===destination&&f.slices[0].at(-1)?.arrival.slice(0,10)===profile.travelStartDate&&f.slices[1][0].origin===returnOrigin&&f.slices[1][0].departure.slice(0,10)===profile.travelEndDate&&f.slices[1].at(-1)?.destination===origin);
   // Prefer fewer connections, then shorter total flying time. Never use sandbox prices to assess suitability.
   const duration=(f:FlightItinerary)=>f.slices.flat().reduce((n,s)=>{const match=s.duration.match(/^PT(?:(\d+)H)?(?:(\d+)M)?$/);return n+(match?Number(match[1]||0)*60+Number(match[2]||0):100000)},0);

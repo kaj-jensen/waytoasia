@@ -265,6 +265,8 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
     // issue (for example, naming a nearby day trip beside its overnight base).
     if(qualityIssues.length)console.warn('Trip suggestion retained after repair with quality advisories',{requestId,qualityIssues});
     if (!suggestion) throw new Error('Model response did not match the trip suggestion contract.');
+    // Pricing and flight searches use the completed route and can run independently.
+    const flightPlanning=planFlights(env.DUFFEL_TEST_TOKEN,profile,suggestion.route);
     let priceEstimate;
     if(env.TAVILY_API_KEY||travellerResearch.length){
       try{
@@ -285,7 +287,7 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
       }
     }
     suggestion={...suggestion,...(priceEstimate?{priceEstimate}:{}),hotelStays:suggestion.hotelStays.map(stay=>({...stay,options:stay.options.filter(option=>hotelOptionMatchesBudget(option,profile.budget))}))};
-    suggestion={...suggestion,flightPlanning:await planFlights(env.DUFFEL_TEST_TOKEN,profile,suggestion.route)};
+    suggestion={...suggestion,flightPlanning:await flightPlanning};
     return json({suggestion,requestId});
   } catch (error) {
     const message=error instanceof Error ? error.message : 'Unknown error';

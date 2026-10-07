@@ -37,3 +37,17 @@ test('Vietnam combined route names resolve gateways and disclose transfers',asyn
  globalThis.fetch=async(_url,init)=>{calls++;const data=JSON.parse(String(init?.body)).data;assert.equal(data.slices[0].destination,'HAN');assert.equal(data.slices[1].origin,'SGN');const segment=offer.slices[0].segments[0];return Response.json({data:{live_mode:false,offers:[{...offer,id:`off_vietnam${calls}`,slices:[{segments:[{...segment,destination:{iata_code:'HAN'},departing_at:'2026-11-07T14:00:00',arriving_at:'2026-11-08T06:00:00'}]},{segments:[{...segment,origin:{iata_code:'SGN'},destination:{iata_code:'CPH'},departing_at:'2026-11-20T12:00:00',arriving_at:'2026-11-20T20:00:00'}]}]}]}})};
  try{const result=await planFlights('duffel_test_example',{departureAirport:'CPH',travelStartDate:'2026-11-08',travelEndDate:'2026-11-20',adults:2,children:0},[{place:'Vietnam: Hanoi & Ninh Binh'},{place:'Vietnam: Mekong Delta'}]);assert.equal(result.status,'test-results');assert.equal(calls,2);assert.deepEqual(result.transfers,[{place:'Vietnam: Mekong Delta',airport:'SGN'}]);}finally{globalThis.fetch=original}
 });
+
+test('departure date searches overlap and keep valid offers if one request fails',async()=>{
+ const {planFlights}=await import('../functions/_lib/planner-flights');
+ const original=globalThis.fetch;let calls=0;let release!:()=>void;
+ const bothStarted=new Promise<void>(resolve=>{release=resolve});
+ globalThis.fetch=async()=>{
+  const call=++calls;if(calls===2)release();
+  await Promise.race([bothStarted,new Promise((_,reject)=>setTimeout(()=>reject(Error('searches ran sequentially')),500))]);
+  if(call===1)return new Response('',{status:502});
+  const segment=offer.slices[0].segments[0];
+  return Response.json({data:{live_mode:false,offers:[{...offer,slices:[offer.slices[0],{segments:[{...segment,origin:{iata_code:'BKK'},destination:{iata_code:'CPH'},departing_at:'2027-02-24T12:00:00',arriving_at:'2027-02-24T20:00:00'}]}]}]}});
+ };
+ try{const result=await planFlights('duffel_test_example',{departureAirport:'CPH',travelStartDate:'2027-02-11',travelEndDate:'2027-02-24',adults:2,children:0},[{place:'Bangkok'}]);assert.equal(calls,2);assert.equal(result.status,'test-results');}finally{globalThis.fetch=original}
+});
