@@ -20,7 +20,7 @@ export function normalizeComponents(value:unknown,currency:string):Components|nu
  const v=value as Record<string,unknown>,costCurrency=currencyCode(v.costCurrency||currency),fxRate=rate(v.fxRate,costCurrency,currency);
  const result={costCurrency,fxRate} as Components;
  for(const key of ['priceBase','supplierCost','markup','serviceFee','discount','commission','otherCost','paymentCost'] as const){
-  if((key==='priceBase'||key==='supplierCost')&&(v[key]===''||v[key]===undefined))throw Error('Enter both the base customer price and supplier cost, or leave this version unpriced.');
+  if((key==='priceBase'||key==='supplierCost')&&(v[key]===''||v[key]===undefined||v[key]===null))throw Error('Enter both the base customer price and supplier cost, or leave this version unpriced.');
   result[key]=minor(v[key]??'0',['supplierCost','commission'].includes(key)?costCurrency:currency);
  }
  if(result.discount<0||result.paymentCost<0||result.otherCost<0)throw Error('Discount and additional costs must be zero or positive. Use a negative price or supplier cost for credits.');
@@ -39,7 +39,7 @@ export function summarize(items:FinanceItem[],currency:string,basis:'quote'|'act
  return {...totals,margin:totals.revenue>0?totals.earnings/totals.revenue*100:null,unpriced:lines.filter(i=>!i.values).length,priced:lines.filter(i=>i.values).length,count:active.length,categories,lines};
 }
 export function paymentSummary(payments:Payment[],summary:ReturnType<typeof summarize>,today=new Date().toISOString().slice(0,10)){
- const active=payments.filter(p=>!p.voided),sum=(kind:string)=>active.filter(p=>p.kind===kind).reduce((n,p)=>n+p.file_amount_minor,0);
+ const active=payments.filter(p=>!p.voided),sum=(kind:string)=>active.filter(p=>p.kind===kind).reduce((n,p)=>{const total=n+p.file_amount_minor;if(!Number.isSafeInteger(total))throw Error('Payment total exceeds the supported range.');return total},0);
  const invoiced=sum('invoice')-sum('credit_note'),paid=sum('receipt')-sum('refund'),supplierPaid=sum('supplier_payment')-sum('supplier_refund');
  const invoiceBalance=invoiced-paid,outstanding=summary.revenue-paid,supplierBalance=summary.supplierCost-summary.commission-supplierPaid;
  const overdueInvoices=active.filter(p=>p.kind==='invoice'&&p.due_date&&p.due_date<today).sort((a,b)=>a.due_date.localeCompare(b.due_date));

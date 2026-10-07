@@ -16,7 +16,7 @@ test('single calculation handles components, zero prices, negative margins and d
  assert.equal(calculate(normalizeComponents({priceBase:100,supplierCost:120},'EUR')!,'EUR').earnings,-2000);
  assert.equal(calculate(normalizeComponents({priceBase:-100,supplierCost:-80},'EUR')!,'EUR').earnings,-2000);
  assert.throws(()=>normalizeComponents({priceBase:10,supplierCost:5,discount:-1},'EUR'));
- assert.throws(()=>normalizeComponents({priceBase:'',supplierCost:0},'EUR'));
+ assert.throws(()=>normalizeComponents({priceBase:'',supplierCost:0},'EUR'));assert.throws(()=>normalizeComponents({priceBase:null,supplierCost:0},'EUR'));
 });
 test('ISO currency precision and explicit FX are respected',()=>{
  assert.equal(minor('1.01','EUR'),101);assert.equal(minor('125','JPY'),125);assert.equal(minor('1.234','KWD'),1234);assert.throws(()=>minor('1.01','JPY'));assert.throws(()=>minor('1.234','EUR'));
