@@ -1,6 +1,6 @@
-import {routeGateway,type AirportStop} from './airport-routing';
+import {routeGateway,airportLabel,type AirportStop} from './airport-routing';
 import {duffelReady,searchFlights,type FlightItinerary} from './duffel';
-export interface PlannerFlights {status:'not-connected'|'needs-details'|'unavailable'|'test-results';offers:FlightItinerary[];issues?:string[];transfers?:Array<{place:string;airport:string}>}
+export interface PlannerFlights {status:'not-connected'|'needs-details'|'unavailable'|'test-results';offers:FlightItinerary[];issues?:string[];transfers?:Array<{place:string;airport:string;airportName?:string}>}
 // Explicit airport aliases only. Ambiguous city names are left for the traveller to clarify.
 const airports:Record<string,string>={copenhagen:'CPH',københavn:'CPH',oslo:'OSL',helsinki:'HEL',amsterdam:'AMS',frankfurt:'FRA',zurich:'ZRH',zürich:'ZRH',vienna:'VIE',wien:'VIE',budapest:'BUD',bangkok:'BKK',chiangmai:'CNX',phuket:'HKT',hanoi:'HAN',hochiminhcity:'SGN',saigon:'SGN',danang:'DAD',singapore:'SIN',seoul:'ICN',busan:'PUS',jeju:'CJU',tokyo:'HND',osaka:'KIX',beijing:'PEK',shanghai:'PVG',hongkong:'HKG',bali:'DPS',denpasar:'DPS',jakarta:'CGK',manila:'MNL',kualalumpur:'KUL',taipei:'TPE'};
 export function resolveAirport(value:unknown):string {if(typeof value!=='string')return '';const explicit=value.match(/\(([A-Z]{3})\)/i);if(explicit)return explicit[1].toUpperCase();const name=value.split(':').at(-1)!.trim();const code=name.toUpperCase();if(/^[A-Z]{3}$/.test(code))return code;return airports[name.toLowerCase().replace(/[^\p{L}]/gu,'')]||'';}
@@ -21,10 +21,10 @@ export function resolveRouteAirport(value:string):{airport:string;transfer:boole
 export async function planFlights(token:string|undefined,profile:{departureAirport?:string;travelStartDate?:string;travelEndDate?:string;adults:number;children:number},route:AirportStop[]):Promise<PlannerFlights>{
  const empty=(status:PlannerFlights['status']):PlannerFlights=>({status,offers:[]});
  if(!duffelReady(token))return empty('not-connected');
- const pick=(stop:AirportStop|undefined,position:'arrival'|'return')=>{if(!stop)return {airport:'',transfer:false};const legacy=resolveRouteAirport(stop.place);return stop.airportCode?routeGateway(stop,position):legacy.airport?legacy:routeGateway(stop,position);};
+ const pick=(stop:AirportStop|undefined,position:'arrival'|'return')=>{if(!stop)return {airport:'',transfer:false};const legacy=resolveRouteAirport(stop.place);return stop.airportCode?routeGateway(stop,position):legacy.airport?routeGateway({...stop,airportCode:legacy.airport,airportTransfer:legacy.transfer},position):routeGateway(stop,position);};
  const first=pick(route[0],'arrival'),last=pick(route.at(-1),'return');
  const origin=resolveAirport(profile.departureAirport)||routeGateway({place:profile.departureAirport||''},'arrival').airport,destination=first.airport,returnOrigin=last.airport;
- const transfers=[...(first.transfer?[{place:route[0].place,airport:destination}]:[]),...(last.transfer?[{place:route.at(-1)!.place,airport:returnOrigin}]:[])];
+ const transfers=[...(first.transfer?[{place:route[0].place,airport:destination,airportName:airportLabel(destination)}]:[]),...(last.transfer?[{place:route.at(-1)!.place,airport:returnOrigin,airportName:airportLabel(returnOrigin)}]:[])];
  const issues=[...(!origin?['departure']:[]),...(!destination?['arrival']:[]),...(!returnOrigin?['return']:[]),...(!profile.travelStartDate||!profile.travelEndDate?['dates']:[]),...(profile.children||profile.adults>9?['party']:[])];
  if(issues.length)return {...empty('needs-details'),issues};
  // The brief specifies arrival in Asia. Check same-day departures and overnight travel the preceding day.

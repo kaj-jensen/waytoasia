@@ -35,7 +35,7 @@ test('Vietnam combined route names resolve gateways and disclose transfers',asyn
  assert.equal(resolveRouteAirport('Hanoi & Ho Chi Minh City').airport,'');
  const original=globalThis.fetch;let calls=0;
  globalThis.fetch=async(_url,init)=>{calls++;const data=JSON.parse(String(init?.body)).data;assert.equal(data.slices[0].destination,'HAN');assert.equal(data.slices[1].origin,'SGN');const segment=offer.slices[0].segments[0];return Response.json({data:{live_mode:false,offers:[{...offer,id:`off_vietnam${calls}`,slices:[{segments:[{...segment,destination:{iata_code:'HAN'},departing_at:'2026-11-07T14:00:00',arriving_at:'2026-11-08T06:00:00'}]},{segments:[{...segment,origin:{iata_code:'SGN'},destination:{iata_code:'CPH'},departing_at:'2026-11-20T12:00:00',arriving_at:'2026-11-20T20:00:00'}]}]}]}})};
- try{const result=await planFlights('duffel_test_example',{departureAirport:'CPH',travelStartDate:'2026-11-08',travelEndDate:'2026-11-20',adults:2,children:0},[{place:'Vietnam: Hanoi & Ninh Binh'},{place:'Vietnam: Mekong Delta'}]);assert.equal(result.status,'test-results');assert.equal(calls,2);assert.deepEqual(result.transfers,[{place:'Vietnam: Mekong Delta',airport:'SGN'}]);}finally{globalThis.fetch=original}
+ try{const result=await planFlights('duffel_test_example',{departureAirport:'CPH',travelStartDate:'2026-11-08',travelEndDate:'2026-11-20',adults:2,children:0},[{place:'Vietnam: Hanoi & Ninh Binh'},{place:'Vietnam: Mekong Delta'}]);assert.equal(result.status,'test-results');assert.equal(calls,2);assert.deepEqual(result.transfers?.map(({place,airport})=>({place,airport})),[{place:'Vietnam: Mekong Delta',airport:'SGN'}]);}finally{globalThis.fetch=original}
 });
 
 test('departure date searches overlap and keep valid offers if one request fails',async()=>{
