@@ -10,7 +10,7 @@ const json = (body: unknown, status = 200, extraHeaders: Record<string,string> =
 const researchDomains=['reddit.com','tripadvisor.com','booking.com','agoda.com','hotels.com','expedia.com','viator.com','getyourguide.com','fodors.com','lonelyplanet.com','travel.stackexchange.com','wise.com','xe.com'];
 
 type OpenAiOutput={type?:unknown;content?:unknown;action?:unknown};
-type OpenAiResponse={status?:unknown;output?:OpenAiOutput[];error?:{message?:unknown};incomplete_details?:unknown};
+type OpenAiResponse={status?:unknown;output?:OpenAiOutput[];error?:{message?:unknown;code?:unknown;param?:unknown};incomplete_details?:unknown};
 type TavilyResponse={results?:Array<{title?:unknown;url?:unknown;content?:unknown}>};
 
 const citationKey=(value:string):string=>{
@@ -195,21 +195,22 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
   if (!env.OPENAI_API_KEY) return json({error:'The trip suggestion agent is not connected yet. Please try again later.',code:'AI_NOT_CONFIGURED'},503);
 
   const requestId = crypto.randomUUID();
+  let generationStage='research';
   try {
     // Retrieve sources first, then let OpenAI compose from that bounded evidence.
     // This is much faster and more predictable than a long agentic search call.
     const tavilyResearch=env.TAVILY_API_KEY?await researchWithTavily(profile,env.TAVILY_API_KEY):[];
-    const modelDeadline=AbortSignal.timeout(82000);
+    generationStage='model';
     const userPayload=refinement?{task:'revise_itinerary',travellerProfile:profile,currentItinerary:refinement.currentSuggestion,travellerRefinement:refinement.instruction,verifiedResearchSources:tavilyResearch,wayToAsiaCatalogue:tripCatalogForAgent()}:{task:'create_itinerary',travellerProfile:profile,verifiedResearchSources:tavilyResearch,wayToAsiaCatalogue:tripCatalogForAgent()};
     const callOpenAi=async(input:unknown,useWebSearch:boolean,options?:{schema?:unknown;name?:string;maxTokens?:number;reasoning?:'none'|'low'}):Promise<OpenAiResponse>=>{
       const model=useWebSearch?'gpt-5.4-mini':env.OPENAI_MODEL||'gpt-4.1-mini';
-      const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model,store:false,...(model.startsWith('gpt-5')?{reasoning:{effort:options?.reasoning??'low'}}:{}),instructions:systemPrompt,input:JSON.stringify(input),max_output_tokens:options?.maxTokens??12000,text:{format:{type:'json_schema',name:options?.name??'trip_suggestion',strict:true,schema:options?.schema??tripSuggestionJsonSchema}},...(useWebSearch?{tools:[{type:'web_search',filters:{allowed_domains:researchDomains},search_context_size:'medium'}],tool_choice:'required',include:['web_search_call.action.sources']}:{})}),signal:modelDeadline});
+      const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model,store:false,...(model.startsWith('gpt-5')?{reasoning:{effort:options?.reasoning??'low'}}:{}),instructions:systemPrompt,input:JSON.stringify(input),max_output_tokens:options?.maxTokens??12000,text:{format:{type:'json_schema',name:options?.name??'trip_suggestion',strict:true,schema:options?.schema??tripSuggestionJsonSchema}},...(useWebSearch?{tools:[{type:'web_search',filters:{allowed_domains:researchDomains},search_context_size:'medium'}],tool_choice:'required',include:['web_search_call.action.sources']}:{})}),signal:AbortSignal.timeout(70000)});
       const payload=await response.json().catch(()=>({})) as OpenAiResponse;
       if(!response.ok){
         const detail=typeof payload.error?.message==='string'?payload.error.message:`OpenAI returned ${response.status}`;
-        throw Object.assign(new Error(detail),{status:response.status,retryAfter:response.headers.get('retry-after')});
+        throw Object.assign(new Error(detail),{status:response.status,retryAfter:response.headers.get('retry-after'),phase:options?.name??'trip_suggestion',diagnosticCode:typeof payload.error?.code==='string'?payload.error.code:'AI_HTTP_ERROR'});
       }
-      if(payload.status&&payload.status!=='completed')throw new Error(`OpenAI response was ${String(payload.status)}.`);
+      if(payload.status&&payload.status!=='completed')throw Object.assign(new Error(`OpenAI response was ${String(payload.status)}.`),{phase:options?.name??'trip_suggestion',diagnosticCode:payload.status==='incomplete'?'AI_INCOMPLETE':'AI_RESPONSE_FAILED'});
       return payload;
     };
     let initial:OpenAiResponse;
@@ -230,11 +231,11 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
       const chunks=Array.from({length:Math.ceil(profile.durationDays/dayChunkSize)},(_,index)=>({start:index*dayChunkSize+1,end:Math.min(profile.durationDays,(index+1)*dayChunkSize)}));
       const hotelSchema={type:'object',additionalProperties:false,properties:{hotelStays:{...strictHotelStayProperty,minItems:routeCount,maxItems:routeCount}},required:['hotelStays']};
       const [hotelResponse,...dayResponses]=await Promise.all([
-        callOpenAi({task:'create_hotel_stays',travellerProfile:profile,route:core.route,verifiedResearchSources:tavilyResearch,requiredHotelStandard:requestedHotelStandard,instruction:`Return one hotel stay for every route chapter, in the identical order, with exactly two choices. ${hotelInstruction}`},false,{schema:hotelSchema,name:'trip_hotels',maxTokens:Math.min(4500,1200+routeCount*650),reasoning:'none'}),
+        callOpenAi({task:'create_hotel_stays',travellerProfile:profile,route:core.route,verifiedResearchSources:tavilyResearch,requiredHotelStandard:requestedHotelStandard,instruction:`Return one hotel stay for every route chapter, in the identical order, with exactly two choices. ${hotelInstruction}`},false,{schema:hotelSchema,name:'trip_hotels',maxTokens:Math.min(9000,1800+routeCount*1200),reasoning:'none'}),
         ...chunks.map(({start,end})=>{
         const count=end-start+1;
         const daySchema={type:'object',additionalProperties:false,properties:{dayPlans:{...dayPlanProperty,minItems:count,maxItems:count}},required:['dayPlans']};
-        return callOpenAi({task:'create_day_plan_chunk',travellerProfile:profile,route:core.route,dayRange:{start,end},verifiedResearchSources:tavilyResearch,instruction:'Return each requested day exactly once, with exactly two specific selectable options per day.'},false,{schema:daySchema,name:`trip_days_${start}_${end}`,maxTokens:Math.min(4200,1000+count*500),reasoning:'none'});
+        return callOpenAi({task:'create_day_plan_chunk',travellerProfile:profile,route:core.route,dayRange:{start,end},verifiedResearchSources:tavilyResearch,instruction:'Return each requested day exactly once, with exactly two specific selectable options per day.'},false,{schema:daySchema,name:`trip_days_${start}_${end}`,maxTokens:Math.min(9000,1500+count*1200),reasoning:'none'});
       })]);
       const hotelChunk=JSON.parse(outputTextFromOpenAi(hotelResponse)) as {hotelStays?:unknown[]};
       const hotelStays=Array.isArray(hotelChunk.hotelStays)?hotelChunk.hotelStays:[];
@@ -249,6 +250,7 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
       travellerResearch=sourcesFromOpenAi(initial);
       parsed=JSON.parse(outputTextFromOpenAi(initial)) as unknown;
     }
+    generationStage='normalize';
     parsed=reconcileDraftCitations(parsed,travellerResearch);
     let suggestion=normalizeTripSuggestion(parsed,profile.locale,new Date(),profile.durationDays,travellerResearch);
     let qualityIssues=assessTripSuggestionQuality(parsed,profile,travellerResearch);
@@ -270,6 +272,7 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
     if(qualityIssues.length)console.warn('Trip suggestion retained after repair with quality advisories',{requestId,qualityIssues});
     if (!suggestion) throw new Error('Model response did not match the trip suggestion contract.');
     // Pricing and flight searches use the completed route and can run independently.
+    generationStage='supplier';
     const supplierPlanning=enrichWithHotelbeds(env,profile,suggestion);
     const flightPlanning=planFlights(env.DUFFEL_TEST_TOKEN,profile,suggestion.route);
     let priceEstimate;
@@ -305,7 +308,8 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
     const retryAfter=typeof error==='object'&&error&&'retryAfter' in error&&typeof (error as {retryAfter:unknown}).retryAfter==='string'?(error as {retryAfter:string}).retryAfter:'60';
     if(status===429)return json({error:'The trip agent is busy or has reached its configured usage limit. Please try again shortly.',code:'AI_LIMIT',requestId},429,{'Retry-After':retryAfter});
     if(status===401||status===403)return json({error:'The trip suggestion agent needs an account configuration update.',code:'AI_NOT_CONFIGURED',requestId},503);
-    return json({error:'We could not prepare a suggestion just now. Please try again.',requestId},502);
+    const diagnostic=error as {phase?:string;diagnosticCode?:string};
+    return json({error:'We could not prepare a suggestion just now. Please try again.',requestId,code:diagnostic.diagnosticCode??(error instanceof Error&&error.name==='TimeoutError'?'GENERATION_TIMEOUT':'GENERATION_FAILED'),phase:diagnostic.phase??generationStage},502);
   }
 };
 
