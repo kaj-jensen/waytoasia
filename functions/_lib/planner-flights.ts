@@ -1,16 +1,33 @@
 import {duffelReady,searchFlights,type FlightItinerary} from './duffel';
-export interface PlannerFlights {status:'not-connected'|'needs-details'|'unavailable'|'test-results';offers:FlightItinerary[]}
+export interface PlannerFlights {status:'not-connected'|'needs-details'|'unavailable'|'test-results';offers:FlightItinerary[];issues?:string[];transfers?:Array<{place:string;airport:string}>}
 // Explicit airport aliases only. Ambiguous city names are left for the traveller to clarify.
 const airports:Record<string,string>={copenhagen:'CPH',københavn:'CPH',oslo:'OSL',helsinki:'HEL',amsterdam:'AMS',frankfurt:'FRA',zurich:'ZRH',zürich:'ZRH',vienna:'VIE',wien:'VIE',budapest:'BUD',bangkok:'BKK',chiangmai:'CNX',phuket:'HKT',hanoi:'HAN',hochiminhcity:'SGN',saigon:'SGN',danang:'DAD',singapore:'SIN',seoul:'ICN',busan:'PUS',jeju:'CJU',tokyo:'HND',osaka:'KIX',beijing:'PEK',shanghai:'PVG',hongkong:'HKG',bali:'DPS',denpasar:'DPS',jakarta:'CGK',manila:'MNL',kualalumpur:'KUL',taipei:'TPE'};
 export function resolveAirport(value:unknown):string {if(typeof value!=='string')return '';const explicit=value.match(/\(([A-Z]{3})\)/i);if(explicit)return explicit[1].toUpperCase();const name=value.split(':').at(-1)!.trim();const code=name.toUpperCase();if(/^[A-Z]{3}$/.test(code))return code;return airports[name.toLowerCase().replace(/[^\p{L}]/gu,'')]||'';}
+// Gateways for places without a suitable international airport. Transfers are shown explicitly.
+const gateways:Record<string,string>={mekongdelta:'SGN',hoian:'DAD',ninhbinh:'HAN',halongbay:'HAN',ubud:'DPS',seogwipo:'CJU'};
+export function resolveRouteAirport(value:string):{airport:string;transfer:boolean}{
+ const exact=resolveAirport(value);if(exact)return {airport:exact,transfer:false};
+ const name=value.split(':').at(-1)!.toLowerCase().normalize('NFD').replace(/\p{M}/gu,'');
+ const compact=name.replace(/[^\p{L}]/gu,'');
+ for(const [place,airport] of Object.entries(gateways))if(compact===place)return {airport,transfer:true};
+ const candidates=Object.entries(airports).filter(([alias])=>{
+  const words=alias==='hochiminhcity'?'ho chi minh city':alias==='chiangmai'?'chiang mai':alias==='danang'?'da nang':alias==='hongkong'?'hong kong':alias==='kualalumpur'?'kuala lumpur':alias;
+  return new RegExp(`(^|[^\\p{L}])${words}([^\\p{L}]|$)`,'u').test(name);
+ }).map(([,airport])=>airport);
+ const unique=[...new Set(candidates)];
+ return {airport:unique.length===1?unique[0]:'',transfer:false};
+}
 export async function planFlights(token:string|undefined,profile:{departureAirport?:string;travelStartDate?:string;travelEndDate?:string;adults:number;children:number},route:Array<{place:string}>):Promise<PlannerFlights>{
  const empty=(status:PlannerFlights['status']):PlannerFlights=>({status,offers:[]});
  if(!duffelReady(token))return empty('not-connected');
- const origin=resolveAirport(profile.departureAirport),destination=resolveAirport(route[0]?.place),returnOrigin=resolveAirport(route.at(-1)?.place);
- if(!origin||!destination||!returnOrigin||!profile.travelStartDate||!profile.travelEndDate||profile.children||profile.adults>9)return empty('needs-details');
+ const first=resolveRouteAirport(route[0]?.place||''),last=resolveRouteAirport(route.at(-1)?.place||'');
+ const origin=resolveAirport(profile.departureAirport),destination=first.airport,returnOrigin=last.airport;
+ const transfers=[...(first.transfer?[{place:route[0].place,airport:destination}]:[]),...(last.transfer?[{place:route.at(-1)!.place,airport:returnOrigin}]:[])];
+ const issues=[...(!origin?['departure']:[]),...(!destination?['arrival']:[]),...(!returnOrigin?['return']:[]),...(!profile.travelStartDate||!profile.travelEndDate?['dates']:[]),...(profile.children||profile.adults>9?['party']:[])];
+ if(issues.length)return {...empty('needs-details'),issues};
  // The brief specifies arrival in Asia. Check same-day departures and overnight travel the preceding day.
  const date=new Date(`${profile.travelStartDate}T00:00:00Z`);if(Number.isNaN(date.getTime()))return empty('needs-details');date.setUTCDate(date.getUTCDate()-1);
- const dates=[date.toISOString().slice(0,10),profile.travelStartDate].filter(v=>v>=new Date().toISOString().slice(0,10));
+ const dates=[date.toISOString().slice(0,10),profile.travelStartDate!].filter(v=>v>=new Date().toISOString().slice(0,10));
  try{
   const offers:FlightItinerary[]=[];
   for(const departure of dates){offers.push(...await searchFlights(token,{origin,destination,returnOrigin,departure,returnDate:profile.travelEndDate,adults:profile.adults,cabin:'economy'}));}
@@ -19,6 +36,6 @@ export async function planFlights(token:string|undefined,profile:{departureAirpo
   const duration=(f:FlightItinerary)=>f.slices.flat().reduce((n,s)=>{const match=s.duration.match(/^PT(?:(\d+)H)?(?:(\d+)M)?$/);return n+(match?Number(match[1]||0)*60+Number(match[2]||0):100000)},0);
   matched.sort((a,b)=>a.slices.flat().length-b.slices.flat().length||duration(a)-duration(b));
   const unique=matched.filter((f,i,all)=>all.findIndex(v=>v.offerId===f.offerId)===i).slice(0,3);
-  return unique.length?{status:'test-results',offers:unique}:empty('unavailable');
+  return unique.length?{status:'test-results',offers:unique.map(f=>({...f,transfers})),transfers}:empty('unavailable');
  }catch{return empty('unavailable')}
 }
