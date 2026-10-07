@@ -13,10 +13,10 @@ export function enquiryServices(requirements:string,snapshot='',proposalPrice=''
  const catalogue=enquiryTourPrice(requirements),tour=tours.find(t=>t.slug===catalogue?.slug),services:EnquiryService[]=[];
  const add=(key:string,type:string,description:string,status:string,detail='',supplier='',p:ServicePrice|null=null)=>{if(description)services.push({key,type,description,supplier,status,detail,price:p})};
  if(tour&&catalogue){
-  add('tour:'+tour.slug,'Tours',tour.name,'Published guide',catalogue.partyNote,'',price(catalogue.currency,catalogue.partyTotal??catalogue.perPerson,catalogue.partyTotal??catalogue.perPerson,catalogue.partyTotal!==null?'party total · from':'per person · from'));
+  add('tour:'+tour.slug,'Tours',tour.name,'Published tour price',catalogue.partyNote,'',price(catalogue.currency,catalogue.partyTotal??catalogue.perPerson,catalogue.partyTotal??catalogue.perPerson,catalogue.partyTotal!==null?'party total · from':'per person · from'));
   for(const [i,stay] of (tour.accommodation||[]).entries())add('catalogue-hotel:'+i,'Hotels',`${stay.place} · ${stay.style}`,'Included in package',`${stay.nights} nights · No separate hotel price is published.`);
   if(!services.some(s=>s.type==='Hotels')&&tour.includes.some(s=>/accommodation|hotel/i.test(s)))add('catalogue-hotels','Hotels','Accommodation in the tour','Included in package','Hotel names and separate rates require a supplier quote.');
-  for(const [i,entry] of tour.includes.entries())if(!/accommodation|hotel/i.test(entry))add('catalogue-included:'+i,/transport|transfer/i.test(entry)?'Transfers':/guide/i.test(entry)?'Guides':/tour|excursion|activit/i.test(entry)?'Activities':'Other',entry,'Included in package','Already covered by the tour guide price; not an extra charge.');
+  for(const [i,entry] of tour.includes.entries())if(!/accommodation|hotel/i.test(entry))add('catalogue-included:'+i,/transport|transfer/i.test(entry)?'Transfers':/guide/i.test(entry)?'Guides':/tour|excursion|activit/i.test(entry)?'Activities':'Other',entry,'Included in package','Already covered by the published tour price; not an extra charge.');
   for(const [i,entry] of tour.excludes.entries())add('catalogue-excluded:'+i,/flight/i.test(entry)?'Flights':/insurance/i.test(entry)?'Insurance':'Other',entry,'Excluded from package','Arrange and price separately if required.');
  }
  for(const [i,stay] of list(suggestion.hotelStays).entries()){
