@@ -15,6 +15,9 @@ test('financial workflow persists, drills down, exports and fits mobile',async({
  await page.getByRole('button',{name:'Quoted / expected',exact:true}).click();await expect(page.locator('[data-basis=quote]')).toHaveAttribute('aria-pressed','true');
  const downloadPromise=page.waitForEvent('download');await page.getByRole('link',{name:'Export CSV'}).click();const download=await downloadPromise;expect(download.suggestedFilename()).toContain('internal-finance-quote.csv');
  await page.getByRole('link',{name:'Back to enquiry',exact:true}).click();
+ await expect(page.getByRole('tab',{name:'Trip overview',exact:true})).toHaveAttribute('aria-selected','true');
+ await expect(page.locator('#enquiry-finances')).toBeHidden();
+ await page.getByRole('tab',{name:'Finance',exact:true}).click();
  await expect(page.getByRole('heading',{name:'This file’s finances',exact:true})).toBeVisible();
  await expect(page.locator('#enquiry-finances .finance-kpi')).toHaveCount(5);
  await page.getByText('Individual item earnings (7)',{exact:true}).click();
@@ -44,6 +47,9 @@ test('existing tour enquiry automatically shows its published DKK price and hone
  sqlite.prepare('INSERT INTO clients VALUES (?,?,?,?,?)').run(id,`catalogue-${id}@example.invalid`,'Published tour price test','',now);
  sqlite.prepare('INSERT INTO enquiries (id,reference,client_id,source,requirements_json,original_message,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)').run(id,'TEST-'+id,id,'Synthetic test',JSON.stringify({tour:'silk-and-courtyards',adults:'2',children:'0',budgetCurrency:'DKK'}),'Synthetic price verification',now,now);sqlite.close();
  await page.goto('/preview-login');await page.goto('/dashboard#'+e.id);
+ await expect(page.locator('#enquiry-finance-summary')).toContainText('98,400');
+ await expect(page.getByRole('heading',{name:'Published tour programme'})).toBeVisible();
+ await page.getByRole('tab',{name:'Finance',exact:true}).click();
  await expect(page.locator('#enquiry-finances .finance-published')).toContainText('DKK 49,200.00');
  await expect(page.locator('#enquiry-finances .finance-kpi').first()).toContainText('DKK 98,400.00');
  await expect(page.locator('#enquiry-finances .featured')).toContainText('Not yet known');
@@ -63,4 +69,14 @@ test('existing tour enquiry automatically shows its published DKK price and hone
  await expect(row).toContainText('Not recorded');
  await page.screenshot({path:'/tmp/waytoasia-all-files.png',fullPage:true});
  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+});
+test('enquiry opens on a clear selected trip with finance and communication in separate tabs',async({page})=>{
+ test.skip(!test.info().config.configFile?.endsWith('playwright.finance.config.ts'),'Uses synthetic dashboard server.');
+ await page.goto('/preview-login');const rows=await (await page.request.get('/dashboard/api/enquiries')).json(),id=rows.rows[0].id;
+ const payload={suggestion:{title:'Bangkok and Chiang Mai',summary:'A relaxed cultural journey.',route:[{place:'Bangkok',onwardTravel:'Express bus to Chiang Mai'},{place:'Chiang Mai'}],hotelStays:[{place:'Bangkok',nights:3,options:[{id:'hotel-a',name:'Selected Bangkok Hotel',roomGuidance:'Deluxe twin room'}]}],dayPlans:[{day:1,place:'Bangkok',options:[{id:'activity-a',name:'Temple walk',description:'Guided visit to the temples.'}]}]},builderChoices:{hotels:{'stay-0':'hotel-a'},days:{'day-1':'activity-a'}}};
+ await page.route('**/dashboard/api/enquiries/'+id,async route=>{const response=await route.fetch(),body=await response.json();body.proposals=[{id:'synthetic-proposal',version:1,title:'Bangkok and Chiang Mai',status:'Sent',url:'https://example.invalid/proposal',snapshot_json:JSON.stringify({payload}),created_at:new Date().toISOString()}];await route.fulfill({response,json:body})});
+ await page.goto('/dashboard#'+id);await expect(page.locator('.quoted-trip')).toContainText('Selected Bangkok Hotel');await expect(page.locator('.quoted-trip')).toContainText('Temple walk');await expect(page.locator('.quoted-trip')).toContainText('Express bus to Chiang Mai');await expect(page.locator('#enquiry-finances')).toBeHidden();await expect(page.locator('#edit-form')).toBeVisible();
+ await page.screenshot({path:'/tmp/waytoasia-trip-tabs.png',fullPage:true});
+ await page.getByRole('tab',{name:'Communication',exact:true}).click();await expect(page.locator('#send-form')).toBeVisible();await expect(page.locator('#note-form')).toBeVisible();await expect(page.locator('.quoted-trip')).toBeHidden();
+ await page.getByRole('tab',{name:'Trip overview',exact:true}).click();await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
 });

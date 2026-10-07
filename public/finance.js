@@ -55,6 +55,7 @@
   catch(error){if(root.isConnected){root.innerHTML=`<h2>This file’s finances</h2><p role="alert">${esc(error.message)}</p><button data-retry>Retry financial details</button>`;root.querySelector('[data-retry]').onclick=()=>enquiry(id,root)}}
  }
  function renderEnquiry(root){
+  const compact=document.querySelector('#enquiry-finance-summary');if(compact){const d=data,s=d.actual;compact.textContent=(s.priced?'Recorded customer price: ':d.tourPrice?'Published tour price from: ':'Estimated trip price: ')+(s.priced?amount(s.revenue,d.file.currency):emptyFigure('Customer price',d))+' · Earnings: '+(s.priced?amount(s.earnings,d.file.currency):'Costs pending');}
   const d=data,c=d.file.currency,s=d[basis],p=basis==='actual'?d.paymentActual:d.paymentQuote,expanded=root.querySelector('details')?.open||false;
   root.innerHTML=`<div class="heading"><div><p class="eyebrow">File earnings · ${esc(d.enquiry.reference)}</p><h2>This file’s finances</h2><p class="muted">${d.file.is_demo?'DEMO · Synthetic figures. ':''}Earnings for this enquiry, before any agent remuneration.</p></div><a class="button" href="#finance/${esc(d.enquiry.id)}">Full financial workspace ↗</a></div>
   <div class="finance-toolbar"><div class="finance-tabs" aria-label="Enquiry financial basis">${['quote','actual'].map(b=>`<button data-inline-basis="${b}" aria-pressed="${basis===b}">${b==='quote'?'Quoted / expected':'Actual / recorded'}</button>`).join('')}</div><span class="badge">${esc(d.file.status)} · ${esc(p.status)}</span></div>

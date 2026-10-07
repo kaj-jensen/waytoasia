@@ -1,3 +1,4 @@
+import {tours} from '../../src/content/data';
 import {financeGet,financePost,financePermissions} from '../_lib/finance-api';
 import {duffelReady,searchFlights,getFlight,sampleFlight,FlightError} from '../_lib/duffel';
 import {authenticate,requireAdmin,requireEditor,requireProposalEditor,permissions,json,privateHeaders,statuses,audit,auditStatement,activityStatement,captureEnquiry,safeUrl,readBytes,type DashboardEnv,type Staff} from '../_lib/dashboard';
@@ -73,7 +74,10 @@ async function get(path:string,url:URL,env:DashboardEnv,staff:Staff):Promise<Res
       db.prepare('SELECT id,reference,status FROM enquiries WHERE client_id=? ORDER BY created_at DESC').bind(enquiry.client_id).all(),
     ]);
     if(match[2])await audit(env,staff.email,'enquiry.export',match[1]);
-    return json({enquiry,activities:activities.results,proposals:proposals.results,attachments:attachments.results,related:related.results});
+    let tourSlug='';try{const r=JSON.parse(String(enquiry.requirements_json));tourSlug=r.tour||r.journey||''}catch{/* Legacy requirements may be unstructured. */}
+    const tour=tours.find(t=>t.slug===tourSlug);
+    const catalogueTrip=tour?{name:tour.name,itinerary:tour.itinerary,accommodation:tour.accommodation||[],route:tour.route||[],transport:tour.transport||[],includes:tour.includes,excludes:tour.excludes}:null;
+    return json({enquiry,catalogueTrip,activities:activities.results,proposals:proposals.results,attachments:attachments.results,related:related.results});
   }
   return json({error:'Not found'},404);
 }
