@@ -15,6 +15,7 @@ jobs:
         with: {node-version: 22, cache: npm}
       - run: npm ci
       - run: npm run lint
+      - run: npm run test:trip-planner
       - run: npm run test:content
       - run: npm run test:dashboard
       - run: npm run test:finance

@@ -53,6 +53,8 @@ export interface SuggestedRouteStop {
 export interface ResearchLink {title:string;url:string;domain:string}
 
 export interface SuggestedHotelOption {
+  imageUrl?:string;
+  supplierQuote?:{provider:"LiteAPI";mode:"sandbox";hotelId:string;checkin:string;checkout:string;amount:number;currency:string;board:string;basis:string};
   id:string;
   name:string;
   area:string;
@@ -67,6 +69,7 @@ const higherTierHotelCopy=/\b(?:luxury|premium|five[- ]star|5[- ]star|top[- ]tie
 export const hotelOptionMatchesBudget=(option:SuggestedHotelOption,budget:TripPlannerBudget):boolean=>hotelStandardMatches(option.standard,budget)&&hotelNameLooksSpecific(option.name)&&hotelNameMatchesBudget(option.name,budget)&&(!(['value','comfort','unsure'] as TripPlannerBudget[]).includes(budget)||!higherTierHotelCopy.test(`${option.area} ${option.whyFit} ${option.reviewSignal}`));
 
 export interface SuggestedHotelStay {
+  supplierNote?:string;
   place:string;
   nights:number;
   options:SuggestedHotelOption[];
