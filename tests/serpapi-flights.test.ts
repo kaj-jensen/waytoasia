@@ -16,6 +16,7 @@ test('bounded family open-jaw pilot preserves arrival dates, separate journeys a
  const plan=await planFlights(undefined,{departureAirport:'CPH',travelStartDate:'2027-02-10',travelEndDate:'2027-02-17',adults:2,children:1,childAges:[7]},[{place:'Thailand: Bangkok'},{place:'Thailand: Chiang Mai'}],'private-key',fetcher);
  assert.equal(calls.length,3);assert.equal(plan.status,'search-results');assert.equal(plan.offers[0].slices[1][0].origin,'CNX');assert.equal(plan.offers[0].totalAmount,undefined);assert.doesNotMatch(JSON.stringify(plan),/private-key|api_key|departure_token/);
  assert.match(flightTable(plan.offers[0]),/searched separately/);assert.doesNotMatch(flightTable(plan.offers[0]),/Sandbox/);assert.match(renderFlights(plan.offers[0]),/Google Flights via SerpApi/);
+ assert.match(flightTable(plan.offers[0]),/5h 0m/);assert.doesNotMatch(flightTable(plan.offers[0]),/0h 300m/);
 });
 test('supplier errors do not leak key or provider body',async()=>{
  await assert.rejects(searchSerpFlights('secret',{origin:'CPH',destination:'BKK',date:'2027-02-09',adults:2,children:0},async()=>Response.json({error:'secret upstream error'},{status:401})),e=>e instanceof Error&&!/secret/.test(e.message));
