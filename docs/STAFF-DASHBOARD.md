@@ -91,7 +91,7 @@ Preview source branch: `codex/control-panel`; expected stable alias: `codex-cont
 
 ## Production launch: 4 October 2026
 
-Canonical staff URL: https://proposal.waytoasia.com/dashboard, also linked from the public footer. Production database has only the authorized owner administrator and no preview fixtures. Capture starts with new submissions; historical enquiries are not imported. Independent MFA enrollment must be completed by the owner in Cloudflare App Launcher before the first successful staff login can be verified. Email composition, inbound capture and attachment storage remain disabled/unconfigured pending provider setup. Finances remains a planned module.
+Canonical staff URL: https://waytoasia.com/dashboard, also linked from the public footer. Production database has only the authorized owner administrator and no preview fixtures. Capture starts with new submissions; historical enquiries are not imported. Independent MFA enrollment must be completed by the owner in Cloudflare App Launcher before the first successful staff login can be verified. Email composition, inbound capture and attachment storage remain disabled/unconfigured pending provider setup. Finances remains a planned module.
 
 Pre-migration D1 Time Travel recovery bookmark: `00000013-00000000-000050fa-7375ce6a20610fd073525ad510e866c8`. The additive migration used this protected recovery path. Automatic approval review rejected a plaintext temporary export; no local client-data export was created. A separately encrypted off-platform backup remains to be configured before relying on long-term recovery. Do not run a restore without assessing subsequent production writes.
 

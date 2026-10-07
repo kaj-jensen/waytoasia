@@ -9,7 +9,7 @@ Flight searches support one-way and return journeys, adult counts and cabin clas
 1. Create an account at https://app.duffel.com/ and select Developer test mode.
 2. Create a test access token (starts with `duffel_test_`).
 3. In Cloudflare, verify Pages project **waytoasia** and its waytoasia.com / proposal.waytoasia.com domains. Add an encrypted production secret named `DUFFEL_TEST_TOKEN` via Pages settings, and redeploy the matching source. Configure a separate preview secret if needed. Never paste tokens in chat or commit them.
-4. Open an enquiry in https://proposal.waytoasia.com/dashboard and search future dates using airport codes, e.g. CPH to BKK.
+4. Open an enquiry in https://waytoasia.com/dashboard and search future dates using airport codes, e.g. CPH to BKK.
 5. Verify actual API results, save to a separate test journey, then inspect the customer proposal. The integration rejects live tokens and live responses.
 
 The AI Journey Designer automatically searches test flights after generating its route, using a recognised departure airport, first and last route airports, dates and adult count. It checks same-day and preceding-day outbound departures for arrival on the journey start date, supports returning from a different final airport, and ranks matching offers by fewer connections and shorter flying time. Travellers can choose among up to three suggestions or omit flights. The selected itinerary travels with the enquiry and customer proposal. Missing credentials, ambiguous airports, children or unsuccessful searches produce an honest status without blocking journey generation. Flexible date searches and child passenger support are not yet implemented.
