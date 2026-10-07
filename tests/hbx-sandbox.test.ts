@@ -69,7 +69,7 @@ test('search validation prevents a network call without HBX destination codes',a
 });
 
 test('activity availability reads nested rateDetails and supplier currency',async()=>{
- const adapter=createHbxSandboxAdapter({credentials,fetcher:async()=>Response.json({activities:[{code:'REAL-SHAPE',name:'Bangkok tour',currency:'THB',content:{media:{images:[{urls:[{sizeType:'LARGE',resource:'https://activities.hotelbeds.com/tour.jpg'}]}]}},modalities:[{name:'Guided tour',rates:[{rateCode:'STANDARD',rateDetails:[{rateKey:'nested-rate',totalAmount:{amount:2100}}]}]}]}]})});
+ const adapter=createHbxSandboxAdapter({credentials,fetcher:async()=>Response.json({activities:[{code:'REAL-SHAPE',name:'Bangkok tour',currency:'THB',content:{media:{images:[{urls:[{sizeType:'LARGE',resource:'https://media.activitiesbank.com/tour.jpg'}]}]}},modalities:[{name:'Guided tour',rates:[{rateCode:'STANDARD',rateDetails:[{rateKey:'nested-rate',totalAmount:{amount:2100}}]}]}]}]})});
  const result=await adapter.search({vertical:'activity',requestId:'nested',locale:'en',currency:'EUR',travellerCountry:'DK',party:{adults:2,childAges:[]},destination:{name:'Bangkok',supplierCode:'BKK'},from:'2027-02-10',to:'2027-02-10',interests:[]},new AbortController().signal);
- assert.equal(result.offers[0]?.productId,'REAL-SHAPE');assert.equal(result.offers[0]?.total.amountMinor,210000);assert.equal(result.offers[0]?.total.currency,'THB');assert.equal(result.offers[0]?.imageUrl,'https://activities.hotelbeds.com/tour.jpg');
+ assert.equal(result.offers[0]?.productId,'REAL-SHAPE');assert.equal(result.offers[0]?.total.amountMinor,210000);assert.equal(result.offers[0]?.total.currency,'THB');assert.equal(result.offers[0]?.imageUrl,'https://media.activitiesbank.com/tour.jpg');
 });

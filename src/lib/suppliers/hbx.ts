@@ -84,7 +84,7 @@ const money=(amount:unknown,currency:unknown,fallback:string):Money=>({amountMin
 const retrievedAt=()=>new Date().toISOString();
 
 export function hbxImage(value:unknown):string|undefined{
-  try{const u=new URL(asString(value));return u.protocol==='https:'&&!u.username&&!u.password&&(u.hostname==='hotelbeds.com'||u.hostname.endsWith('.hotelbeds.com'))?u.href:undefined}catch{return undefined}
+  try{const u=new URL(asString(value));return u.protocol==='https:'&&!u.username&&!u.password&&(u.hostname==='hotelbeds.com'||u.hostname.endsWith('.hotelbeds.com')||u.hostname==='media.activitiesbank.com')?u.href:undefined}catch{return undefined}
 }
 function contentImage(content:unknown):string|undefined{
  const c=asObject(content),media=asObject(c.media);
@@ -194,7 +194,7 @@ const hbxLocation=(location:TransferLocation):{type:string;code:string}=>{
 const localDateTime=(value:string):string=>value.replace(/(?:Z|[+-]\d{2}:\d{2})$/,'').slice(0,19);
 const language=(locale:string):string=>locale.toLowerCase().split('-')[0]||'en';
 
-export function createHbxSandboxAdapter(options:HbxAdapterOptions):SupplierSearchAdapter & {hotelContent:(productId:string,signal:AbortSignal)=>Promise<{imageUrl?:string;address:string;description:string;status?:number}|undefined>}{
+export function createHbxSandboxAdapter(options:HbxAdapterOptions):SupplierSearchAdapter & {hotelContent:(productId:string,signal:AbortSignal)=>Promise<{imageUrl?:string;address:string;description:string;status?:number|string}|undefined>}{
   const base=new URL(options.baseUrl??DEFAULT_BASE_URL);
   if(base.protocol!=='https:'||base.hostname!=='api.test.hotelbeds.com')throw new HbxSandboxError('HBX evaluation traffic must use the official HTTPS test host.');
   const fetcher=options.fetcher??fetch;
@@ -223,10 +223,10 @@ export function createHbxSandboxAdapter(options:HbxAdapterOptions):SupplierSearc
       const response=await fetcher(new URL(`/hotel-content-api/1.0/hotels/${productId}/details?language=ENG&useSecondaryLanguage=true`,base),{headers:{Accept:'application/json','Api-key':credentials.apiKey,'X-Signature':signature},signal});
       if(!response.ok)return {address:'',description:'',status:response.status};
       const body=asObject(await response.json()),hotel=asObject(body.hotel);
-      if(String(hotel.code)!==productId)return undefined;
+      if(String(hotel.code)!==productId)return {address:'',description:'',status:'Content product ID did not match'};
       const images=asArray(hotel.images).map(asObject).sort((a,b)=>(asNumber(a.visualOrder)??999)-(asNumber(b.visualOrder)??999));
-      const image=images.find(i=>/^\d{2}\/[^?]+\.(jpg|jpeg|png)$/i.test(asString(i.path))&&!asString(i.path).includes('..'));
-      return {imageUrl:image?hbxImage(`https://photos.hotelbeds.com/giata/bigger/${image.path}`):undefined,address:asString(asObject(hotel.address).content),description:asString(asObject(hotel.description).content).replace(/<[^>]*>/g,'').slice(0,700)};
+      const image=images.find(i=>/^[a-z0-9/_-]+\.(jpg|jpeg|png)$/i.test(asString(i.path))&&!asString(i.path).includes('..'));
+      return {status:image?200:'Supplier content has no supported image path',imageUrl:image?hbxImage(`https://photos.hotelbeds.com/giata/bigger/${image.path}`):undefined,address:asString(asObject(hotel.address).content),description:asString(asObject(hotel.description).content).replace(/<[^>]*>/g,'').slice(0,700)};
     },
     capability:{provider:PROVIDER,verticals:['accommodation','transfer','activity'],bookingModes:['agency'],status:'sandbox-ready',searchOnly:true},
     async search(query,signal):Promise<SupplierSearchResult>{
