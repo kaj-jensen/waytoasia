@@ -1,3 +1,4 @@
+import {enquiryTourPrice} from './enquiry-tour-price';
 import {json,privateHeaders,auditStatement,type DashboardEnv,type Staff} from './dashboard';
 import {clean,parseStoredPayload} from './proposals';
 import {currencyCode,minor,rate,convert,normalizeComponents,summarize,paymentSummary,productTypes,financeStatuses,paymentKinds,csvCell,digits,type FinanceItem,type Payment} from './finance-calculations';
@@ -17,9 +18,10 @@ async function load(env:DashboardEnv,id:string){
   env.PROPOSALS_DB.prepare("SELECT id,revision,action,actor,created_at,json_extract(snapshot_json,'$.currency') currency,json_extract(snapshot_json,'$.status') status,json_extract(snapshot_json,'$.quote') quote,json_extract(snapshot_json,'$.actual') actual FROM finance_history WHERE enquiry_id=? ORDER BY revision DESC LIMIT 100").bind(id).all<Record<string,unknown>>(),
  ]);
  const items=rawItems.results.map(r=>({...r,quote:r.quote_json?JSON.parse(String(r.quote_json)):null,actual:r.actual_json?JSON.parse(String(r.actual_json)):null})) as unknown as FinanceItem[];
- const f=file||{enquiry_id:id,currency:'EUR',status:'Draft',revision:0,is_demo:0,updated_at:'',last_write:''};
+ const tourPrice=enquiryTourPrice(enquiry.requirements_json);
+ const f=file||{enquiry_id:id,currency:tourPrice?.currency||'EUR',status:'Draft',revision:0,is_demo:0,updated_at:'',last_write:''};
  const quote=summarize(items,f.currency,'quote'),actual=summarize(items,f.currency,'actual');
- return {enquiry,file:f,items,payments:payments.results,history:history.results.map(h=>({id:h.id,revision:h.revision,action:h.action,actor:h.actor,created_at:h.created_at,snapshot:{currency:h.currency,status:h.status,quote:JSON.parse(String(h.quote)),actual:JSON.parse(String(h.actual))}})),quote,actual,paymentQuote:paymentSummary(payments.results,quote),paymentActual:paymentSummary(payments.results,actual)};
+ return {enquiry,tourPrice,file:f,items,payments:payments.results,history:history.results.map(h=>({id:h.id,revision:h.revision,action:h.action,actor:h.actor,created_at:h.created_at,snapshot:{currency:h.currency,status:h.status,quote:JSON.parse(String(h.quote)),actual:JSON.parse(String(h.actual))}})),quote,actual,paymentQuote:paymentSummary(payments.results,quote),paymentActual:paymentSummary(payments.results,actual)};
 }
 async function travelCandidates(env:DashboardEnv,id:string){
  const proposal=await env.PROPOSALS_DB.prepare('SELECT snapshot_json FROM enquiry_proposals WHERE enquiry_id=? ORDER BY version DESC LIMIT 1').bind(id).first<{snapshot_json:string}>();

@@ -72,3 +72,7 @@ test('journey import creates linked unpriced items and never overwrites saved fi
  const res=await call(env,'/'+e.id+'/import',{revision:0});assert.equal(res.status,200,await res.clone().text());const d=await res.json();assert.equal(d.items.length,4);assert.equal(d.actual.unpriced,4);assert.equal(d.actual.revenue,0);assert.equal(d.paymentActual.status,'Pricing incomplete');assert.ok(d.items.every((i:FinanceItem)=>i.source_key&&i.travel_item_id));
  assert.equal((await call(env,'/'+e.id+'/import',{revision:1})).status,400);assert.equal((await(await call(env,'/'+e.id)).json()).items.length,4);
 });
+test('catalogue enquiry prices use the selected tour and currency without inventing earnings',async()=>{
+ const {env}=setup();const e=await captureEnquiry(env,{name:'Price test',email:'price@example.invalid',source:'Test',message:'Synthetic',requirements:{tour:'silk-and-courtyards',journey:'silk-and-courtyards',adults:'2',children:'0',budgetCurrency:'EUR'}});
+ const d=await(await call(env,'/'+e.id)).json();assert.equal(d.tourPrice.perPerson,6600);assert.equal(d.tourPrice.partyTotal,13200);assert.equal(d.tourPrice.currency,'EUR');assert.equal(d.actual.priced,0);assert.equal(d.actual.earnings,0);assert.equal(d.items.length,0);
+});

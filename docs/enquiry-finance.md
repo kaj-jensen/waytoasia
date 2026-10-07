@@ -34,3 +34,9 @@ The portfolio uses the latest 200 financial files and groups currencies separate
 **Open realistic demo** creates or reopens one clearly named synthetic family holiday with seven products, quote/actual differences, varied margins, an invoice, deposit and supplier payment. No email is sent and no real transaction occurs. Demo files are excluded from portfolio totals unless explicitly included.
 
 Run `node --import tsx --test tests/dashboard/finance.test.ts` for financial invariants, permissions, persistence, conflicts, imports and ledger checks. Run `npm run preview:dashboard` for the loopback-only synthetic UI at `http://127.0.0.1:8788/preview-login`. Production must never enable the local identity fixture. Apply migration 0005 to the verified matching Way to Asia D1 database before deploying the new dashboard code.
+
+## Published tour prices
+
+Catalogue enquiries automatically resolve their saved `tour` (or `journey`) identifier against the same tour catalogue used by the website. The enquiry and full finance views show the current published guide price, inclusions and exclusions. The saved budget currency selects a published currency price; unsupported currencies fall back visibly to EUR. A party estimate is calculated only for a known adult-only party; child pricing is not assumed. Empty files default to that catalogue currency. Existing financial records and their currencies are preserved.
+
+Published guide prices are explicitly labelled as current catalogue context, not a historical quotation, booked revenue, supplier cost or payment due. They do not create artificial profit or overwrite entered figures. Supplier costs and confirmation of the selling price are needed before recording booked financials.

@@ -20,7 +20,7 @@ test('financial workflow persists, drills down, exports and fits mobile',async({
  await page.getByText('Individual item earnings (7)',{exact:true}).click();
  await expect(page.locator('#enquiry-finances tbody tr')).toHaveCount(7);
  await page.getByRole('button',{name:'8 nights · two family rooms',exact:true}).click();
- await page.getByLabel('Internal notes').fill('Synthetic example. Inline enquiry edit verification.');
+ await page.getByLabel('Internal notes').fill('Synthetic example. Inline enquiry edit verification '+Date.now());
  await page.locator('#finance-dialog [type=submit]').click();
  await expect(page.locator('#enquiry-finances [data-inline-feedback]')).toHaveText('✓ Financial changes saved.');
  await expect(page.locator('#detail-view')).toBeVisible();
@@ -36,4 +36,19 @@ test('financial workflow persists, drills down, exports and fits mobile',async({
  await page.emulateMedia({media:'print'});await page.pdf({path:'/tmp/waytoasia-finance-internal.pdf',format:'A4',landscape:true,printBackground:true});await page.emulateMedia({media:'screen'});
  await page.setViewportSize({width:390,height:844});await page.reload();await expect(page.getByRole('heading',{name:'Financial overview',exact:true})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);await page.screenshot({path:'/tmp/waytoasia-finance-mobile.png',fullPage:true});expect(errors).toEqual([]);
+});
+test('existing tour enquiry automatically shows its published DKK price and honest pending costs',async({page})=>{
+ test.skip(!test.info().config.configFile?.endsWith('playwright.finance.config.ts'),'Uses the isolated synthetic dashboard server.');
+ const {database}=await import('./dashboard/support');const {sqlite}=database('.wrangler/dashboard-preview.sqlite');
+ const id=crypto.randomUUID(),now=new Date().toISOString(),e={id};
+ sqlite.prepare('INSERT INTO clients VALUES (?,?,?,?,?)').run(id,`catalogue-${id}@example.invalid`,'Published tour price test','',now);
+ sqlite.prepare('INSERT INTO enquiries (id,reference,client_id,source,requirements_json,original_message,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)').run(id,'TEST-'+id,id,'Synthetic test',JSON.stringify({tour:'silk-and-courtyards',adults:'2',children:'0',budgetCurrency:'DKK'}),'Synthetic price verification',now,now);sqlite.close();
+ await page.goto('/preview-login');await page.goto('/dashboard#'+e.id);
+ await expect(page.locator('#enquiry-finances .finance-published')).toContainText('DKK 49,200.00');
+ await expect(page.locator('#enquiry-finances .finance-kpi').first()).toContainText('DKK 98,400.00');
+ await expect(page.locator('#enquiry-finances .featured')).toContainText('Not yet known');
+ await page.getByText('Tour price & item earnings',{exact:true}).click();await expect(page.locator('#enquiry-finances tbody')).toContainText('Silk & Courtyards');
+ await page.screenshot({path:'/tmp/waytoasia-published-price.png',fullPage:true});
+ await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+ await page.getByRole('link',{name:'Full financial workspace ↗'}).click();await expect(page.locator('[data-drill=revenue]')).toContainText('DKK 98,400.00');
 });
