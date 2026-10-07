@@ -10,7 +10,9 @@ export interface RouteLocation {index:number;place:string;label:string;coordinat
 const escape=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 const normalize=(s:string)=>s.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[’']/g,'').replace(/[^a-z0-9]+/g,' ').trim();
 const registry=Object.entries(mapPlaces).flatMap(([country,places])=>Object.entries(places).filter(([name,p])=>!p.note?.startsWith('Representative')&&!['Great Wall','Yunnan','Bali','Mekong','Flores','Southern islands'].includes(name)).map(([name,p])=>({country,name,key:normalize(name),coordinates:p.coordinates})));
-registry.push({country:'china',name:'Mutianyu',key:'mutianyu',coordinates:[116.5619,40.4380]},{country:'japan',name:'Tokyo',key:'tokyo',coordinates:[139.6917,35.6895]},{country:'japan',name:'Kyoto',key:'kyoto',coordinates:[135.7681,35.0116]});
+// Hakone town centre: GSI Gazetteer of Japan 2021, 35°14′N 139°06′E.
+// https://web1.gsi.go.jp/common/000238295.pdf
+registry.push({country:'japan',name:'Hakone',key:'hakone',coordinates:[139.1,35.233333]},{country:'china',name:'Mutianyu',key:'mutianyu',coordinates:[116.5619,40.4380]},{country:'japan',name:'Tokyo',key:'tokyo',coordinates:[139.6917,35.6895]},{country:'japan',name:'Kyoto',key:'kyoto',coordinates:[135.7681,35.0116]});
 const countries:Record<string,string[]>={china:['china','kina','chine','cina','chiny'],japan:['japan','japon','giappone'],'south-korea':['south korea','sydkorea','sydkorea','coree'],thailand:['thailand','thailande'],vietnam:['vietnam'],indonesia:['indonesia','indonesie']};
 export function resolveRoute(route:unknown,context:unknown=[]):RouteLocation[]{
   const contextText=normalize(Array.isArray(context)?context.join(' '):String(context));

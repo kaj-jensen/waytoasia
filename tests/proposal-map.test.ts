@@ -41,3 +41,13 @@ test('many repeated stops are retained rather than visually collapsed',()=>{
  assert.equal(resolveRoute([{place:'Jeju City & Seogwipo'}],['south-korea'])[0].waypoints?.length,2);
  assert.match(svg,/2a/);assert.match(svg,/3b/);assert.doesNotMatch(svg,/NaN|Infinity/);
  });
+
+test('Japan proposal includes Hakone and both consecutive route connections',()=>{
+ const route=resolveRoute([{place:'Japan: Tokyo'},{place:'Japan: Hakone'},{place:'Japan: Kyoto'}]);
+ assert.deepEqual(route.map(p=>p.label),['Tokyo','Hakone','Kyoto']);
+ assert.ok(route.every(p=>p.coordinates&&!p.issue));
+ assert.deepEqual(route[1].coordinates,[139.1,35.233333]);
+ const svg=routeMap(route,copy);
+ assert.match(svg,/1\. Tokyo → 2\. Hakone → 3\. Kyoto/);
+ assert.equal((svg.match(/class="map-route"/g)||[]).length,4);
+});
