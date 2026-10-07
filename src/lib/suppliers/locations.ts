@@ -11,10 +11,12 @@ export function hotelbedsLocation(place:string,countries:string[],overnightEvide
  const matches=points.filter(p=>key(p.name)===city&&(countries.includes(p.country)||key(p.country.replaceAll('-',' '))===explicit));if(matches.length===1)return matches[0];
  // A chapter can include day trips. Resolve its base only when every proposed
  // hotel independently identifies the same curated city within that chapter.
- const scoped=[...Object.values(hbxGateways),...points].filter(p=>countries.includes(p.country));
+ const scoped=[...Object.values(hbxGateways),...points].filter(p=>!countries.length||countries.includes(p.country));
  const cities=new Map<string,HbxLocation>();
  for(const p of scoped){const id=`${p.country}:${key(p.name)}`;if(!cities.has(id))cities.set(id,p);}
  const contains=(text:string,name:string)=>new RegExp(`(?:^|[^a-z])${key(name).replace(/[.*+?^${}()|[\\]\\\\]/g,'\\$&')}(?:$|[^a-z])`).test(key(text));
+ const exact=[...cities.values()].filter(p=>key(p.name)===city);
+ if(!countries.length&&exact.length===1)return exact[0];
  const evidence=overnightEvidence.map(text=>[...cities.values()].filter(p=>contains(place,p.name)&&contains(text,p.name)));
  if(evidence.length&&evidence.every(found=>found.length===1&&found[0].id===evidence[0][0]?.id))return evidence[0][0];
  return undefined;
