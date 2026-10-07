@@ -37,3 +37,5 @@
 
 /* Selected hotel photography uses the same proportions and palette as the designer. */
 .selected-hotel-photo{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:3px;margin:0 0 16px}.selected-hotel-card{min-width:0;overflow:hidden}.programme-hotel-photo{display:block;width:100%;max-height:190px;aspect-ratio:16/10;object-fit:cover;border-radius:3px;margin:12px 0 16px}.selected-hotel-photo[hidden],.programme-hotel-photo[hidden]{display:none}@media print{.selected-hotel-photo,.programme-hotel-photo{max-height:140px}}
+
+.chapter-hotel-photo{aspect-ratio:16/9;max-height:260px}
