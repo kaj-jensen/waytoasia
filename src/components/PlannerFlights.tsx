@@ -1,4 +1,4 @@
-import {flightTable,flightTableStyles} from '../../functions/_lib/flight-display';
+import {flightTable} from '../../functions/_lib/flight-display';
 import type {PlannerFlights as FlightPlan} from '../../functions/_lib/planner-flights';
 import type {FlightItinerary} from '../../functions/_lib/duffel';
 const copy:Record<string,string[]>={
@@ -13,5 +13,5 @@ nl:['Vluchten voor je reis','Alleen testtijden. Vluchten zijn niet bevestigd en 
 hu:['Repülőjáratok az utazáshoz','Csak tesztmenetrend. A járatok nem megerősítettek, külön foglalhatók. Az időpontok helyi idők.','A keresés a tesztkapcsolat beállítása után lesz elérhető.','A keresés ismert repülőtereket, dátumokat és legfeljebb kilenc felnőttet igényel, gyermekek nélkül. A tanácsadó segíthet pontosítani.','Nem találtunk megfelelő tesztjáratokat a dátumokra és repülőterekre. A tanácsadó átnézheti az útvonalat.','Javasolt repülési útiterv','Nincs kiválasztott repülési útiterv']};
 export default function PlannerFlights({plan,locale,selected,onSelect}:{plan:FlightPlan;locale:string;selected?:FlightItinerary;onSelect:(flight?:FlightItinerary)=>void}){
  const c=copy[locale]||copy.en;
- return <section className="traveller-research planner-flights"><style>{flightTableStyles}</style><h3>{c[0]}</h3><p>{c[1]}</p>{plan.status!=='test-results'?<p>{c[plan.status==='not-connected'?2:plan.status==='needs-details'?3:4]}</p>:<><div className="hotel-options">{plan.offers.map((f,i)=><label className="hotel-option" key={f.offerId}><input type="radio" name="planner-flight" checked={selected?.offerId===f.offerId} onChange={()=>onSelect(f)}/><div><strong>{c[5]} {i+1}</strong><div dangerouslySetInnerHTML={{__html:flightTable(f,locale)}}/></div></label>)}</div><label><input type="radio" name="planner-flight" checked={!selected} onChange={()=>onSelect()}/>{c[6]}</label></>}</section>;
+ return <section className="traveller-research planner-flights"><link rel="stylesheet" href="/flights.css"/><h3>{c[0]}</h3><p>{c[1]}</p>{plan.status!=='test-results'?<p>{c[plan.status==='not-connected'?2:plan.status==='needs-details'?3:4]}</p>:<><div className="hotel-options">{plan.offers.map((f,i)=><label className="hotel-option" key={f.offerId}><input type="radio" name="planner-flight" checked={selected?.offerId===f.offerId} onChange={()=>onSelect(f)}/><div><strong>{c[5]} {i+1}</strong><div dangerouslySetInnerHTML={{__html:flightTable(f,locale)}}/></div></label>)}</div><label><input type="radio" name="planner-flight" checked={!selected} onChange={()=>onSelect()}/>{c[6]}</label></>}</section>;
 }

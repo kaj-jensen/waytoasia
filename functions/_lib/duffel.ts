@@ -1,4 +1,4 @@
-import {flightTable,flightTableStyles} from './flight-display';
+import {flightTable} from './flight-display';
 export interface FlightSegment {origin:string;destination:string;departure:string;arrival:string;airline:string;flightNumber:string;duration:string;originCity?:string;originName?:string;destinationCity?:string;destinationName?:string;cabin?:string;operatingAirline?:string}
 export interface FlightItinerary {source:'duffel-test'|'sample';offerId:string;retrievedAt:string;slices:FlightSegment[][]}
 export class FlightError extends Error {constructor(message:string,public status=400){super(message)}}
@@ -36,5 +36,5 @@ const labels:Record<string,[string,string,string]>={en:['Flight itinerary','Test
 export function renderFlights(value:unknown,locale='en'):string{
  const f=record(value);if(!['sample','duffel-test'].includes(String(f.source))||!Array.isArray(f.slices))return '';
  const c=labels[locale.split('-')[0]]||labels.en;
- return `<section id="flights" class="stays-section"><style>${flightTableStyles}</style><div class="brochure-heading"><h2>${c[0]}</h2><p>${c[1]}</p><small>${c[2]}</small></div>${flightTable(f as unknown as FlightItinerary,locale)}</section>`;
+ return `<section id="flights" class="stays-section"><div class="brochure-heading"><h2>${c[0]}</h2><p>${c[1]}</p><small>${c[2]}</small></div>${flightTable(f as unknown as FlightItinerary,locale)}</section>`;
 }
