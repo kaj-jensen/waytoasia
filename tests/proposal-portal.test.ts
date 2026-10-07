@@ -97,3 +97,14 @@ test('the direct Pages hostname cannot become a public alternate entrance',async
  assert.doesNotMatch(html,/No services have yet been confirmed/);
  assert.match(renderManagePage({...row,payload_json:JSON.stringify(p)},false),/name="services_included"/);
  });
+
+test('daily programme associates overnight stays with route chapters and excludes departure night',()=>{
+ const p=structuredClone(payload);
+ p.suggestion.dayPlans=[{day:1,place:'Tokyo',options:[{id:'day-1-a',name:'Old Tokyo walk',description:'Walk'}]},{day:8,place:'Kyoto',options:[]}];
+ const html=renderProposalPage({...row,payload_json:JSON.stringify(p)},'A'.repeat(43),'');
+ const first=html.split('class="programme-day" id="day-1"')[1].split('</article>')[0];
+ assert.match(first,/Hotel Test/);assert.match(first,/Programme &amp; excursions|Programme & excursions/);
+ const last=html.split('class="programme-day" id="day-8"')[1].split('</article>')[0];
+ assert.match(last,/Departure day · no overnight stay/);assert.doesNotMatch(last,/Hotel Test/);
+ assert.match(first,/inclusion to be confirmed/);
+});
