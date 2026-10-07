@@ -50,3 +50,16 @@ test('concurrent stale update sends no notification and is acknowledged',async()
   const response=await onRequestPost({params:{token},env:{PROPOSALS_DB:db,RESEND_API_KEY:'test-only',LEAD_TO_EMAIL:'test@example.invalid'} as unknown as ProposalEnv,request});assert.equal(response.status,409);assert.equal(mails,0);
  }finally{globalThis.fetch=oldFetch}
 });
+
+test('customer approval atomically updates the active enquiry and notifies its assigned consultant',async()=>{
+ const statements:Array<{sql:string;values:unknown[]}>=[];let sent:Record<string,unknown>|undefined;
+ const db={prepare(sql:string){return {bind(...values:unknown[]){const statement={sql,values,first:async()=>sql.startsWith('SELECT ep.')?{enquiry_id:'enquiry-1',assigned_email:'agent@example.invalid'}:row};return statement}}},async batch(items:Array<{sql:string;values:unknown[]}>){statements.push(...items);return items.map(()=>({meta:{changes:1}}))}};
+ const oldFetch=globalThis.fetch;globalThis.fetch=async(_url,init)=>{sent=JSON.parse(String(init?.body));return Response.json({id:'test-mail'})};
+ try{
+ const request=new Request(`https://proposal.waytoasia.com/api/proposals/${token}/response`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'approve'})});
+ const response=await onRequestPost({params:{token},env:{PROPOSALS_DB:db,DASHBOARD_CAPTURE:'true',RESEND_API_KEY:'test',LEAD_TO_EMAIL:'fallback@example.invalid'} as unknown as ProposalEnv,request});
+ assert.equal(response.status,303);const update=statements.find(s=>s.sql.startsWith('UPDATE enquiries '))!;
+ assert.match(String(update.values[0]),/^\d{4}-/);assert.match(update.sql,/NOT IN \('Confirmed','Closed'\)/);assert.match(update.sql,/MAX\(version\)/);assert.match(update.sql,/response_receipt/);
+ assert.deepEqual(sent?.to,['agent@example.invalid']);assert.match(String(sent?.text),/awaiting confirmation/);
+ }finally{globalThis.fetch=oldFetch}
+});

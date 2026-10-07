@@ -1,3 +1,4 @@
+import {customerApprovedStatus,enquiryStatusSql,displayEnquiryStatus} from '../_lib/enquiry-status';
 import {tours} from '../../src/content/data';
 import {financeGet,financePost,financePermissions} from '../_lib/finance-api';
 import {duffelReady,searchFlights,getFlight,sampleFlight,FlightError} from '../_lib/duffel';
@@ -38,7 +39,7 @@ async function get(path:string,url:URL,env:DashboardEnv,staff:Staff):Promise<Res
     const conditions:string[]=[],args:unknown[]=[];
     const search=(url.searchParams.get('q')||'').slice(0,160);
     if(search){conditions.push('(c.name LIKE ? OR c.email LIKE ? OR e.reference LIKE ?)');args.push(...Array(3).fill(`%${search}%`))}
-    for(const [param,column] of [['status','e.status'],['assigned','e.assigned_to']]){const value=url.searchParams.get(param);if(value){conditions.push(`${column}=?`);args.push(value)}}
+    for(const [param,column] of [['status',enquiryStatusSql('e.')],['assigned','e.assigned_to']]){const value=url.searchParams.get(param);if(value){conditions.push(`${column}=?`);args.push(value)}}
     for(const [param,op] of [['from','>='],['to','<=']]){const value=url.searchParams.get(param);if(value&&/^\d{4}-\d{2}-\d{2}$/.test(value)){conditions.push(`substr(e.created_at,1,10) ${op} ?`);args.push(value)}}
     if(url.searchParams.get('overdue')==='1'){conditions.push("e.follow_up < ? AND e.status NOT IN ('Closed','Confirmed')");args.push(new Date().toISOString().slice(0,10))}
     const where=conditions.length?` WHERE ${conditions.join(' AND ')}`:'',page=Math.max(1,Math.min(100000,Number(url.searchParams.get('page'))||1));
@@ -47,15 +48,15 @@ async function get(path:string,url:URL,env:DashboardEnv,staff:Staff):Promise<Res
     const [rows,total,counts,overdue,unmatched]=await Promise.all([
       db.prepare(`SELECT e.*,c.name,c.email,(SELECT COUNT(*) FROM activities a WHERE a.enquiry_id=e.id AND a.unread=1) unread${base}${where} ORDER BY ${order} LIMIT 25 OFFSET ?`).bind(...args,(page-1)*25).all(),
       db.prepare(`SELECT COUNT(*) total${base}${where}`).bind(...args).first(),
-      db.prepare('SELECT status,COUNT(*) count FROM enquiries GROUP BY status').all(),
+      db.prepare(`SELECT ${enquiryStatusSql()} status,COUNT(*) count FROM enquiries GROUP BY ${enquiryStatusSql()}`).all(),
       db.prepare("SELECT COUNT(*) count FROM enquiries WHERE follow_up < ? AND status NOT IN ('Closed','Confirmed')").bind(new Date().toISOString().slice(0,10)).first(),
       db.prepare("SELECT COUNT(*) count FROM activities WHERE enquiry_id IS NULL AND kind='incoming'").first(),
     ]);
-    return json({rows:rows.results,total,counts:counts.results,overdue,unmatched,page});
+    return json({rows:rows.results.map(e=>({...e,status:displayEnquiryStatus(e)})),total,counts:counts.results,overdue,unmatched,page});
   }
   const match=path.match(/^api\/enquiries\/([^/]+)(\/(?:export|export-client))?$/);
   if(match){
-    const enquiry=await db.prepare('SELECT e.*,c.name,c.email,c.phone FROM enquiries e JOIN clients c ON c.id=e.client_id WHERE e.id=?').bind(match[1]).first();if(!enquiry)return json({error:'Enquiry not found'},404);
+    const enquiry=await db.prepare(`SELECT e.*,c.name,c.email,c.phone FROM enquiries e JOIN clients c ON c.id=e.client_id WHERE e.id=?`).bind(match[1]).first();if(!enquiry)return json({error:'Enquiry not found'},404);
     if(match[2])requireAdmin(staff);
     if(match[2]==='/export-client'){
       const enquiries=await db.prepare('SELECT * FROM enquiries WHERE client_id=? ORDER BY created_at').bind(enquiry.client_id).all();
@@ -71,13 +72,13 @@ async function get(path:string,url:URL,env:DashboardEnv,staff:Staff):Promise<Res
       db.prepare('SELECT * FROM activities WHERE enquiry_id=? ORDER BY created_at,id').bind(match[1]).all(),
       db.prepare('SELECT * FROM enquiry_proposals WHERE enquiry_id=? ORDER BY version DESC').bind(match[1]).all(),
       db.prepare('SELECT t.* FROM attachments t JOIN activities a ON a.id=t.activity_id WHERE a.enquiry_id=?').bind(match[1]).all(),
-      db.prepare('SELECT id,reference,status FROM enquiries WHERE client_id=? ORDER BY created_at DESC').bind(enquiry.client_id).all(),
+      db.prepare(`SELECT id,reference,${enquiryStatusSql()} status FROM enquiries WHERE client_id=? ORDER BY created_at DESC`).bind(enquiry.client_id).all(),
     ]);
     if(match[2])await audit(env,staff.email,'enquiry.export',match[1]);
     let tourSlug='';try{const r=JSON.parse(String(enquiry.requirements_json));tourSlug=r.tour||r.journey||''}catch{/* Legacy requirements may be unstructured. */}
     const tour=tours.find(t=>t.slug===tourSlug);
     const catalogueTrip=tour?{name:tour.name,itinerary:tour.itinerary,accommodation:tour.accommodation||[],route:tour.route||[],transport:tour.transport||[],includes:tour.includes,excludes:tour.excludes}:null;
-    return json({enquiry,catalogueTrip,activities:activities.results,proposals:proposals.results,attachments:attachments.results,related:related.results});
+    return json({enquiry:{...enquiry,status:displayEnquiryStatus(enquiry)},catalogueTrip,activities:activities.results,proposals:proposals.results,attachments:attachments.results,related:related.results});
   }
   return json({error:'Not found'},404);
 }
@@ -129,10 +130,10 @@ async function post(path:string,input:Record<string,unknown>,env:DashboardEnv,st
   }
   if(action==='read'){await db.prepare('UPDATE activities SET unread=0 WHERE enquiry_id=?').bind(id).run();return json({ok:true})}
   if(action==='edit'){
-    const status=clean(input.status,40),assigned=clean(input.assigned,240).toLowerCase(),followup=clean(input.followUp,10);
+    const status=clean(input.status,80),assigned=clean(input.assigned,240).toLowerCase(),followup=clean(input.followUp,10);
     if(!statuses.includes(status)||followup&&!/^\d{4}-\d{2}-\d{2}$/.test(followup))fail('Invalid status or follow-up date');
     if(assigned&&!await db.prepare('SELECT email FROM staff_users WHERE email=? AND enabled=1').bind(assigned).first())fail('Assignee must be an active staff member');
-    await db.batch([db.prepare('UPDATE enquiries SET status=?,assigned_to=?,follow_up=?,updated_at=? WHERE id=?').bind(status,assigned||null,followup||null,now,id),activityStatement(env,id,'status',`${enquiry!.status} → ${status}; assigned: ${assigned||'Unassigned'}; follow-up: ${followup||'None'}`,staff.email),auditStatement(env,staff.email,'enquiry.updated',id)]);return json({ok:true});
+    await db.batch([db.prepare('UPDATE enquiries SET status=?,assigned_to=?,follow_up=?,updated_at=?,customer_approved_at=? WHERE id=?').bind(status===customerApprovedStatus?'In progress':status,assigned||null,followup||null,now,status===customerApprovedStatus?(enquiry!.customer_approved_at||now):null,id),activityStatement(env,id,'status',`${enquiry!.status} → ${status}; assigned: ${assigned||'Unassigned'}; follow-up: ${followup||'None'}`,staff.email),auditStatement(env,staff.email,'enquiry.updated',id)]);return json({ok:true});
   }
   if(action==='note'||action==='call'){
     const body=clean(input.body,10000);if(!body)fail('A message is required');await db.batch([activityStatement(env,id,action,body,staff.email),auditStatement(env,staff.email,`enquiry.${action}`,id)]);return json({ok:true});
@@ -168,7 +169,7 @@ async function post(path:string,input:Record<string,unknown>,env:DashboardEnv,st
     const sent=await response.json() as {id:string};
     const proposals=await db.prepare("SELECT id,url FROM enquiry_proposals WHERE enquiry_id=? AND status='Draft'").bind(id).all<{id:string;url:string}>();
     const included=proposals.results.filter(p=>body.includes(p.url));
-    await db.batch([db.prepare("UPDATE activities SET provider_id=?,delivery=CASE WHEN delivery IN ('pending','failed') THEN 'sent' ELSE delivery END WHERE id=?").bind(sent.id,activity),...included.map(p=>db.prepare("UPDATE enquiry_proposals SET status='Sent',sent_at=?,sent_by=? WHERE id=?").bind(now,staff.email,p.id)),...(included.length?[db.prepare("UPDATE enquiries SET status='Proposal sent',updated_at=? WHERE id=?").bind(now,id),activityStatement(env,id,'status','Proposal sent',staff.email)]:[]),auditStatement(env,staff.email,'email.sent',id)]);return json({ok:true});
+    await db.batch([db.prepare("UPDATE activities SET provider_id=?,delivery=CASE WHEN delivery IN ('pending','failed') THEN 'sent' ELSE delivery END WHERE id=?").bind(sent.id,activity),...included.map(p=>db.prepare("UPDATE enquiry_proposals SET status='Sent',sent_at=?,sent_by=? WHERE id=?").bind(now,staff.email,p.id)),...(included.length?[db.prepare("UPDATE enquiries SET status='Proposal sent',customer_approved_at=NULL,updated_at=? WHERE id=?").bind(now,id),activityStatement(env,id,'status','Proposal sent',staff.email)]:[]),auditStatement(env,staff.email,'email.sent',id)]);return json({ok:true});
   }
   if(action==='delete-client'){
     requireAdmin(staff);if(input.confirm!==enquiry!.email)fail('Confirm deletion with the client email');

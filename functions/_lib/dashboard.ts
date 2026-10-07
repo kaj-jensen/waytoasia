@@ -1,3 +1,4 @@
+import {customerApprovedStatus} from './enquiry-status';
 import type {D1Database, R2Bucket, D1PreparedStatement} from '@cloudflare/workers-types';
 import {createRemoteJWKSet, importJWK, jwtVerify, type JWK} from 'jose';
 import {clean, escapeHtml} from './proposals';
@@ -17,7 +18,7 @@ export interface DashboardEnv {
   PRIVATE_ATTACHMENTS?: R2Bucket;
 }
 export interface Staff {email:string; name:string; role:'admin'|'staff'|'backoffice'|'finance'|'viewer'; enabled:number}
-export const statuses=['New','In progress','Awaiting client','Proposal sent','Confirmed','Closed'];
+export const statuses=['New','In progress','Awaiting client','Proposal sent',customerApprovedStatus,'Confirmed','Closed'];
 export const json=(data:unknown,status=200)=>Response.json(data,{status,headers:privateHeaders()});
 export function privateHeaders():Record<string,string>{return {'Cache-Control':'private, no-store','X-Robots-Tag':'noindex, nofollow, noarchive','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"}}
 const keysets=new Map<string,ReturnType<typeof createRemoteJWKSet>>();

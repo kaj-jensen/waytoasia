@@ -39,24 +39,28 @@ const handlePost=async({params,env,request}:PageContext):Promise<Response>=>{
   const receipt=crypto.randomUUID();
   const update=env.PROPOSALS_DB.prepare('UPDATE proposals SET status = ?, traveller_response = ?, updated_at = ?, response_receipt = ? WHERE id = ? AND updated_at = ?').bind(status,note,now,receipt,row.id,row.updated_at);
   let result:{meta?:{changes?:number}};
+  let notificationEmail=env.LEAD_TO_EMAIL;
   if(env.DASHBOARD_CAPTURE==='true'){
-    const linked=await env.PROPOSALS_DB.prepare('SELECT enquiry_id FROM enquiry_proposals WHERE legacy_id=? ORDER BY version DESC LIMIT 1').bind(row.id).first<{enquiry_id:string}>();
+    const linked=await env.PROPOSALS_DB.prepare('SELECT ep.enquiry_id,s.email assigned_email FROM enquiry_proposals ep JOIN enquiries e ON e.id=ep.enquiry_id LEFT JOIN staff_users s ON s.email=e.assigned_to AND s.enabled=1 WHERE ep.legacy_id=? ORDER BY ep.version DESC LIMIT 1').bind(row.id).first<{enquiry_id:string;assigned_email?:string}>();
     if(linked){
+      notificationEmail=linked.assigned_email||env.LEAD_TO_EMAIL;
       const winner='EXISTS (SELECT 1 FROM proposals WHERE id=? AND response_receipt=?)';
+      const current="EXISTS (SELECT 1 FROM enquiry_proposals ep WHERE ep.enquiry_id=enquiries.id AND ep.legacy_id=? AND ep.status!='Superseded' AND ep.version=(SELECT MAX(version) FROM enquiry_proposals WHERE enquiry_id=enquiries.id))";
       const statements=[update,
+        env.PROPOSALS_DB.prepare(`UPDATE enquiries SET status='In progress',customer_approved_at=?,updated_at=? WHERE id=? AND status NOT IN ('Confirmed','Closed') AND ${current} AND ${winner}`).bind(action==='approve'?now:null,now,linked.enquiry_id,row.id,row.id,receipt),
         env.PROPOSALS_DB.prepare(`INSERT INTO activities (id,enquiry_id,kind,actor,body,created_at,unread) SELECT ?,?,'incoming',?,?,?,1 WHERE ${winner}`).bind(crypto.randomUUID(),linked.enquiry_id,row.traveller_email,`Customer ${action==='approve'?'approved the journey direction':'requested changes'}. ${note}`,now,row.id,receipt),
         env.PROPOSALS_DB.prepare(`INSERT INTO audit_log (id,actor,action,target,created_at) SELECT ?,?,'proposal.customer_response',?,? WHERE ${winner}`).bind(crypto.randomUUID(),row.traveller_email,row.id,now,row.id,receipt),
-        ...(action==='approve'?[env.PROPOSALS_DB.prepare(`UPDATE enquiry_proposals SET status='Accepted' WHERE legacy_id=? AND version=(SELECT MAX(version) FROM enquiry_proposals WHERE legacy_id=?) AND ${winner}`).bind(row.id,row.id,row.id,receipt)]:[])];
+        env.PROPOSALS_DB.prepare(`UPDATE enquiry_proposals SET status=? WHERE legacy_id=? AND status!='Superseded' AND version=(SELECT MAX(ep.version) FROM enquiry_proposals ep WHERE ep.enquiry_id=enquiry_proposals.enquiry_id) AND ${winner}`).bind(action==='approve'?'Accepted':'Sent',row.id,row.id,receipt)];
       [result]=await env.PROPOSALS_DB.batch(statements);
     }else result=await update.run();
   }else result=await update.run();
   if(result.meta?.changes===0)return json({error:'This proposal changed while your response was being saved. Reload the proposal to review its current state.'},409);
-  if(env.RESEND_API_KEY&&env.LEAD_TO_EMAIL&&env.EMAIL_SEND_ENABLED!=='false'){
+  if(env.RESEND_API_KEY&&notificationEmail&&env.EMAIL_SEND_ENABLED!=='false'){
     const label=action==='approve'?'approved the journey direction':'requested changes';
     const subject=`Journey proposal response · ${row.traveller_name} · ${label}`;
-    const text=[`${row.traveller_name} ${label}.`,note?`Traveller note: ${note}`:'',`Proposal: ${row.title}`,`Reply to: ${row.traveller_email}`].filter(Boolean).join('\n\n');
-    const html=`<!doctype html><html><body style="margin:0;background:#eee8dc;font-family:Arial,sans-serif;color:#173229"><table role="presentation" width="100%"><tr><td align="center" style="padding:30px"><table role="presentation" width="100%" style="max-width:640px;background:#fffdf8;border-top:5px solid #b44b37"><tr><td style="padding:24px 30px;background:#102d24;color:white;font-weight:700;letter-spacing:2px">WAY <i style="color:#d3ae68">to</i> ASIA</td></tr><tr><td style="padding:32px"><p style="color:#9b3f2e;font-size:12px;font-weight:700;text-transform:uppercase">Proposal response</p><h1 style="font:32px Georgia,serif">${escapeHtml(row.traveller_name)} ${escapeHtml(label)}</h1><p style="line-height:1.7;color:#50625a">${note?escapeHtml(note):'No additional note was included.'}</p><p><a href="mailto:${escapeHtml(row.traveller_email)}" style="color:#8f3828">Reply to ${escapeHtml(row.traveller_email)}</a></p></td></tr></table></td></tr></table></body></html>`;
-    await sendResend(env.RESEND_API_KEY,{to:[env.LEAD_TO_EMAIL],replyTo:row.traveller_email,subject,text,html});
+    const text=[`${row.traveller_name} ${label}.`,note?`Traveller note: ${note}`:'',`Proposal: ${row.title}`,action==='approve'?'Customer approved — awaiting confirmation. Verify price and availability before confirming the booking.':'Review the requested changes in the dashboard.','Dashboard: https://waytoasia.com/dashboard',`Reply to: ${row.traveller_email}`].filter(Boolean).join('\n\n');
+    const html=`<!doctype html><html><body style="margin:0;background:#eee8dc;font-family:Arial,sans-serif;color:#173229"><table role="presentation" width="100%"><tr><td align="center" style="padding:30px"><table role="presentation" width="100%" style="max-width:640px;background:#fffdf8;border-top:5px solid #b44b37"><tr><td style="padding:24px 30px;background:#102d24;color:white;font-weight:700;letter-spacing:2px">WAY <i style="color:#d3ae68">to</i> ASIA</td></tr><tr><td style="padding:32px"><p style="color:#9b3f2e;font-size:12px;font-weight:700;text-transform:uppercase">Proposal response</p><h1 style="font:32px Georgia,serif">${escapeHtml(row.traveller_name)} ${escapeHtml(label)}</h1><p style="line-height:1.7;color:#50625a">${note?escapeHtml(note):'No additional note was included.'}</p><p>Review this response and verify price and availability before confirming the booking.</p><p><a href="https://waytoasia.com/dashboard">Open dashboard</a></p><p><a href="mailto:${escapeHtml(row.traveller_email)}" style="color:#8f3828">Reply to ${escapeHtml(row.traveller_email)}</a></p></td></tr></table></td></tr></table></body></html>`;
+    try{await sendResend(env.RESEND_API_KEY,{to:[notificationEmail],replyTo:row.traveller_email,subject,text,html});}catch{console.error('Proposal response saved; consultant email notification failed');}
   }
   const suffix=action==='approve'?'approved':'changes';
   return Response.redirect(`${new URL(request.url).origin}/proposal/${encodeURIComponent(token)}?response=${suffix}`,303);
