@@ -13,8 +13,14 @@ export function hotelbedsLocations():HbxLocation[]{const cities=new Map<string,H
 export function hotelbedsLocationById(id:string){return hotelbedsLocations().find(p=>p.id===id)}
 /** Exact city names only: combined itinerary chapters need a consultant to resolve their overnight base. */
 export function hotelbedsLocation(place:string,countries:string[],overnightEvidence:string[]=[]):HbxLocation|undefined{
- let city=key(place.split(':').at(-1)||'').replace(/\s+(?:&|and)\s+(?:surrounds|surroundings|environs)$/,'');const explicit=place.includes(':')?key(place.split(':')[0]):'';
- city=aliases[city]||city;const knownCountries=[...new Set(hotelbedsLocations().map(p=>p.country))];const namedCountry=knownCountries.find(c=>key(c.replaceAll('-',' '))===explicit);if(namedCountry)countries=[namedCountry];
+ const knownCountries=[...new Set(hotelbedsLocations().map(p=>p.country))];
+ // Generated/localised headings may use a colon, hyphen or typographic dash.
+ // Strip only a recognised country prefix; never split a multi-city label.
+ let location=key(place),namedCountry:string|undefined;
+ for(const country of knownCountries){for(const label of [country,country.replaceAll('-',' '),...(country==='south-korea'?['korea']:[])]){const prefix=new RegExp(`^${label}\\s*[:—–-]\\s*`);if(prefix.test(location)){namedCountry=country;location=location.replace(prefix,'');break}}if(namedCountry)break}
+ if(namedCountry)countries=[namedCountry];
+ const explicit=namedCountry||'';
+ let city=location.replace(/\s+(?:&|and)\s+(?:surrounds|surroundings|environs)$/,'');city=aliases[city]||city;
  const gateway=Object.values(hbxGateways).filter(g=>g.id!=='bali').find(g=>key(g.name)===city&&(countries.includes(g.country)||key(g.country.replaceAll('-',' '))===explicit));if(gateway)return gateway;
  const matches=points.filter(p=>key(p.name)===city&&(countries.includes(p.country)||key(p.country.replaceAll('-',' '))===explicit));if(matches.length===1)return matches[0].name==='Sukhothai'?{...matches[0],searchRadiusKm:20}:matches[0];
  // A chapter can include day trips. Resolve its base only when the proposed hotels identify

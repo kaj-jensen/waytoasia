@@ -55,6 +55,9 @@ test('accepts supplied family ages and curated coordinates, without guessing com
 test('resolves spelling variants and keeps combined or wrong-country bases unresolved',async()=>{
  const {hotelbedsLocation,hotelbedsLocations}=await import('../src/lib/suppliers/locations');
  assert.equal(hotelbedsLocation('Thailand: Sukhotai',['thailand'])?.name,'Sukhothai');
+ assert.equal(hotelbedsLocation('Thailand-Chiang Mai',['thailand'])?.name,'Chiang Mai');
+ assert.equal(hotelbedsLocation('Thailand — Sukhothai',['thailand'])?.name,'Sukhothai');
+ assert.equal(hotelbedsLocation('South Korea - Gyeongju',['south-korea'])?.name,'Gyeongju');
  assert.equal(hotelbedsLocation('Vietnam: Bangkok',['thailand']),undefined);
  assert.equal(hotelbedsLocation('Ayutthaya & Sukhothai',['thailand']),undefined);
  assert.equal(hotelbedsLocation('Bali',['indonesia']),undefined);
