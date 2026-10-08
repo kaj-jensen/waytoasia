@@ -241,6 +241,7 @@ export function createHbxSandboxAdapter(options:HbxAdapterOptions):SupplierSearc
       results.set(id,content);
       if(content.imageUrl)try{await cache?.put(cacheKey(id),Response.json(content,{headers:{'Cache-Control':'public, max-age=604800'}}))}catch{/* A valid image remains usable without cache. */}
     }
+    console.info(JSON.stringify({message:'Hotelbeds hotel content response',requested:missing.length,returned:asArray(body.hotels).length,photos:[...results.values()].filter(c=>c.imageUrl).length}));
     return results;
   };
   return {
