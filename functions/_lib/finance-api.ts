@@ -85,7 +85,7 @@ export async function financePost(path:string,input:Record<string,unknown>,env:D
  }
  if(action==='import'){
   const candidates=await travelCandidates(env,id);let count=0;
-  for(const candidate of candidates){if(items.some(i=>i.source_key===candidate.key))continue;if(items.length>=250)bad('Import would exceed the 250-item limit.');const item:FinanceItem={id:crypto.randomUUID(),enquiry_id:id,source_key:candidate.key,product_type:candidate.type,description:candidate.description,supplier:candidate.supplier,travel_item_id:candidate.key,status:'Draft',quote:null,actual:null,notes:'Imported from the selected journey. Enter verified prices and supplier costs.',created_at:now,updated_at:now};items.push(item);addItem(item);count++}
+  for(const candidate of candidates){if(items.some(i=>i.source_key===candidate.key||i.travel_item_id===candidate.key))continue;if(items.length>=250)bad('Import would exceed the 250-item limit.');const item:FinanceItem={id:crypto.randomUUID(),enquiry_id:id,source_key:candidate.key,product_type:candidate.type,description:candidate.description,supplier:candidate.supplier,travel_item_id:candidate.key,status:'Draft',quote:null,actual:null,notes:'Imported from the selected journey. Enter verified prices and supplier costs.',created_at:now,updated_at:now};items.push(item);addItem(item);count++}
   if(!count)bad('No new selected travel items to import. Existing financial items were preserved.');
  }
  if(action==='payment'){

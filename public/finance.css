@@ -8,3 +8,5 @@
 .finance-published{display:grid;grid-template-columns:1.3fr 1fr;gap:1.5rem;padding:1.2rem;margin:1rem 0;background:#eef3ea;border:1px solid #d5dfcf;border-radius:.5rem}.finance-published h3{margin:.3rem 0 .6rem}.finance-published p{font-size:.85rem;margin:.5rem 0}.finance-published strong{font-size:1.15rem}#enquiry-finances .finance-kpi strong{font-size:1.25rem}@media(max-width:700px){.finance-published{grid-template-columns:1fr;gap:.5rem}}
 
 .finance-dialog-actions{position:sticky;bottom:-1.5rem;display:flex;align-items:center;justify-content:flex-end;gap:1rem;background:#fff;border-top:1px solid #cbd6cf;padding:1rem 0;margin-top:1rem;z-index:2}.finance-dialog-actions .finance-error{margin:0;flex:1}
+
+.finance-summary-version{display:block;margin:.4rem 0;line-height:1.6}

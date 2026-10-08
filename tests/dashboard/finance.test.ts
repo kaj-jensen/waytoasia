@@ -84,3 +84,33 @@ test('portfolio includes every enquiry without finance records and paginates bey
 });
 
 test("invalid commission identifies the amount field rather than blaming decimals",()=>{assert.throws(()=>normalizeComponents({priceBase:"550.00",supplierCost:"480.00",commission:"EUR"},"EUR"),/Supplier commission: Enter a numeric amount/)});
+
+test('registered figures reconcile across reload, portfolio, balances, categories, CSV and revisions',async()=>{
+ const {env,sqlite}=setup(),e=await enquiry(env),path='/'+e.id;
+ const actual={priceBase:'550.00',markup:'50.00',serviceFee:'10.00',discount:'5.00',supplierCost:'480.00',commission:'20.00',costCurrency:'USD',fxRate:'0.9',otherCost:'6.00',paymentCost:'5.00'};
+ const payload={description:'Reconciliation hotel',product_type:'Hotels',status:'Fully booked',quote:components,actual};
+ let response=await call(env,path+'/item',{revision:0,...payload});assert.equal(response.status,200);let d=await response.json();const itemId=d.items[0].id;
+ assert.equal(d.actual.revenue,60500);assert.equal(d.actual.cost,42500);assert.equal(d.actual.earnings,18000);assert.equal(d.actual.commission,1800);assert.equal(d.quote.revenue,108500);
+ for(const [kind,amount] of [['receipt','200.00'],['supplier_payment','100.00'],['invoice','605.00']]){
+  response=await call(env,path+'/payment',{revision:d.file.revision,kind,amount,currency:'EUR',date:'2026-10-07',due_date:kind==='invoice'?'2026-10-07':'',item_id:itemId});assert.equal(response.status,200);d=await response.json();
+ }
+ response=await call(env,path+'/item',{revision:d.file.revision,id:itemId,...payload,actual:{...actual,priceBase:'600.00'}});assert.equal(response.status,200);d=await response.json();
+ const reloaded=await(await call(env,path)).json(),row=(await(await call(env,'')).json()).files.find((f:{enquiry_id:string})=>f.enquiry_id===e.id);
+ for(const record of [d,reloaded,row]){assert.equal(record.actual.revenue,65500);assert.equal(record.actual.cost,42500);assert.equal(record.actual.earnings,23000);assert.equal(record.quote.earnings,30000);assert.equal(record.actual.categories.Hotels.earnings,23000);assert.equal(record.actual.margin,23000/65500*100)}
+ assert.equal(reloaded.paymentActual.paid,20000);assert.equal(reloaded.paymentActual.outstanding,45500);assert.equal(reloaded.paymentActual.supplierPaid,10000);assert.equal(reloaded.paymentActual.supplierBalance,31400);assert.deepEqual(row.payment,reloaded.paymentActual);
+ assert.equal(reloaded.history.length,5);assert.equal(reloaded.history[0].snapshot.actual.earnings,23000);assert.equal(reloaded.history[1].snapshot.actual.earnings,18000);
+ const csv=await(await call(env,path+'/csv?basis=actual')).text();assert.ok(csv.includes('"655","425","18","11","230"'));assert.ok(csv.includes('"200","455","100","314"'));
+ const quoted=await(await call(env,path+'/csv?basis=quote')).text();assert.ok(quoted.includes('"1085","785","50","35","300"'));
+ assert.equal((await call(env,path+'/item',{revision:1,id:itemId,...payload})).status,409);assert.equal((await(await call(env,path)).json()).actual.revenue,65500);
+ assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM finance_items WHERE enquiry_id=?').get(e.id)!.n,1);
+});
+
+test('adding figures to a service before import does not duplicate its price',async()=>{
+ const {env,sqlite}=setup(),e=await enquiry(env);
+ const snapshot={suggestion:{hotelStays:[{place:'Bangkok',options:[{id:'hotel-a',name:'Linked hotel'}]}],dayPlans:[{day:1,options:[{id:'tour-a',name:'Linked excursion'}]}]},builderChoices:{hotels:{'stay-0':'hotel-a'},days:{'day-1':'tour-a'}}};
+ sqlite.prepare("INSERT INTO enquiry_proposals (id,enquiry_id,title,url,version,status,created_at,snapshot_json) VALUES (?,?,'Test','https://example.invalid',1,'Draft',?,?)").run(crypto.randomUUID(),e.id,new Date().toISOString(),JSON.stringify(snapshot));
+ const source=await(await call(env,'/'+e.id)).json(),service=source.source.services.find((s:{type:string})=>s.type==='Hotels');assert.ok(service);
+ let response=await call(env,'/'+e.id+'/item',{revision:0,travel_item_id:service.key,description:service.description,product_type:'Hotels',status:'Quoted',quote:components,actual:components});assert.equal(response.status,200);
+ response=await call(env,'/'+e.id+'/import',{revision:1});assert.equal(response.status,200);const d=await response.json();
+ assert.equal(d.items.filter((i:FinanceItem)=>i.travel_item_id===service.key).length,1);assert.equal(d.actual.revenue,108500);assert.equal(d.items.length,2);
+});

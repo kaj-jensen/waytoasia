@@ -6,7 +6,7 @@ test('financial workflow persists, drills down, exports and fits mobile',async({
  await expect(page.getByRole('heading',{name:'Financial overview',exact:true})).toBeVisible();
  const id=new URL(page.url()).hash.slice(9),response=await page.request.get('/dashboard/api/finance/'+id),before=await response.json();
  await expect(page.locator('[data-drill=earnings]')).toContainText((before.actual.earnings/100).toLocaleString('en-GB',{minimumFractionDigits:2}));
- await page.locator('[data-category=Hotels]').click();await expect(page.locator('#finance-items tbody tr')).toHaveCount(1);
+ await page.locator('[data-category=Hotels]').click();await expect(page.locator('#finance-items tbody tr')).toHaveCount(before.actual.lines.filter((i:{product_type:string})=>i.product_type==='Hotels').length);
  await page.getByRole('button',{name:'8 nights · two family rooms',exact:true}).click();await expect(page.locator('#finance-dialog [type=submit]')).toBeDisabled();
  const field=page.locator('[name=actual_otherCost]'),original=await field.inputValue();await field.fill('24.00');await page.locator('#finance-dialog [type=submit]').click();await expect(page.locator('#notice')).toHaveText('✓ Financial changes saved.');
  await page.reload();await expect(page.getByRole('heading',{name:'Financial overview',exact:true})).toBeVisible();await page.getByRole('button',{name:'8 nights · two family rooms',exact:true}).click();await expect(page.locator('[name=actual_otherCost]')).toHaveValue('24.00');await page.locator('[name=actual_otherCost]').fill(original);await page.locator('#finance-dialog [type=submit]').click();
@@ -20,8 +20,8 @@ test('financial workflow persists, drills down, exports and fits mobile',async({
  await page.getByRole('tab',{name:'Finance',exact:true}).click();
  await expect(page.getByRole('heading',{name:'This file’s finances',exact:true})).toBeVisible();
  await expect(page.locator('#enquiry-finances .finance-kpi')).toHaveCount(5);
- await page.getByText('Individual item earnings (7)',{exact:true}).click();
- await expect(page.locator('#enquiry-finances .enquiry-finance-items tbody tr')).toHaveCount(7);
+ await page.getByText(`Individual item earnings (${before.items.length})`,{exact:true}).click();
+ await expect(page.locator('#enquiry-finances .enquiry-finance-items tbody tr')).toHaveCount(before.items.length);
  await page.getByRole('button',{name:'8 nights · two family rooms',exact:true}).click();
  await page.getByLabel('Internal notes').fill('Synthetic example. Inline enquiry edit verification '+Date.now());
  await page.locator('#finance-dialog [type=submit]').click();
@@ -101,4 +101,31 @@ test('editing an unpriced amount persists without a separate checkbox step',asyn
  await expect(page.locator('[name=actual_priced]')).toBeChecked();
  await expect(page.locator('[name=quote_priced]')).not.toBeChecked();
  await expect(page.locator('#finance-dialog [type=submit]')).toBeDisabled();
+});
+
+test('saved quote and actual values update every corresponding finance view',async({page})=>{
+ test.skip(!test.info().config.configFile?.endsWith('playwright.finance.config.ts'),'Uses isolated synthetic dashboard server.');
+ const {database}=await import('./dashboard/support');const {sqlite}=database('.wrangler/dashboard-preview.sqlite');
+ const id=crypto.randomUUID(),now=new Date().toISOString(),name='Finance connections '+id;
+ sqlite.prepare('INSERT INTO clients VALUES (?,?,?,?,?)').run(id,`${id}@example.invalid`,name,'',now);
+ sqlite.prepare('INSERT INTO enquiries (id,reference,client_id,source,requirements_json,original_message,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)').run(id,'TEST-'+id,id,'Synthetic test','{}','Finance reconciliation',now,now);
+ const snapshot={suggestion:{hotelStays:[{place:'Bangkok',options:[{id:'hotel-a',name:'Connected hotel figures'}]}]},builderChoices:{hotels:{'stay-0':'hotel-a'}}};
+ sqlite.prepare("INSERT INTO enquiry_proposals (id,enquiry_id,title,url,version,status,created_at,snapshot_json) VALUES (?,?,'Synthetic','https://example.invalid',1,'Draft',?,?)").run(crypto.randomUUID(),id,now,JSON.stringify(snapshot));sqlite.close();
+ await page.goto('/preview-login');await page.goto('/dashboard#'+id);await page.getByRole('tab',{name:'Finance',exact:true}).click();
+ await page.locator('[data-service]').first().click();await page.getByLabel('Description',{exact:true}).fill('Connected hotel figures');
+ for(const [key,value] of Object.entries({quote_priceBase:'550.00',quote_markup:'50.00',quote_supplierCost:'480.00',actual_priceBase:'600.00',actual_markup:'50.00',actual_supplierCost:'500.00',actual_commission:'10.00',actual_otherCost:'5.00',actual_paymentCost:'5.00'}))await page.locator(`[name=${key}]`).fill(value);
+ await page.locator('#finance-dialog [type=submit]').click();await expect(page.locator('[data-inline-feedback]')).toContainText('saved');
+ const cards=page.locator('#enquiry-finances .finance-kpi');await expect(cards.nth(0)).toContainText('EUR 650.00');await expect(cards.nth(1)).toContainText('EUR 500.00');await expect(cards.nth(2)).toContainText('EUR 150.00');
+ const serviceRow=page.locator('.finance-services tbody tr').filter({hasText:'Bangkok · Connected hotel figures'});await expect(serviceRow).toContainText('EUR 650.00');await expect(serviceRow).toContainText('EUR 500.00 cost');await expect(serviceRow).toContainText('EUR 150.00 earnings');await expect(serviceRow).not.toContainText('Price needed');
+ await expect(page.locator('[data-summary-basis=quote]')).toContainText('EUR 600.00 customer price');await expect(page.locator('[data-summary-basis=actual]')).toContainText('EUR 150.00 earnings');
+ await page.getByRole('button',{name:'Quoted / expected',exact:true}).click();await expect(cards.nth(0)).toContainText('EUR 600.00');await expect(cards.nth(2)).toContainText('EUR 120.00');
+ await page.locator('.enquiry-finance-items summary').click();await page.getByRole('button',{name:'Connected hotel figures',exact:true}).click();await page.locator('[name=quote_priceBase]').fill('575.00');await page.locator('#finance-dialog [type=submit]').click();
+ await expect(cards.nth(0)).toContainText('EUR 625.00');await expect(page.locator('[data-summary-basis=quote]')).toContainText('EUR 145.00 earnings');await expect(page.locator('[data-summary-basis=actual]')).toContainText('EUR 650.00 customer price');
+ await page.reload();await expect(page.locator('[data-summary-basis=quote]')).toContainText('EUR 625.00 customer price');await page.getByRole('tab',{name:'Finance',exact:true}).click();await page.getByRole('link',{name:'Full financial workspace ↗'}).click();
+ await expect(page.locator('[data-drill=revenue]')).toContainText('EUR 650.00');await expect(page.locator('[data-drill=earnings]')).toContainText('EUR 150.00');await expect(page.locator('[data-category=Hotels]')).toContainText('EUR 150.00');
+ for(const [kind,value] of [['receipt','200.00'],['supplier_payment','100.00'],['invoice','650.00']]){await page.getByRole('button',{name:'Record entry',exact:true}).click();await page.getByLabel('Entry type').selectOption(kind);await page.getByLabel('Amount',{exact:true}).fill(value);await page.locator('#finance-dialog [type=submit]').click()}
+ await expect(page.locator('[data-drill=payments]')).toContainText('EUR 450.00');await expect(page.locator('.finance-balances')).toContainText('EUR 390.00');
+ const api=await(await page.request.get('/dashboard/api/finance/'+id)).json();expect(api.actual.revenue).toBe(65000);expect(api.quote.revenue).toBe(62500);expect(api.paymentActual.outstanding).toBe(45000);expect(api.history[0].snapshot.actual.earnings).toBe(15000);
+ const csv=await(await page.request.get('/dashboard/api/finance/'+id+'/csv?basis=actual')).text();expect(csv).toContain('"650","500","10","10","150"');
+ await page.getByRole('button',{name:'Finances',exact:true}).click();const row=page.locator('#portfolio-content tbody tr').filter({hasText:name});await expect(row).toContainText('EUR 625.00');await expect(row).toContainText('EUR 650.00');await expect(row).toContainText('EUR 500.00');await expect(row).toContainText('EUR 150.00');
 });
