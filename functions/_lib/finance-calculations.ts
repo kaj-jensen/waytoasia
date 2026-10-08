@@ -21,7 +21,8 @@ export function normalizeComponents(value:unknown,currency:string):Components|nu
  const result={costCurrency,fxRate} as Components;
  for(const key of ['priceBase','supplierCost','markup','serviceFee','discount','commission','otherCost','paymentCost'] as const){
   if((key==='priceBase'||key==='supplierCost')&&(v[key]===''||v[key]===undefined||v[key]===null))throw Error('Enter both the base customer price and supplier cost, or leave this version unpriced.');
-  result[key]=minor(v[key]??'0',['supplierCost','commission'].includes(key)?costCurrency:currency);
+  const labels={priceBase:'Base customer price',supplierCost:'Supplier cost before commission',markup:'Markup',serviceFee:'Service fee',discount:'Discount',commission:'Supplier commission',otherCost:'Other cost',paymentCost:'Payment / card cost'};
+  try{result[key]=minor(v[key]??'0',['supplierCost','commission'].includes(key)?costCurrency:currency)}catch(error){const text=String(v[key]??'').trim();throw Error(`${labels[key]}: ${/[a-z]/i.test(text)?'Enter a numeric amount, such as 0 or 50.00. Currency codes belong in Supplier currency.':(error as Error).message}`,{cause:error})}
  }
  if(result.discount<0||result.paymentCost<0||result.otherCost<0)throw Error('Discount and additional costs must be zero or positive. Use a negative price or supplier cost for credits.');
  return result;

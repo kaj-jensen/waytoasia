@@ -82,3 +82,5 @@ test('portfolio includes every enquiry without finance records and paginates bey
  const ids:string[]=[];let cursor='';do{const page=await(await call(env,cursor?'?cursor='+cursor:'')).json();for(const f of page.files){ids.push(f.enquiry_id);assert.equal(f.actual.revenue,0);if(f.enquiry_id!==first.id){assert.equal(f.source.catalogue.partyTotal,98400);assert.equal(f.currency,'DKK')}}cursor=page.nextCursor||''}while(cursor);
  assert.equal(ids.length,206);assert.equal(new Set(ids).size,206);
 });
+
+test("invalid commission identifies the amount field rather than blaming decimals",()=>{assert.throws(()=>normalizeComponents({priceBase:"550.00",supplierCost:"480.00",commission:"EUR"},"EUR"),/Supplier commission: Enter a numeric amount/)});
