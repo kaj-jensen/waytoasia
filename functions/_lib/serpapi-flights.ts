@@ -13,10 +13,10 @@ export function normaliseSerpFlight(value:unknown):FlightSegment[]{
   return i<segments.length-1&&layover.id===segment.destination&&Number.isFinite(minutes)&&minutes>=0?{...segment,connectionDuration:`PT${Math.floor(minutes)}M`}:segment;
  });
 }
-export async function searchSerpFlights(key:string,input:{origin:string;destination:string;date:string;adults:number;children:number;locale?:string;currency?:string},fetcher:typeof fetch=fetch):Promise<FlightSegment[][]>{
+export async function searchSerpFlights(key:string,input:{origin:string;destination:string;date:string;adults:number;children:number;locale?:string;currency?:string;cabin?:string},fetcher:typeof fetch=fetch):Promise<FlightSegment[][]>{
  if(!key||! /^[A-Z]{3}$/.test(input.origin)||! /^[A-Z]{3}$/.test(input.destination)||! /^\d{4}-\d{2}-\d{2}$/.test(input.date)||input.adults<1||input.adults+input.children>9)throw Error('Invalid flight search details.');
  const url=new URL('https://serpapi.com/search.json');
- const params={engine:'google_flights',api_key:key,type:'2',departure_id:input.origin,arrival_id:input.destination,outbound_date:input.date,adults:String(input.adults),children:String(input.children),travel_class:'1',currency:input.currency||'EUR',hl:input.locale||'en',gl:'dk'};
+ const params={engine:'google_flights',api_key:key,type:'2',departure_id:input.origin,arrival_id:input.destination,outbound_date:input.date,adults:String(input.adults),children:String(input.children),travel_class:({economy:'1',premium_economy:'2',business:'3',first:'4'}[input.cabin||'economy']||'1'),currency:input.currency||'EUR',hl:input.locale||'en',gl:'dk'};
  for(const [name,value] of Object.entries(params))url.searchParams.set(name,value);
  // Never propagate the request URL or provider error body: the URL contains a secret.
  let response:Response;try{response=await fetcher(url,{signal:AbortSignal.timeout(25000)});}catch{throw Error('Flight search did not respond.');}

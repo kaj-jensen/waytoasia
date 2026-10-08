@@ -30,3 +30,9 @@ test('does not guess infant seating or child age categories',async()=>{
  }
  assert.equal(calls,0);
 });
+
+test('staff searches use SerpApi and selections are signed, enquiry-bound and preserve cabin',async()=>{
+ const {searchStaffFlights,selectedStaffFlight}=await import('../functions/_lib/staff-flights');const original=globalThis.fetch;let calls=0;
+ globalThis.fetch=async(input)=>{const u=new URL(String(input));assert.equal(u.hostname,'serpapi.com');assert.equal(u.searchParams.get('travel_class'),'3');calls++;const from=u.searchParams.get('departure_id')!,to=u.searchParams.get('arrival_id')!,day=u.searchParams.get('outbound_date')!;return Response.json({best_flights:[{flights:[segment(from,to,day+' 10:00',day+' 18:00')]}]})};
+ try{const offers=await searchStaffFlights('synthetic-private-key','enquiry-a',{origin:'CPH',destination:'BKK',departure:'2027-02-09',returnDate:'2027-02-17',adults:2,cabin:'business'});assert.equal(calls,2);assert.equal(offers[0].source,'serpapi-google-flights');assert.equal((await selectedStaffFlight('synthetic-private-key','enquiry-a',offers[0].selection)).slices.length,2);await assert.rejects(selectedStaffFlight('synthetic-private-key','enquiry-b',offers[0].selection));await assert.rejects(selectedStaffFlight('synthetic-private-key','enquiry-a',offers[0].selection+'x'));assert.doesNotMatch(JSON.stringify(offers),/synthetic-private-key/);await assert.rejects(searchStaffFlights(undefined,'enquiry-a',{}));}finally{globalThis.fetch=original}
+});

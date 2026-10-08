@@ -166,3 +166,9 @@ test('legacy passenger without a lead defaults to the contact without losing pas
  await page.goto('/dashboard#'+id);await page.getByRole('tab',{name:'Customer & passengers',exact:true}).click();await page.getByRole('button',{name:'Open protected record',exact:true}).click();
  await expect(page.locator('[data-contact-lead]')).toBeChecked();await expect(page.locator('.customer-passenger')).toHaveCount(1);await expect(page.locator('[data-passenger-dob]')).toHaveValue('1980-02-03');await expect(page.locator('[data-lead]')).toBeChecked();await expect(page.locator('.customer-error-summary')).toBeHidden();
 });
+
+test('staff flights show SerpApi controls instead of Duffel setup',async({page})=>{
+ test.skip(!test.info().config.configFile?.endsWith('playwright.finance.config.ts'),'Uses isolated synthetic dashboard server.');
+ await page.goto('/preview-login');const rows=await (await page.request.get('/dashboard/api/enquiries')).json(),id=rows.rows[0].id;
+ await page.goto('/dashboard#'+id);await page.getByRole('tab',{name:'Flights',exact:true}).click();await expect(page.getByRole('button',{name:'Search Google Flights via SerpApi',exact:true})).toBeDisabled();await expect(page.locator('.flight-panel')).not.toContainText('Search Duffel');await expect(page.locator('.flight-panel')).not.toContainText('DUFFEL_TEST_TOKEN');await expect(page.locator('.flight-panel')).toContainText('configure SerpApi');
+});
