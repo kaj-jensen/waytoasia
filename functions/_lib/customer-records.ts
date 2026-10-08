@@ -18,7 +18,7 @@ export async function openCustomerRecord(env:DashboardEnv,id:string,value:string
  try{const data=JSON.parse(value);if(data.v!==1)throw Error('Unknown version');const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:bytes(data.iv),additionalData:encoder.encode('wta-customer:v1:'+id)},k,bytes(data.data));return JSON.parse(new TextDecoder().decode(plain))}
  catch{bad('Protected record could not be authenticated. No personal data was returned.',503)}
 }
-export interface CustomerRecord {contact:{name:string;email:string;phone:string;address:string;postalCode:string;city:string;country:string};journey:{startDate:string;endDate:string};passengers:{name:string;dateOfBirth:string;nationality:string;title:string;lead:boolean;type:string}[]}
+export interface CustomerRecord {contactIsLead?:boolean;contact:{name:string;email:string;phone:string;address:string;postalCode:string;city:string;country:string};journey:{startDate:string;endDate:string};passengers:{name:string;dateOfBirth:string;nationality:string;title:string;lead:boolean;type:string}[]}
 const text=(v:unknown,max:number)=>{if(typeof v!=='string'||v.length>max||[...v].some(c=>c.charCodeAt(0)<32&&![9,10,13].includes(c.charCodeAt(0))))bad('Invalid customer field.');return v.trim()};
 export function validateCustomerRecord(input:Record<string,unknown>):CustomerRecord{
  const c=input.contact;if(!c||typeof c!=='object'||Array.isArray(c))bad('Contact details are required.');
@@ -35,8 +35,9 @@ export function validateCustomerRecord(input:Record<string,unknown>):CustomerRec
  if(retentionUntil(journey.endDate)<=new Date().toISOString())bad('The 365-day retention period for this trip has ended. Do not recreate expired protected details.');
  if(!Array.isArray(input.passengers)||input.passengers.length>12)bad('A maximum of 12 passengers is supported.');
  const passengers=input.passengers.map(p=>{if(!p||typeof p!=='object'||Array.isArray(p))bad('Invalid passenger.');const name=text(p.name??'',160),dateOfBirth=text(p.dateOfBirth??'',10),nationality=text(p.nationality??'',80);if(!name)bad('Enter each passenger’s full name.');if(dateOfBirth&&(!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)||!Number.isFinite(Date.parse(dateOfBirth))||new Date(dateOfBirth).toISOString().slice(0,10)!==dateOfBirth||dateOfBirth>new Date().toISOString().slice(0,10)))bad('Enter a valid passenger birth date.');if(nationality&&!countries.has(nationality))bad('Nationality: choose a country from the list.');if(sensitiveNumber(name))bad('Passenger name: remove card-like or passport-like numbers.');const age=ageOn(dateOfBirth,journey.startDate);if(dateOfBirth&&age===null)bad('Passenger birth date must be on or before travel starts.');const title=text(p.title??'',10);if(!['','Mr','Ms','Mrs','Mx','Dr'].includes(title))bad('Choose a valid passenger title.');return {name,dateOfBirth,nationality,title,lead:p.lead===true,type:passengerType(age)}});
+ if(input.contactIsLead===true&&!passengers.some(p=>p.lead&&p.name===contact.name))bad('The lead passenger must match the primary contact.');
  if(passengers.length&&passengers.filter(p=>p.lead).length!==1)bad('Choose exactly one lead passenger.');
- return {contact,journey,passengers};
+ return {contact,journey,passengers,contactIsLead:input.contactIsLead===true};
 }
 async function authorised(env:DashboardEnv,id:string,staff:Staff){
  const row=await env.PROPOSALS_DB.prepare('SELECT e.id,e.client_id,e.assigned_to,c.name,c.email,c.phone,e.requirements_json FROM enquiries e JOIN clients c ON c.id=e.client_id WHERE e.id=?').bind(id).first<{id:string;client_id:string;assigned_to:string;name:string;email:string;phone:string;requirements_json:string}>();

@@ -47,6 +47,7 @@ test('late replies cannot restore personal content to an identity-removed file',
 
 test('country, phone, postal, sensitive-number and passenger age validation is enforced server-side',async()=>{
  const {validateCustomerRecord}=await import('../../functions/_lib/customer-records');
+ assert.throws(()=>validateCustomerRecord({...record,contactIsLead:true}));const contactLead=validateCustomerRecord({...record,contactIsLead:true,passengers:[{...record.passengers[0],name:record.contact.name}]});assert.equal(contactLead.contactIsLead,true);
  const valid=validateCustomerRecord(record);assert.equal(valid.passengers[0].type,'Adult'); // age 13 at travel, not age today
  assert.throws(()=>validateCustomerRecord({...record,contact:{...record.contact,country:'Brasil'}}));
  assert.throws(()=>validateCustomerRecord({...record,contact:{...record.contact,phone:'51991719'}}));
