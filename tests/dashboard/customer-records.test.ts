@@ -7,7 +7,7 @@ import {sealCustomerRecord,openCustomerRecord} from '../../functions/_lib/custom
 const auth=await identity(),secret=Buffer.alloc(32,9).toString('base64');
 async function setup(){const {adapter,sqlite}=database();const env:DashboardEnv={PROPOSALS_DB:adapter,CUSTOMER_RECORDS_KEY:secret,ACCESS_TEAM_DOMAIN:'preview.invalid',ACCESS_AUD:'local-preview',LOCAL_ACCESS_JWK:JSON.stringify(auth.publicJwk)};for(const role of ['admin','staff','backoffice','finance','viewer'])sqlite.prepare('INSERT INTO staff_users (email,name,role,access_role,enabled,created_at) VALUES (?,?,?,?,1,?)').run(role+'@example.invalid',role,role==='admin'?'admin':'staff',role,new Date().toISOString());const e=await captureEnquiry(env,{name:'Synthetic customer',email:'person@example.invalid',source:'Test',message:'Private original message',requirements:{name:'Synthetic customer'}});return {env,sqlite,id:e.id}}
 async function call(env:DashboardEnv,id:string,body?:unknown,role='admin',action='customer-records'){return onRequest({env,request:new Request(`http://localhost:8788/dashboard/api/enquiries/${id}/${action}`,{method:body?'POST':'GET',headers:{'Cf-Access-Jwt-Assertion':await auth.token(role+'@example.invalid'),Origin:'http://localhost:8788','Content-Type':'application/json'},body:body?JSON.stringify(body):undefined})})}
-const record={contact:{name:'Sensitive Person',email:'private@example.invalid',phone:'+4512345678',address:'Secret Street 12',postalCode:'1000',city:'Copenhagen',country:'Denmark'},passengers:[{name:'Private Child',dateOfBirth:'2014-01-02',nationality:'Danish'}]};
+const record={journey:{startDate:'2027-04-03',endDate:'2027-04-12'},contact:{name:'Sensitive Person',email:'private@example.invalid',phone:'+4512345678',address:'Secret Street 12',postalCode:'1000',city:'Copenhagen',country:'DK'},passengers:[{name:'Private Child',dateOfBirth:'2014-01-02',nationality:'DK',lead:true}]};
 test('AES-GCM is randomized, authenticated, bound to the enquiry and fails closed',async()=>{
  const {env,id}=await setup(),a=await sealCustomerRecord(env,id,record),b=await sealCustomerRecord(env,id,record);assert.notEqual(a,b);assert.ok(!a.includes('Sensitive'));assert.deepEqual(await openCustomerRecord(env,id,a),record);
  await assert.rejects(()=>openCustomerRecord(env,'another-id',a));const altered=JSON.parse(a);altered.data=(altered.data[0]==='A'?'B':'A')+altered.data.slice(1);await assert.rejects(()=>openCustomerRecord(env,id,JSON.stringify(altered)));await assert.rejects(()=>sealCustomerRecord({...env,CUSTOMER_RECORDS_KEY:undefined},id,record));
@@ -43,4 +43,22 @@ test('late replies cannot restore personal content to an identity-removed file',
  env.RESEND_WEBHOOK_SECRET='whsec_'+Buffer.from('synthetic-webhook-secret').toString('base64');env.RESEND_RECEIVING_API_KEY='synthetic';
  const original=globalThis.fetch;globalThis.fetch=async()=>Response.json({id:'late-reply',from:'person@example.invalid',to:['journeys@example.invalid'],subject:reference,text:'Sensitive late reply',attachments:[],created_at:new Date().toISOString()});
  try{const event=JSON.stringify({type:'email.received',data:{email_id:'late-reply'}}),eventId='late-event',now=new Date();const res=await onRequestPost({env,request:new Request('https://example.invalid/api/webhooks/resend',{method:'POST',body:event,headers:{'svix-id':eventId,'svix-timestamp':String(Math.floor(now.getTime()/1000)),'svix-signature':new Webhook(env.RESEND_WEBHOOK_SECRET).sign(eventId,now,event)}})});assert.equal(res.status,200);assert.equal((await res.json()).suppressed,true);assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM activities').get()!.n,0)}finally{globalThis.fetch=original}
+});
+
+test('country, phone, postal, sensitive-number and passenger age validation is enforced server-side',async()=>{
+ const {validateCustomerRecord}=await import('../../functions/_lib/customer-records');
+ const valid=validateCustomerRecord(record);assert.equal(valid.passengers[0].type,'Adult'); // age 13 at travel, not age today
+ assert.throws(()=>validateCustomerRecord({...record,contact:{...record.contact,country:'Brasil'}}));
+ assert.throws(()=>validateCustomerRecord({...record,contact:{...record.contact,phone:'51991719'}}));
+ assert.throws(()=>validateCustomerRecord({...record,contact:{...record.contact,postalCode:'123'}}));
+ assert.throws(()=>validateCustomerRecord({...record,contact:{...record.contact,name:'1234 5678 9012 3456'}}));
+ assert.throws(()=>validateCustomerRecord({...record,passengers:[{...record.passengers[0],nationality:'Danish'}]}));
+ assert.throws(()=>validateCustomerRecord({...record,passengers:[{...record.passengers[0],lead:false}]}));
+ const infant=validateCustomerRecord({...record,journey:{startDate:'2026-12-01',endDate:'2026-12-12'},passengers:[{...record.passengers[0],dateOfBirth:'2025-01-01'}]});assert.equal(infant.passengers[0].type,'Infant');
+});
+test('365-day expiry deletes only expired protected records and leaves finance and undated legacy records intact',async()=>{
+ const {expireCustomerRecords}=await import('../../maintenance/customer-retention');const {retentionUntil}=await import('../../functions/_lib/customer-validation');
+ const {env,sqlite,id}=await setup();assert.equal(retentionUntil('2027-04-12'),'2028-04-11T23:59:59.999Z');await call(env,id,{revision:0,...record});
+ assert.equal(await expireCustomerRecords(env,'2028-04-11T23:59:59.998Z'),0);assert.equal(await expireCustomerRecords(env,'2028-04-12T00:00:00.000Z'),1);assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM enquiries WHERE id=?').get(id)!.n,1);
+ sqlite.prepare('INSERT INTO customer_records (enquiry_id,ciphertext,updated_at,updated_by) VALUES (?,?,?,?)').run(id,'legacy encrypted fixture',new Date().toISOString(),'admin@example.invalid');assert.equal(await expireCustomerRecords(env,'2035-01-01T00:00:00.000Z'),0);
 });

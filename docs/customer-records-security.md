@@ -23,3 +23,12 @@ The action is **de-identification of active records**, not certification of irre
 
 ## Verification
 Automated tests cover encryption randomness, authentication/tampering, record binding, missing key, role denials, stale saves, persistence, audit content, subject export and identity removal preserving amounts. UI tests use synthetic records only.
+
+## Form and retention update
+Country/nationality are ISO alpha-2 identifiers; display uses searchable native country lists. Telephone is saved in E.164 syntax after removing separators, with an additional Danish length check. Postal checks cover DK/NO/SE/DE/FR/US/BR/NL/CA/GB; other countries retain flexible postal text. No address is sent to an external postal lookup service. Supplier title is optional; document sex/gender is deliberately not collected without an identified supplier requirement.
+
+Passenger categories are calculated at travel start (infant under 2, child under 12, adult otherwise), not today's age; suppliers can have different age rules. Completed summaries show age/country, never the full birth date. Lead passenger is unique. Nationality/date of birth stay optional. Same as primary contact copies only the name.
+
+The owner selected 365 days after travel ends. New/updated encrypted records require travel dates and receive a server-calculated retention_until. The dedicated waytoasia-customer-retention Worker runs daily and deletes only expired protected ciphertext. Reads also remove expired ciphertext before returning details. Financial records and legacy enquiry contacts/history are not erased by this TTL. Existing protected records without dates are not backfilled by guesswork: they require review and a save with travel dates before expiry can be scheduled. Deployment does not erase existing records. Backups/provider/export retention remains separate.
+
+The Hide protected details control clears this browser view; it is not a shared booking lock. No false manager-unlock or read-only lock state is presented. Passenger removal has an eight-second Undo window; switching away clears temporary undo state as part of hiding protected data.

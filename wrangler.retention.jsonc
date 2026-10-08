@@ -1,0 +1,11 @@
+{
+ "$schema":"./node_modules/wrangler/config-schema.json",
+ "name":"waytoasia-customer-retention",
+ "account_id":"d29f48cc069d51d0787fc306533039e1",
+ "main":"maintenance/customer-retention.ts",
+ "compatibility_date":"2026-10-08",
+ "workers_dev":false,
+ "preview_urls":false,
+ "triggers":{"crons":["0 1 * * *"]},
+ "d1_databases":[{"binding":"PROPOSALS_DB","database_name":"waytoasia-proposals","database_id":"0cc36aa2-dbdd-4f8d-ae3b-35e5c757c18c"}]
+}

@@ -1,3 +1,4 @@
+import {countries,postalPatterns,dateOnly,ageOn,passengerType,sensitiveNumber,retentionUntil} from './customer-validation';
 import {auditStatement,json,requireAdmin,type DashboardEnv,type Staff} from './dashboard';
 const encoder=new TextEncoder();
 function bad(message:string,status=400):never{throw json({error:message},status)}
@@ -17,18 +18,28 @@ export async function openCustomerRecord(env:DashboardEnv,id:string,value:string
  try{const data=JSON.parse(value);if(data.v!==1)throw Error('Unknown version');const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:bytes(data.iv),additionalData:encoder.encode('wta-customer:v1:'+id)},k,bytes(data.data));return JSON.parse(new TextDecoder().decode(plain))}
  catch{bad('Protected record could not be authenticated. No personal data was returned.',503)}
 }
-export interface CustomerRecord {contact:{name:string;email:string;phone:string;address:string;postalCode:string;city:string;country:string};passengers:{name:string;dateOfBirth:string;nationality:string}[]}
+export interface CustomerRecord {contact:{name:string;email:string;phone:string;address:string;postalCode:string;city:string;country:string};journey:{startDate:string;endDate:string};passengers:{name:string;dateOfBirth:string;nationality:string;title:string;lead:boolean;type:string}[]}
 const text=(v:unknown,max:number)=>{if(typeof v!=='string'||v.length>max||[...v].some(c=>c.charCodeAt(0)<32&&![9,10,13].includes(c.charCodeAt(0))))bad('Invalid customer field.');return v.trim()};
 export function validateCustomerRecord(input:Record<string,unknown>):CustomerRecord{
  const c=input.contact;if(!c||typeof c!=='object'||Array.isArray(c))bad('Contact details are required.');
  const contact=Object.fromEntries(Object.entries({name:160,email:240,phone:80,address:500,postalCode:30,city:120,country:80}).map(([k,n])=>[k,text((c as Record<string,unknown>)[k]??'',n)])) as CustomerRecord['contact'];
  if(!contact.name)bad('Enter the customer name.');if(contact.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email))bad('Enter a valid contact email.');
+ if(contact.phone&&!/^\+[1-9]\d{6,14}$/.test(contact.phone))bad('Telephone: use an international number beginning with + and a country code.');
+ if(contact.phone.startsWith('+45')&&!/^\+45\d{8}$/.test(contact.phone))bad('Telephone: Danish numbers require +45 and 8 digits.');
+ if(contact.country&&!countries.has(contact.country))bad('Country: choose a country from the list.');
+ if(contact.postalCode&&!contact.country)bad('Country: select the country for this postal code.');
+ if(contact.postalCode&&postalPatterns[contact.country]&&!postalPatterns[contact.country].test(contact.postalCode))bad('Postal code: check the format for the selected country.');
+ if(sensitiveNumber(contact.name))bad('Full name: remove card-like or passport-like numbers.');
+ const j=input.journey as Record<string,unknown>|undefined,journey={startDate:text(j?.startDate??'',10),endDate:text(j?.endDate??'',10)};
+ if(!dateOnly(journey.startDate)||!dateOnly(journey.endDate)||journey.endDate<journey.startDate)bad('Enter valid travel start and end dates for passenger ages and retention.');
+ if(retentionUntil(journey.endDate)<=new Date().toISOString())bad('The 365-day retention period for this trip has ended. Do not recreate expired protected details.');
  if(!Array.isArray(input.passengers)||input.passengers.length>12)bad('A maximum of 12 passengers is supported.');
- const passengers=input.passengers.map(p=>{if(!p||typeof p!=='object'||Array.isArray(p))bad('Invalid passenger.');const name=text(p.name??'',160),dateOfBirth=text(p.dateOfBirth??'',10),nationality=text(p.nationality??'',80);if(!name)bad('Enter each passenger’s full name.');if(dateOfBirth&&(!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)||!Number.isFinite(Date.parse(dateOfBirth))||new Date(dateOfBirth).toISOString().slice(0,10)!==dateOfBirth||dateOfBirth>new Date().toISOString().slice(0,10)))bad('Enter a valid passenger birth date.');return {name,dateOfBirth,nationality}});
- return {contact,passengers};
+ const passengers=input.passengers.map(p=>{if(!p||typeof p!=='object'||Array.isArray(p))bad('Invalid passenger.');const name=text(p.name??'',160),dateOfBirth=text(p.dateOfBirth??'',10),nationality=text(p.nationality??'',80);if(!name)bad('Enter each passenger’s full name.');if(dateOfBirth&&(!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)||!Number.isFinite(Date.parse(dateOfBirth))||new Date(dateOfBirth).toISOString().slice(0,10)!==dateOfBirth||dateOfBirth>new Date().toISOString().slice(0,10)))bad('Enter a valid passenger birth date.');if(nationality&&!countries.has(nationality))bad('Nationality: choose a country from the list.');if(sensitiveNumber(name))bad('Passenger name: remove card-like or passport-like numbers.');const age=ageOn(dateOfBirth,journey.startDate);if(dateOfBirth&&age===null)bad('Passenger birth date must be on or before travel starts.');const title=text(p.title??'',10);if(!['','Mr','Ms','Mrs','Mx','Dr'].includes(title))bad('Choose a valid passenger title.');return {name,dateOfBirth,nationality,title,lead:p.lead===true,type:passengerType(age)}});
+ if(passengers.length&&passengers.filter(p=>p.lead).length!==1)bad('Choose exactly one lead passenger.');
+ return {contact,journey,passengers};
 }
 async function authorised(env:DashboardEnv,id:string,staff:Staff){
- const row=await env.PROPOSALS_DB.prepare('SELECT e.id,e.client_id,e.assigned_to,c.name,c.email,c.phone FROM enquiries e JOIN clients c ON c.id=e.client_id WHERE e.id=?').bind(id).first<{id:string;client_id:string;assigned_to:string;name:string;email:string;phone:string}>();
+ const row=await env.PROPOSALS_DB.prepare('SELECT e.id,e.client_id,e.assigned_to,c.name,c.email,c.phone,e.requirements_json FROM enquiries e JOIN clients c ON c.id=e.client_id WHERE e.id=?').bind(id).first<{id:string;client_id:string;assigned_to:string;name:string;email:string;phone:string;requirements_json:string}>();
  if(!row)bad('Enquiry not found.',404);
  if(!['admin','staff','backoffice'].includes(staff.role))bad('Only administrators, sales and back-office can access passenger records.',403);
  return row;
@@ -36,10 +47,12 @@ async function authorised(env:DashboardEnv,id:string,staff:Staff){
 export async function customerRecordsGet(path:string,env:DashboardEnv,staff:Staff):Promise<Response|null>{
  const match=path.match(/^api\/enquiries\/([^/]+)\/customer-records$/);if(!match)return null;
  const row=await authorised(env,match[1],staff);await key(env);
+ await env.PROPOSALS_DB.prepare('DELETE FROM customer_records WHERE enquiry_id=? AND retention_until<=?').bind(row.id,new Date().toISOString()).run();
  const saved=await env.PROPOSALS_DB.prepare('SELECT * FROM customer_records WHERE enquiry_id=?').bind(row.id).first<{ciphertext:string;revision:number;updated_at:string}>();
  const record=saved?await openCustomerRecord(env,row.id,saved.ciphertext):{contact:{name:row.name,email:row.email,phone:row.phone,address:'',postalCode:'',city:'',country:''},passengers:[]};
  await env.PROPOSALS_DB.batch([auditStatement(env,staff.email,'customer_records.viewed',row.id)]);
- return json({record,revision:saved?.revision||0,updatedAt:saved?.updated_at||'',canAnonymize:staff.role==='admin',removed:row.email.endsWith('@anonymized.invalid')});
+ let travel={};try{const req=JSON.parse(row.requirements_json);travel={startDate:req.travelStartDate||req.departureDate||'',endDate:req.travelEndDate||''}}catch{/* Legacy dates need staff review. */}
+ return json({travel,record,revision:saved?.revision||0,updatedAt:saved?.updated_at||'',canAnonymize:staff.role==='admin',removed:row.email.endsWith('@anonymized.invalid')});
 }
 export async function customerRecordsPost(path:string,input:Record<string,unknown>,env:DashboardEnv,staff:Staff):Promise<Response|null>{
  const match=path.match(/^api\/enquiries\/([^/]+)\/(customer-records|anonymize-customer)$/);if(!match)return null;
@@ -54,7 +67,7 @@ export async function customerRecordsPost(path:string,input:Record<string,unknow
  const now=new Date().toISOString(),db=env.PROPOSALS_DB;
  // Atomic optimistic lock: the audit is committed only for the winning write.
  const result=await db.batch([
- db.prepare(`INSERT INTO customer_records (enquiry_id,ciphertext,revision,updated_at,updated_by) SELECT ?,?,1,?,? WHERE (?=0 OR EXISTS (SELECT 1 FROM customer_records WHERE enquiry_id=? AND revision=?)) AND EXISTS (SELECT 1 FROM enquiries e JOIN clients c ON c.id=e.client_id WHERE e.id=? AND c.email NOT LIKE '%@anonymized.invalid') ON CONFLICT(enquiry_id) DO UPDATE SET ciphertext=excluded.ciphertext,revision=customer_records.revision+1,updated_at=excluded.updated_at,updated_by=excluded.updated_by WHERE customer_records.revision=?`).bind(row.id,ciphertext,now,staff.email,revision,row.id,revision,row.id,revision),
+ db.prepare(`INSERT INTO customer_records (enquiry_id,ciphertext,revision,updated_at,updated_by,retention_until) SELECT ?,?,1,?,?,? WHERE (?=0 OR EXISTS (SELECT 1 FROM customer_records WHERE enquiry_id=? AND revision=?)) AND EXISTS (SELECT 1 FROM enquiries e JOIN clients c ON c.id=e.client_id WHERE e.id=? AND c.email NOT LIKE '%@anonymized.invalid') ON CONFLICT(enquiry_id) DO UPDATE SET ciphertext=excluded.ciphertext,revision=customer_records.revision+1,updated_at=excluded.updated_at,updated_by=excluded.updated_by,retention_until=excluded.retention_until WHERE customer_records.revision=?`).bind(row.id,ciphertext,now,staff.email,retentionUntil(record.journey.endDate),revision,row.id,revision,row.id,revision),
  db.prepare('INSERT INTO audit_log SELECT ?,?,?,?,? WHERE changes()=1').bind(crypto.randomUUID(),staff.email,'customer_records.saved',row.id,now)]);
  if(result[0].meta.changes!==1)bad('This record changed in another session. Reopen it before saving.',409);
  return json({ok:true,revision:Number(revision)+1,updatedAt:now});
