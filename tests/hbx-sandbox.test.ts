@@ -83,3 +83,14 @@ test('production searches require explicit approval and the exact official produ
  await adapter.search({vertical:'accommodation',requestId:'approved',locale:'en',currency:'EUR',travellerCountry:'DK',party:{adults:2,childAges:[]},destination:{name:'Chiang Mai',latitude:18.7904,longitude:98.985},checkIn:'2027-02-10',checkOut:'2027-02-14',rooms:[{adults:2,childAges:[]}]},new AbortController().signal);
  assert.equal(captured,'https://api.hotelbeds.com/hotel-api/1.0/hotels');assert.equal(adapter.capability.searchOnly,true);assert.equal(adapter.capability.status,'production-ready');
 });
+
+test('batches exact hotel IDs and caches successful photographs without mixing products',async()=>{
+ const previous=Object.getOwnPropertyDescriptor(globalThis,'caches');const saved=new Map<string,Response>();let calls=0;
+ Object.defineProperty(globalThis,'caches',{configurable:true,value:{default:{match:async(r:Request)=>saved.get(r.url)?.clone(),put:async(r:Request,response:Response)=>{assert.match(response.headers.get('cache-control')!,/604800/);saved.set(r.url,response.clone())}}}});
+ try{
+  const adapter=createHbxSandboxAdapter({credentials,fetcher:async(input)=>{calls++;const url=new URL(String(input));assert.equal(url.pathname,'/hotel-content-api/1.0/hotels');assert.equal(url.searchParams.get('codes'),'101,202');return Response.json({hotels:[{code:202,address:{content:'Hue'},images:[{path:'02/202.jpg'}]},{code:101,address:{content:'Ninh Binh'},images:[{path:'01/101.jpg'}]},{code:999,images:[{path:'09/999.jpg'}]}]})}});
+  const content=await adapter.hotelContents(['101','202','101','bad'],AbortSignal.timeout(1000));
+  assert.match(content.get('101')!.imageUrl!,/101.jpg/);assert.equal(content.get('202')!.address,'Hue');assert.equal(content.has('999'),false);
+  assert.match((await adapter.hotelContent('202',AbortSignal.timeout(1000)))!.imageUrl!,/202.jpg/);assert.equal(calls,1);
+ }finally{if(previous)Object.defineProperty(globalThis,'caches',previous);else Reflect.deleteProperty(globalThis,'caches')}
+});

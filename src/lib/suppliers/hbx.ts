@@ -197,7 +197,8 @@ const hbxLocation=(location:TransferLocation):{type:string;code:string}=>{
 const localDateTime=(value:string):string=>value.replace(/(?:Z|[+-]\d{2}:\d{2})$/,'').slice(0,19);
 const language=(locale:string):string=>locale.toLowerCase().split('-')[0]||'en';
 
-export function createHbxSandboxAdapter(options:HbxAdapterOptions):SupplierSearchAdapter & {hotelContent:(productId:string,signal:AbortSignal)=>Promise<{imageUrl?:string;address:string;description:string;status?:number|string}|undefined>}{
+type HotelContent={imageUrl?:string;address:string;description:string;status?:number|string};
+export function createHbxSandboxAdapter(options:HbxAdapterOptions):SupplierSearchAdapter & {hotelContent:(productId:string,signal:AbortSignal)=>Promise<HotelContent|undefined>;hotelContents:(productIds:string[],signal:AbortSignal)=>Promise<Map<string,HotelContent>>}{
   const base=new URL(options.baseUrl??DEFAULT_BASE_URL);
   if(base.protocol!=='https:'||base.hostname!==(options.production?'api.hotelbeds.com':'api.test.hotelbeds.com'))throw new HbxSandboxError('HBX evaluation traffic must use the official HTTPS test host.');
   const fetcher=options.fetcher??fetch;
@@ -218,19 +219,33 @@ export function createHbxSandboxAdapter(options:HbxAdapterOptions):SupplierSearc
     return response.json();
   };
 
-  return {
-    async hotelContent(productId:string,signal:AbortSignal){
-      if(!/^\d+$/.test(productId))return undefined;
-      const credentials=options.credentials.accommodation;
-      const signature=await createHbxSignature(credentials.apiKey,credentials.secret,Math.floor(now()/1000));
-      const response=await fetcher(new URL(`/hotel-content-api/1.0/hotels/${productId}/details?language=ENG&useSecondaryLanguage=true`,base),{headers:{Accept:'application/json','Api-key':credentials.apiKey,'X-Signature':signature},signal});
-      if(!response.ok)return {address:'',description:'',status:response.status};
-      const body=asObject(await response.json()),hotel=asObject(body.hotel);
-      if(String(hotel.code)!==productId)return {address:'',description:'',status:'Content product ID did not match'};
+  const hotelContents=async(productIds:string[],signal:AbortSignal):Promise<Map<string,HotelContent>>=>{
+    const ids=[...new Set(productIds.filter(id=>/^\d+$/.test(id)))].slice(0,24);
+    const results=new Map<string,HotelContent>();
+    const cache=(globalThis as unknown as {caches?:{default?:Cache}}).caches?.default;
+    const cacheKey=(id:string)=>new Request(new URL(`/__waytoasia/hotel-content/v1/${id}`,base));
+    for(const id of ids){try{const hit=await cache?.match(cacheKey(id));if(hit)results.set(id,await hit.json() as HotelContent)}catch{/* Cache failure must not suppress supplier content. */}}
+    const missing=ids.filter(id=>!results.has(id));if(!missing.length)return results;
+    const credentials=options.credentials.accommodation;
+    const signature=await createHbxSignature(credentials.apiKey,credentials.secret,Math.floor(now()/1000));
+    const url=new URL('/hotel-content-api/1.0/hotels',base);
+    url.search=new URLSearchParams({codes:missing.join(','),fields:'all',language:'ENG',from:'1',to:String(missing.length),useSecondaryLanguage:'true'}).toString();
+    const response=await fetcher(url,{headers:{Accept:'application/json','Api-key':credentials.apiKey,'X-Signature':signature},signal});
+    if(!response.ok){console.warn(JSON.stringify({message:'Hotelbeds hotel content unavailable',status:response.status,hotelCount:missing.length}));for(const id of missing)results.set(id,{address:'',description:'',status:response.status});return results}
+    const body=asObject(await response.json());
+    for(const raw of asArray(body.hotels)){
+      const hotel=asObject(raw),id=String(hotel.code);if(!missing.includes(id))continue;
       const images=asArray(hotel.images).map(asObject).sort((a,b)=>(asNumber(a.visualOrder)??999)-(asNumber(b.visualOrder)??999));
       const image=images.find(i=>/^[a-z0-9/_-]+\.(jpg|jpeg|png)$/i.test(asString(i.path))&&!asString(i.path).includes('..'));
-      return {status:image?200:'Supplier content has no supported image path',imageUrl:image?hbxImage(`https://photos.hotelbeds.com/giata/bigger/${image.path}`):undefined,address:asString(asObject(hotel.address).content),description:asString(asObject(hotel.description).content).replace(/<[^>]*>/g,'').slice(0,700)};
-    },
+      const content:HotelContent={status:image?200:'Supplier content has no supported image path',imageUrl:image?hbxImage(`https://photos.hotelbeds.com/giata/bigger/${image.path}`):undefined,address:asString(asObject(hotel.address).content),description:asString(asObject(hotel.description).content).replace(/<[^>]*>/g,'').slice(0,700)};
+      results.set(id,content);
+      if(content.imageUrl)try{await cache?.put(cacheKey(id),Response.json(content,{headers:{'Cache-Control':'public, max-age=604800'}}))}catch{/* A valid image remains usable without cache. */}
+    }
+    return results;
+  };
+  return {
+    hotelContents,
+    async hotelContent(productId:string,signal:AbortSignal){return (await hotelContents([productId],signal)).get(productId)},
     capability:{provider:PROVIDER,verticals:['accommodation','transfer','activity'],bookingModes:['agency'],status:options.production?'production-ready':'sandbox-ready',searchOnly:true},
     async search(query,signal):Promise<SupplierSearchResult>{
       const errors=validateSupplierSearch(query);

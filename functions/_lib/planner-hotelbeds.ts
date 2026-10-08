@@ -47,7 +47,6 @@ export async function enrichWithHotelbeds(env:HbxSecretBindings,profile:TripPlan
     const standard=hotelStandardForBudget(profile.budget);
     const option:SuggestedHotelOption={id:`hotelbeds-${offer.productId}`,name:offer.title,area:gateway.name,standard,whyFit:'Hotelbeds supplier option for these overnight dates. Room and availability require confirmation.',roomGuidance:offer.summary,reviewSignal:'No independently verified review score supplied.',sources:[],supplierQuote:{provider:'Hotelbeds',mode:production?'production':'sandbox',hotelId:offer.productId,checkin:checkIn,checkout:checkOut,amount:offer.total.amountMinor/100,currency:offer.total.currency,board:String(offer.attributes.board||''),basis:production?'Supplier rate for the stated party in one room, Denmark source market; subject to recheck.':'Evaluation rate for the stated party in one room; Denmark source market assumed for testing.'}};
     if(!hotelOptionMatchesBudget(option,profile.budget))continue;
-    try{const content=await adapter.hotelContent(offer.productId,signal);if(content){option.imageUrl=content.imageUrl;option.area=content.address||gateway.name;}}catch{/* Keep an accurate text card if content fails. */}
     options.push(option);if(options.length===2)break;
    }
    if(options.length){stay.options=options;stay.supplierNote=note;
@@ -58,6 +57,10 @@ export async function enrichWithHotelbeds(env:HbxSecretBindings,profile:TripPlan
    }else stay.supplierNote='No Hotelbeds hotel matching the requested standard was returned. Researched suggestions remain available.';
   }catch{stay.supplierNote='Hotelbeds hotel search was unavailable. Researched suggestions remain available.';}
  }));
+ // Static content has its own budget and one batched request, rather than competing
+ // per-hotel calls sharing the availability deadline. Only supplier IDs are matched.
+ const quotedOptions=result.hotelStays.flatMap(s=>s.options).filter(o=>o.supplierQuote?.provider==='Hotelbeds');
+ try{const contents=await adapter.hotelContents(quotedOptions.map(o=>o.supplierQuote!.hotelId),AbortSignal.timeout(12000));for(const option of quotedOptions){const content=contents.get(option.supplierQuote!.hotelId);if(content){option.imageUrl=content.imageUrl;option.area=content.address||option.area}}}catch{console.warn('Hotelbeds hotel content batch failed; rates retained.');}
  // Hotels are searched for every base before excursions use the remaining time budget.
  for(const {gateway,checkIn,checkOut} of activityJobs){
   const destination={name:gateway.name,supplierCode:gateway.destinationCode,latitude:gateway.latitude,longitude:gateway.longitude,searchRadiusKm:gateway.searchRadiusKm};

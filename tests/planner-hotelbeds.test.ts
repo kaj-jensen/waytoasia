@@ -11,7 +11,7 @@ test('uses exact Hotelbeds products for hotels, airport transfers and tours with
  const fetcher:typeof fetch=async(url,init)=>{
   const path=new URL(String(url)).pathname;calls.push(path);
   if(path==='/hotel-api/1.0/hotels'){const body=JSON.parse(String(init?.body));if(body.geolocation)return Response.json({hotels:{hotels:[]}});assert.equal(body.stay!.checkIn,'2027-02-10');assert.equal(body.stay.checkOut,'2027-02-13');return Response.json({hotels:{currency:'EUR',hotels:[{code:123,name:'Bangkok Riverside Hotel',categoryName:'4 STARS',rooms:[{name:'Double room',rates:[{rateKey:'private-hotel-token',net:350,boardName:'BREAKFAST'}]}]}]}});}
-  if(path.includes('/hotel-content-api/'))return Response.json({hotel:{code:123,address:{content:'Bangkok riverside'},images:[{path:'00/000123/000123a_hb_f_001.jpg',visualOrder:0}]}});
+  if(path.includes('/hotel-content-api/'))return Response.json({hotels:[{code:123,address:{content:'Bangkok riverside'},images:[{path:'00/000123/000123a_hb_f_001.jpg',visualOrder:0}]}]});
   if(path.includes('/transfer-api/'))return Response.json({services:[{serviceId:'transfer-123',rateKey:'private-transfer-token',vehicle:{name:'Car'},price:{totalAmount:35,currencyId:'EUR'}}]});
   if(path.includes('/activity-api/'))return Response.json({activities:[{activityCode:'tour-123',name:'Bangkok Park Walk',content:{description:'Guided park walk',media:{images:[{urls:[{sizeType:'LARGE',resource:'https://photos.hotelbeds.com/tour-123.jpg'}]}]}},modalities:[{code:'walk',name:'Morning walk',currency:'EUR',amountsFrom:[{amount:25}]}]}]});
   throw Error('Unexpected endpoint '+path);
