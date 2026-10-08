@@ -1,28 +1,11 @@
 import type {Money,SupplierOffer,SupplierSearchResult,SupplierVertical} from './contracts';
 
-export const hbxGatewayIds=['beijing','seoul','bangkok','hanoi','bali'] as const;
-export type HbxGatewayId=typeof hbxGatewayIds[number];
-
-export interface HbxGateway {
-  id:HbxGatewayId;
-  name:string;
-  country:string;
-  destinationCode:string;
-  airportCode:string;
-  utcOffset:string;
-}
-
-export const hbxGateways:Record<HbxGatewayId,HbxGateway>={
-  beijing:{id:'beijing',name:'Beijing',country:'china',destinationCode:'BJS',airportCode:'PEK',utcOffset:'+08:00'},
-  seoul:{id:'seoul',name:'Seoul',country:'south-korea',destinationCode:'SEL',airportCode:'ICN',utcOffset:'+09:00'},
-  bangkok:{id:'bangkok',name:'Bangkok',country:'thailand',destinationCode:'BKK',airportCode:'BKK',utcOffset:'+07:00'},
-  hanoi:{id:'hanoi',name:'Hanoi',country:'vietnam',destinationCode:'HAN',airportCode:'HAN',utcOffset:'+07:00'},
-  bali:{id:'bali',name:'Bali',country:'indonesia',destinationCode:'DPS',airportCode:'DPS',utcOffset:'+08:00'},
-};
+import {hotelbedsLocationById} from './locations';
+export {hbxGateways,hbxGatewayIds,type HbxGateway,type HbxGatewayId} from './gateways';
 
 export interface HbxAvailabilityRequest {
   locale:string;
-  gateway:HbxGatewayId;
+  gateway:string;
   checkIn:string;
   nights:number;
   adults:number;
@@ -51,7 +34,7 @@ export interface HbxAvailabilityResponse {
   provider:'HBX / Hotelbeds';
   environment:'evaluation-sandbox'|'production';
   bookable:false;
-  gateway:{id:HbxGatewayId;name:string};
+  gateway:{id:string;name:string};
   checkedAt:string;
   sections:HbxAvailabilitySection[];
 }
@@ -69,7 +52,7 @@ export function addDays(date:string,days:number):string{
 export function parseHbxAvailabilityRequest(value:unknown,now=new Date()):HbxAvailabilityRequest|null{
   if(!value||typeof value!=='object')return null;
   const input=value as Record<string,unknown>;
-  const gateway=typeof input.gateway==='string'&&hbxGatewayIds.includes(input.gateway as HbxGatewayId)?input.gateway as HbxGatewayId:null;
+  const gateway=typeof input.gateway==='string'&&hotelbedsLocationById(input.gateway)?input.gateway:null;
   const locale=typeof input.locale==='string'&&localePattern.test(input.locale)?input.locale:'en';
   const currency=typeof input.currency==='string'&&currencyPattern.test(input.currency)?input.currency:'EUR';
   const checkIn=typeof input.checkIn==='string'&&datePattern.test(input.checkIn)?input.checkIn:'';

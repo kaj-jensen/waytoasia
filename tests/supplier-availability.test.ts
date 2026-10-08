@@ -44,3 +44,10 @@ test('orchestrates three read-only HBX checks and strips rate keys from the resp
     assert.match(serialized,/Bangkok food walk/);
   }finally{globalThis.fetch=originalFetch}
 });
+
+
+test('individual overnight bases use coordinates and never invent an airport transfer',async()=>{
+ const originalFetch=globalThis.fetch;let hotelSeen=false;
+ globalThis.fetch=async(input,init)=>{const url=String(input);if(url.includes('/hotel-api/')){const body=JSON.parse(String(init?.body));assert.equal(body.geolocation.latitude,14.357);assert.equal(body.destination,undefined);hotelSeen=true;return Response.json({hotels:{hotels:[]}})}return Response.json({activities:[]})};
+ try{const response=await onRequestPost({env,request:new Request('https://waytoasia.com/api/supplier-availability',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({gateway:'thailand:Ayutthaya',checkIn:'2027-02-12',nights:2,adults:2})})});assert.equal(response.status,200);assert.equal(hotelSeen,true);const body=await response.json();assert.equal(body.gateway.name,'Ayutthaya');assert.equal(body.sections[2].status,'skipped')}finally{globalThis.fetch=originalFetch}
+});

@@ -1,5 +1,6 @@
+import {hotelbedsLocationById} from '../../src/lib/suppliers/locations';
 import {createConfiguredHbxAdapter,type HbxSecretBindings} from '../../src/lib/suppliers/hbx';
-import {addDays,availabilitySection,hbxGateways,parseHbxAvailabilityRequest,type HbxAvailabilityResponse,type HbxAvailabilitySection} from '../../src/lib/suppliers/availability';
+import {addDays,availabilitySection,parseHbxAvailabilityRequest,type HbxAvailabilityResponse,type HbxAvailabilitySection} from '../../src/lib/suppliers/availability';
 
 interface PagesContext {request:Request;env:HbxSecretBindings}
 
@@ -16,9 +17,9 @@ export const onRequestPost=async({request,env}:PagesContext):Promise<Response>=>
   let raw:unknown;
   try{raw=await request.json()}catch{return json({error:'Invalid JSON request.'},400)}
   const query=parseHbxAvailabilityRequest(raw);
-  if(!query)return json({error:'Choose a valid gateway, future arrival date and traveller group.'},400);
+  if(!query)return json({error:'Choose a specific overnight base, future arrival date and traveller group.'},400);
 
-  const gateway=hbxGateways[query.gateway];
+  const gateway=hotelbedsLocationById(query.gateway)!;
   const requestId=crypto.randomUUID();
   const travellerCountry=(request.headers.get('CF-IPCountry')??'DK').toUpperCase();
   const sourceMarket=isoCountry.test(travellerCountry)?travellerCountry:'DK';
@@ -30,19 +31,19 @@ export const onRequestPost=async({request,env}:PagesContext):Promise<Response>=>
     const adapter=createConfiguredHbxAdapter(env);
     const signal=AbortSignal.timeout(30_000);
     const [hotelResult,activityResult]=await Promise.allSettled([
-      adapter.search({vertical:'accommodation',requestId:`${requestId}-hotel`,locale:query.locale,currency:query.currency,travellerCountry:sourceMarket,party,destination:{name:gateway.name,supplierCode:gateway.destinationCode},checkIn:query.checkIn,checkOut,rooms:[{adults:query.adults,childAges:query.childAges}]},signal),
-      adapter.search({vertical:'activity',requestId:`${requestId}-activity`,locale:query.locale,currency:query.currency,travellerCountry:sourceMarket,party,destination:{name:gateway.name,supplierCode:gateway.destinationCode},from:query.checkIn,to:activityTo,interests:[]},signal),
+      adapter.search({vertical:'accommodation',requestId:`${requestId}-hotel`,locale:query.locale,currency:query.currency,travellerCountry:sourceMarket,party,destination:{name:gateway.name,supplierCode:gateway.destinationCode,latitude:gateway.latitude,longitude:gateway.longitude,searchRadiusKm:gateway.searchRadiusKm},checkIn:query.checkIn,checkOut,rooms:[{adults:query.adults,childAges:query.childAges}]},signal),
+      adapter.search({vertical:'activity',requestId:`${requestId}-activity`,locale:query.locale,currency:query.currency,travellerCountry:sourceMarket,party,destination:{name:gateway.name,supplierCode:gateway.destinationCode,latitude:gateway.latitude,longitude:gateway.longitude,searchRadiusKm:gateway.searchRadiusKm},from:query.checkIn,to:activityTo,interests:[]},signal),
     ]);
     if(hotelResult.status==='fulfilled'&&hotelResult.value.offers[0]?.productId){
       const first=hotelResult.value.offers[0];
       try{const content=await adapter.hotelContent(first.productId,signal);for(const offer of hotelResult.value.offers)if(offer.productId===first.productId){offer.imageUrl=content?.imageUrl;offer.attributes.imageContentStatus=content?.status??'Content received';}}catch{/* Keep rates available when images fail. */}
     }
     const sections:HbxAvailabilitySection[]=[availabilitySection('accommodation',hotelResult),availabilitySection('activity',activityResult)];
-    if(hotelResult.status==='fulfilled'&&hotelResult.value.offers[0]?.productId){
+    if(gateway.airportCode&&gateway.utcOffset&&hotelResult.status==='fulfilled'&&hotelResult.value.offers[0]?.productId){
       const hotel=hotelResult.value.offers[0];
       const transferResult=await Promise.allSettled([adapter.search({vertical:'transfer',requestId:`${requestId}-transfer`,locale:query.locale,currency:query.currency,travellerCountry:sourceMarket,party,pickup:{type:'airport',name:`${gateway.name} airport`,code:gateway.airportCode},dropoff:{type:'hotel',name:hotel.title,code:hotel.productId},pickupAt:`${query.checkIn}T15:00:00${gateway.utcOffset}`,returnAt:`${checkOut}T11:00:00${gateway.utcOffset}`},signal)]);
       sections.push(availabilitySection('transfer',transferResult[0]));
-    }else sections.push({vertical:'transfer',status:'skipped',offers:[],message:'Transfer search needs an HBX hotel result from the same check.'});
+    }else sections.push({vertical:'transfer',status:'skipped',offers:[],message:'Transfer search needs a verified airport mapping and an HBX hotel result from the same check.'});
     const response:HbxAvailabilityResponse={provider:'HBX / Hotelbeds',environment:env.HBX_ENVIRONMENT==='production'?'production':'evaluation-sandbox',bookable:false,gateway:{id:gateway.id,name:gateway.name},checkedAt:new Date().toISOString(),sections};
     return json(response);
   }catch(error){

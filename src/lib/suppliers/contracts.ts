@@ -24,7 +24,7 @@ export interface SupplierSearchContext {
 
 export interface AccommodationSearch extends SupplierSearchContext {
   vertical: 'accommodation';
-  destination: {name:string; latitude?:number; longitude?:number; supplierCode?:string};
+  destination: {name:string; latitude?:number; longitude?:number; searchRadiusKm?:number; supplierCode?:string};
   checkIn: string;
   checkOut: string;
   rooms: Array<{adults:number;childAges:number[]}>;
@@ -50,7 +50,7 @@ export interface TransferSearch extends SupplierSearchContext {
 
 export interface ActivitySearch extends SupplierSearchContext {
   vertical: 'activity';
-  destination: {name:string; latitude?:number; longitude?:number; supplierCode?:string};
+  destination: {name:string; latitude?:number; longitude?:number; searchRadiusKm?:number; supplierCode?:string};
   from: string;
   to: string;
   interests: string[];

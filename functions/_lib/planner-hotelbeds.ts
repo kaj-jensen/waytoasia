@@ -22,13 +22,17 @@ export async function enrichWithHotelbeds(env:HbxSecretBindings,profile:TripPlan
  const context={requestId:crypto.randomUUID(),locale:profile.locale,currency,travellerCountry:'DK',party:{adults:profile.adults,childAges:profile.childAges??[]}};
  const signal=AbortSignal.timeout(40000);
  let offset=0,searches=0,activitySearches=0;
- for(const stay of result.hotelStays){
-  const checkIn=addDays(profile.travelStartDate,offset),checkOut=addDays(checkIn,stay.nights);offset+=stay.nights;
-  if(stay.nights===0){stay.options=[];stay.supplierNote='No overnight stay is needed on the departure day.';continue;}
-  const gateway=hotelbedsLocation(stay.place,profile.destinations,stay.options.map(o=>`${o.name} ${o.area}`));
-  if(!gateway||searches>=(production?12:3)){stay.supplierNote='Researched recommendations. Hotelbeds destination coverage has not been verified for this stop.';continue;}
+ const activityJobs:Array<{gateway:NonNullable<ReturnType<typeof hotelbedsLocation>>;checkIn:string;checkOut:string}>=[];
+ const datedStays=result.hotelStays.map(stay=>{const checkIn=addDays(profile.travelStartDate,offset),checkOut=addDays(checkIn,stay.nights);offset+=stay.nights;return {stay,checkIn,checkOut}});
+ // Bound concurrency so a slow base does not prevent every later hotel search.
+ for(let batch=0;batch<datedStays.length;batch+=3)await Promise.all(datedStays.slice(batch,batch+3).map(async({stay,checkIn,checkOut})=>{
+  if(stay.nights===0){stay.options=[];stay.supplierNote='No overnight stay is needed on the departure day.';return;}
+  const gateway=hotelbedsLocation(stay.overnightBase||stay.place,profile.destinations,stay.options.map(o=>`${o.name} ${o.area}`));
+  if(!gateway){stay.supplierNote='Choose one specific overnight city or town for this stop. Hotelbeds was not searched because the location is ambiguous or unsupported; researched suggestions remain available.';return;}
+  if(searches>=12){stay.supplierNote='Hotelbeds hotel search limit reached for this itinerary; a consultant must check this stop.';return;}
+  stay.overnightBase=`${gateway.country}: ${gateway.name}`;activityJobs.push({gateway,checkIn,checkOut});
   searches++;
-  const destination={name:gateway.name,supplierCode:gateway.destinationCode,latitude:gateway.latitude,longitude:gateway.longitude};
+  const destination={name:gateway.name,supplierCode:gateway.destinationCode,latitude:gateway.latitude,longitude:gateway.longitude,searchRadiusKm:gateway.searchRadiusKm};
   const hotelQuery={...context,vertical:'accommodation' as const,destination,checkIn,checkOut,rooms:[{adults:profile.adults,childAges:profile.childAges??[]}]};
   try{
    const hotels=await adapter.search(hotelQuery,signal);
@@ -53,9 +57,13 @@ export async function enrichWithHotelbeds(env:HbxSecretBindings,profile:TripPlan
     }catch{/* Missing transfers never suppress hotels. */}
    }else stay.supplierNote='No Hotelbeds hotel matching the requested standard was returned. Researched suggestions remain available.';
   }catch{stay.supplierNote='Hotelbeds hotel search was unavailable. Researched suggestions remain available.';}
+ }));
+ // Hotels are searched for every base before excursions use the remaining time budget.
+ for(const {gateway,checkIn,checkOut} of activityJobs){
+  const destination={name:gateway.name,supplierCode:gateway.destinationCode,latitude:gateway.latitude,longitude:gateway.longitude,searchRadiusKm:gateway.searchRadiusKm};
   // Exact dates only; never reuse a quote on an unqueried day or add excursions on arrival/departure days.
   const usedProducts=new Set<string>();
-  const days=result.dayPlans.filter(d=>d.day>1&&d.day<profile.durationDays&&hotelbedsLocation(d.place,profile.destinations)?.id===gateway.id&&addDays(profile.travelStartDate,d.day-1)>=checkIn&&addDays(profile.travelStartDate,d.day-1)<checkOut);
+  const days=result.dayPlans.filter(d=>d.day>1&&d.day<profile.durationDays&&hotelbedsLocation(d.place,profile.destinations,result.hotelStays.filter(s=>s.place===d.place).map(s=>s.overnightBase||''))?.id===gateway.id&&addDays(profile.travelStartDate,d.day-1)>=checkIn&&addDays(profile.travelStartDate,d.day-1)<checkOut);
   for(const day of days){
    if(activitySearches>=(production?35:10))break;
    activitySearches++;
