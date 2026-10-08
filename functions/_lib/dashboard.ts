@@ -4,7 +4,6 @@ import {createRemoteJWKSet, importJWK, jwtVerify, type JWK} from 'jose';
 import {clean, escapeHtml} from './proposals';
 export interface DashboardEnv {
   CUSTOMER_RECORDS_KEY?: string;
-  DUFFEL_TEST_TOKEN?: string;
   SERPAPI_API_KEY?: string;
   PROPOSALS_DB: D1Database;
   ACCESS_TEAM_DOMAIN?: string;

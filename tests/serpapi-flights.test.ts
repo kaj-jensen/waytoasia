@@ -13,7 +13,7 @@ test('validates complete segment data and rejects an unreported airport change',
 test('bounded family open-jaw pilot preserves arrival dates, separate journeys and safe provenance',async()=>{
  const calls:URL[]=[];
  const fetcher:typeof fetch=async(input)=>{const u=new URL(String(input));calls.push(u);assert.equal(u.hostname,'serpapi.com');assert.equal(u.searchParams.get('type'),'2');assert.equal(u.searchParams.get('children'),'1');const out=u.searchParams.get('departure_id')==='CPH';const day=u.searchParams.get('outbound_date')!;return Response.json({best_flights:[{price:123,flights:[segment(out?'CPH':'CNX',out?'BKK':'CPH',day+' 14:00',(out?'2027-02-10':day)+' 20:00')]}]});};
- const plan=await planFlights(undefined,{departureAirport:'CPH',travelStartDate:'2027-02-10',travelEndDate:'2027-02-17',adults:2,children:1,childAges:[7]},[{place:'Thailand: Bangkok'},{place:'Thailand: Chiang Mai'}],'private-key',fetcher);
+ const plan=await planFlights('private-key',{departureAirport:'CPH',travelStartDate:'2027-02-10',travelEndDate:'2027-02-17',adults:2,children:1,childAges:[7]},[{place:'Thailand: Bangkok'},{place:'Thailand: Chiang Mai'}],fetcher);
  assert.equal(calls.length,3);assert.equal(plan.status,'search-results');assert.equal(plan.offers[0].slices[1][0].origin,'CNX');assert.equal(plan.offers[0].totalAmount,undefined);assert.doesNotMatch(JSON.stringify(plan),/private-key|api_key|departure_token/);
  assert.match(flightTable(plan.offers[0]),/searched separately/);assert.doesNotMatch(flightTable(plan.offers[0]),/Sandbox/);assert.match(renderFlights(plan.offers[0]),/Google Flights via SerpApi/);
  assert.match(flightTable(plan.offers[0]),/5h 0m/);assert.doesNotMatch(flightTable(plan.offers[0]),/0h 300m/);
@@ -25,7 +25,7 @@ test('does not guess infant seating or child age categories',async()=>{
  let calls=0;const fetcher:typeof fetch=async()=>{calls++;return Response.json({best_flights:[]})};
  const route=[{place:'Thailand: Bangkok'},{place:'Thailand: Chiang Mai'}];
  for(const childAges of [undefined,[1]]){
- const plan=await planFlights(undefined,{departureAirport:'CPH',travelStartDate:'2027-02-10',travelEndDate:'2027-02-17',adults:2,children:1,childAges},route,'private-key',fetcher);
+ const plan=await planFlights('private-key',{departureAirport:'CPH',travelStartDate:'2027-02-10',travelEndDate:'2027-02-17',adults:2,children:1,childAges},route,fetcher);
  assert.equal(plan.status,'needs-details');
  }
  assert.equal(calls,0);
@@ -35,4 +35,11 @@ test('staff searches use SerpApi and selections are signed, enquiry-bound and pr
  const {searchStaffFlights,selectedStaffFlight}=await import('../functions/_lib/staff-flights');const original=globalThis.fetch;let calls=0;
  globalThis.fetch=async(input)=>{const u=new URL(String(input));assert.equal(u.hostname,'serpapi.com');assert.equal(u.searchParams.get('travel_class'),'3');calls++;const from=u.searchParams.get('departure_id')!,to=u.searchParams.get('arrival_id')!,day=u.searchParams.get('outbound_date')!;return Response.json({best_flights:[{flights:[segment(from,to,day+' 10:00',day+' 18:00')]}]})};
  try{const offers=await searchStaffFlights('synthetic-private-key','enquiry-a',{origin:'CPH',destination:'BKK',departure:'2027-02-09',returnDate:'2027-02-17',adults:2,cabin:'business'});assert.equal(calls,2);assert.equal(offers[0].source,'serpapi-google-flights');assert.equal((await selectedStaffFlight('synthetic-private-key','enquiry-a',offers[0].selection)).slices.length,2);await assert.rejects(selectedStaffFlight('synthetic-private-key','enquiry-b',offers[0].selection));await assert.rejects(selectedStaffFlight('synthetic-private-key','enquiry-a',offers[0].selection+'x'));assert.doesNotMatch(JSON.stringify(offers),/synthetic-private-key/);await assert.rejects(searchStaffFlights(undefined,'enquiry-a',{}));}finally{globalThis.fetch=original}
+});
+
+test('planner never falls back to another supplier when SerpApi is missing or unavailable',async()=>{
+ let calls=0;const fetcher:typeof fetch=async(input)=>{calls++;assert.equal(new URL(String(input)).hostname,'serpapi.com');return new Response('',{status:503})};
+ const profile={departureAirport:'CPH',travelStartDate:'2027-02-10',travelEndDate:'2027-02-17',adults:2,children:0};const route=[{place:'Bangkok'}];
+ assert.equal((await planFlights(undefined,profile,route,fetcher)).status,'not-connected');assert.equal(calls,0);
+ const result=await planFlights('synthetic-key',profile,route,fetcher);assert.equal(result.status,'unavailable');assert.equal(result.provider,'serpapi');assert.equal(calls,3);assert.deepEqual(result.offers,[]);
 });

@@ -3,7 +3,7 @@ import type {HbxSecretBindings} from '../../src/lib/suppliers/hbx';
 import {planFlights} from '../_lib/planner-flights';
 import {assessTripSuggestionQuality,estimateTripPrice,hotelStandardForBudget,normalizeTripSuggestion,parseTripPlannerRefinement,parseTripPlannerRequest,tripCatalogForAgent,tripPlannerCurrencyForLocale,tripSuggestionJsonSchema,type TravellerResearchSource,type TripSuggestion} from '../../src/lib/tripPlanner';
 
-interface Env extends HbxSecretBindings { LITEAPI_SANDBOX_KEY?:string; DUFFEL_TEST_TOKEN?:string; SERPAPI_API_KEY?:string; OPENAI_API_KEY?:string;OPENAI_MODEL?:string;TAVILY_API_KEY?:string }
+interface Env extends HbxSecretBindings { LITEAPI_SANDBOX_KEY?:string; SERPAPI_API_KEY?:string; OPENAI_API_KEY?:string;OPENAI_MODEL?:string;TAVILY_API_KEY?:string }
 interface PagesContext {request:Request;env:Env}
 
 const json = (body: unknown, status = 200, extraHeaders: Record<string,string> = {}) => Response.json(body,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...extraHeaders}});
@@ -276,7 +276,7 @@ export const onRequestPost = async ({request,env}:PagesContext):Promise<Response
     // Complete the bounded flight searches before Hotelbeds starts its content
     // requests, so those requests cannot exhaust the Worker's connection slots
     // while the flight provider's timeout is running.
-    const flightPlanning=await planFlights(env.DUFFEL_TEST_TOKEN,profile,suggestion.route,env.SERPAPI_API_KEY);
+    const flightPlanning=await planFlights(env.SERPAPI_API_KEY,profile,suggestion.route);
     const supplierSuggestion=await enrichWithHotelbeds(env,profile,suggestion);
     const supplierSelectionsChanged=supplierSuggestion.hotelStays.some(stay=>stay.options.some(option=>option.supplierQuote?.provider==='Hotelbeds'))||supplierSuggestion.dayPlans.some(day=>day.options.some(option=>option.supplierProductId));
     let priceEstimate;
