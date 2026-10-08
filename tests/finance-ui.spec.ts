@@ -83,3 +83,22 @@ test('enquiry opens on a clear selected trip with finance and communication in s
  await page.getByRole('tab',{name:'Communication',exact:true}).click();await expect(page.locator('#send-form')).toBeVisible();await expect(page.locator('#note-form')).toBeVisible();await expect(page.locator('.quoted-trip')).toBeHidden();
  await page.getByRole('tab',{name:'Trip overview',exact:true}).click();await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
 });
+
+test('editing an unpriced amount persists without a separate checkbox step',async({page})=>{
+ test.skip(!test.info().config.configFile?.endsWith('playwright.finance.config.ts'),'Uses isolated synthetic dashboard server.');
+ await page.goto('/preview-login');await page.getByRole('button',{name:'Finances',exact:true}).click();await page.getByRole('button',{name:'Open realistic demo'}).click();
+ await page.getByRole('button',{name:'Add item',exact:true}).click();
+ const name='Synthetic amount persistence '+Date.now();
+ await page.getByLabel('Description',{exact:true}).fill(name);
+ await expect(page.locator('[name=actual_priced]')).not.toBeChecked();
+ await page.locator('[name=actual_priceBase]').fill('125.50');
+ await expect(page.locator('[name=actual_priced]')).toBeChecked();
+ await expect(page.locator('[name=quote_priced]')).not.toBeChecked();
+ await page.locator('#finance-dialog [type=submit]').click();
+ await expect(page.locator('#notice')).toHaveText('✓ Financial changes saved.');
+ await page.reload();await page.getByRole('button',{name,exact:true}).click();
+ await expect(page.locator('[name=actual_priceBase]')).toHaveValue('125.50');
+ await expect(page.locator('[name=actual_priced]')).toBeChecked();
+ await expect(page.locator('[name=quote_priced]')).not.toBeChecked();
+ await expect(page.locator('#finance-dialog [type=submit]')).toBeDisabled();
+});
