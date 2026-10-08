@@ -29,6 +29,9 @@ export async function onRequestPost({request,env}:{request:Request;env:Dashboard
       const email=await provider(env,`emails/receiving/${event.data.email_id}`) as Received;
       if(!email||typeof email.from!=='string'||!Array.isArray(email.to))throw Error('Invalid provider payload');
       const enquiry=await matchReply(env,email),activity=`received-${event.data.email_id}`;
+      if(enquiry&&await db.prepare("SELECT 1 FROM enquiries e JOIN clients c ON c.id=e.client_id WHERE e.id=? AND c.email LIKE '%@anonymized.invalid'").bind(enquiry).first()){
+        await db.batch([db.prepare('INSERT OR IGNORE INTO message_tombstones VALUES (?,?)').bind(event.data.email_id,new Date().toISOString()),eventStatement]);return json({ok:true,suppressed:true});
+      }
       const existing=await db.prepare('SELECT id FROM activities WHERE provider_id=?').bind(event.data.email_id).first();
       if(existing){await eventStatement.run();return json({ok:true,duplicate:true})}
       const files=email.attachments||[];if(files.length>20)throw Error('Too many attachments');

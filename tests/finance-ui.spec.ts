@@ -129,3 +129,21 @@ test('saved quote and actual values update every corresponding finance view',asy
  const csv=await(await page.request.get('/dashboard/api/finance/'+id+'/csv?basis=actual')).text();expect(csv).toContain('"650","500","10","10","150"');
  await page.getByRole('button',{name:'Finances',exact:true}).click();const row=page.locator('#portfolio-content tbody tr').filter({hasText:name});await expect(row).toContainText('EUR 625.00');await expect(row).toContainText('EUR 650.00');await expect(row).toContainText('EUR 500.00');await expect(row).toContainText('EUR 150.00');
 });
+
+test('protected customer tab persists encrypted details, locks on navigation and fits mobile',async({page})=>{
+ test.skip(!test.info().config.configFile?.endsWith('playwright.finance.config.ts'),'Uses isolated synthetic dashboard server.');
+ const {database}=await import('./dashboard/support');const {sqlite}=database('.wrangler/dashboard-preview.sqlite');const id=crypto.randomUUID(),now=new Date().toISOString();
+ sqlite.prepare('INSERT INTO clients VALUES (?,?,?,?,?)').run(id,`${id}@example.invalid`,'Synthetic protected contact','',now);
+ sqlite.prepare('INSERT INTO enquiries (id,reference,client_id,source,requirements_json,original_message,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)').run(id,'TEST-'+id,id,'Synthetic test','{}','Customer security test',now,now);sqlite.close();
+ const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+ await page.goto('/preview-login');await page.goto('/dashboard#'+id);await page.getByRole('tab',{name:'Customer & passengers',exact:true}).click();
+ await expect(page.locator('[name=contact_name]')).toHaveCount(0);await page.getByRole('button',{name:'Open protected record',exact:true}).click();
+ await page.locator('[name=contact_name]').fill('Synthetic Confidential Contact');await page.locator('[name=contact_address]').fill('Synthetic Address 12');await page.locator('[name=contact_city]').fill('Copenhagen');
+ await page.getByRole('button',{name:'Add passenger',exact:true}).click();await page.locator('[data-passenger-name]').fill('Synthetic Passenger');await page.locator('[data-passenger-dob]').fill('2000-01-02');
+ await page.getByRole('button',{name:'Save protected record',exact:true}).click();await expect(page.locator('[data-feedback]')).toHaveText('✓ Protected record saved.');
+ await page.getByRole('button',{name:'Lock record',exact:true}).click();await expect(page.locator('[name=contact_name]')).toHaveCount(0);await page.getByRole('button',{name:'Open protected record',exact:true}).click();await expect(page.locator('[name=contact_address]')).toHaveValue('Synthetic Address 12');await expect(page.locator('[data-passenger-name]')).toHaveValue('Synthetic Passenger');
+ await page.getByRole('tab',{name:'Trip overview',exact:true}).click();await expect(page.locator('[data-passenger-name]')).toHaveCount(0);
+ await page.getByRole('tab',{name:'Customer & passengers',exact:true}).click();await page.getByRole('button',{name:'Open protected record',exact:true}).click();await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:'/tmp/waytoasia-customers-mobile.png',fullPage:true});
+ await page.setViewportSize({width:1280,height:900});await page.screenshot({path:'/tmp/waytoasia-customers-desktop.png',fullPage:true});
+ const {sqlite:db}=database('.wrangler/dashboard-preview.sqlite');const raw=String(db.prepare('SELECT ciphertext FROM customer_records WHERE enquiry_id=?').get(id)!.ciphertext);db.close();expect(raw).not.toContain('Synthetic Passenger');expect(raw).not.toContain('Synthetic Address');expect(errors).toEqual([]);
+});

@@ -6,7 +6,7 @@ import {captureEnquiry,type DashboardEnv} from '../functions/_lib/dashboard';
 import {onRequest} from '../functions/staff/[[path]]';
 const {adapter,sqlite}=database('.wrangler/dashboard-preview.sqlite');
 const auth=await identity();
-const env:DashboardEnv={PROPOSALS_DB:adapter,ACCESS_TEAM_DOMAIN:'preview.invalid',ACCESS_AUD:'local-preview',LOCAL_ACCESS_JWK:JSON.stringify(auth.publicJwk),ACCESS_REQUIRE_MFA:'false',EMAIL_SEND_ENABLED:'false'};
+const env:DashboardEnv={CUSTOMER_RECORDS_KEY:Buffer.alloc(32,7).toString('base64'),PROPOSALS_DB:adapter,ACCESS_TEAM_DOMAIN:'preview.invalid',ACCESS_AUD:'local-preview',LOCAL_ACCESS_JWK:JSON.stringify(auth.publicJwk),ACCESS_REQUIRE_MFA:'false',EMAIL_SEND_ENABLED:'false'};
 sqlite.prepare('INSERT OR IGNORE INTO staff_users (email,name,role,enabled,created_at) VALUES (?,?,?,?,?)').run('journeys@waytoasia.com','Preview administrator','admin',1,new Date().toISOString());
 sqlite.prepare('INSERT OR IGNORE INTO staff_users (email,name,role,enabled,created_at) VALUES (?,?,?,?,?)').run('consultant@example.invalid','Demo consultant','staff',1,new Date().toISOString());
 if(!sqlite.prepare('SELECT id FROM enquiries LIMIT 1').get()){
@@ -27,7 +27,7 @@ createServer(async(req,res)=>{
     const url=new URL(req.url||'/','http://127.0.0.1:8788');
     if(url.pathname==='/preview-login'){res.writeHead(303,{'Set-Cookie':`preview_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=3600`,Location:'/staff','Cache-Control':'no-store'});res.end();return}
     if(url.pathname==='/cdn-cgi/access/logout'){res.writeHead(303,{'Set-Cookie':'preview_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0',Location:'/staff'});res.end();return}
-    if(['/staff.js','/staff.css','/finance.js','/finance.css'].includes(url.pathname)){res.writeHead(200,{'Content-Type':url.pathname.endsWith('js')?'application/javascript':'text/css'});res.end(readFileSync(`public${url.pathname}`));return}
+    if(['/staff.js','/staff.css','/finance.js','/finance.css','/customers.js'].includes(url.pathname)){res.writeHead(200,{'Content-Type':url.pathname.endsWith('js')?'application/javascript':'text/css'});res.end(readFileSync(`public${url.pathname}`));return}
     if(!url.pathname.startsWith('/staff')&&!url.pathname.startsWith('/dashboard')){res.writeHead(404);res.end('Local dashboard preview');return}
     const chunks:Buffer[]=[];for await(const chunk of req){chunks.push(Buffer.from(chunk));if(chunks.reduce((n,b)=>n+b.length,0)>100000){res.writeHead(413);res.end();return}}
     const headers=new Headers();for(const [key,value] of Object.entries(req.headers)){if(value)headers.set(key,Array.isArray(value)?value.join(','):value)}

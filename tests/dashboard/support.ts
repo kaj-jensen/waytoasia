@@ -11,6 +11,7 @@ export function database(filename=':memory:'){
   if(!sqlite.prepare('PRAGMA table_info(proposals)').all().some(c=>c.name==='response_receipt'))sqlite.exec(readFileSync('migrations/0004_proposal_response_receipt.sql','utf8'));
   if(!sqlite.prepare("SELECT name FROM sqlite_master WHERE name='finance_files'").get())sqlite.exec(readFileSync('migrations/0005_enquiry_finance.sql','utf8'));
   if(!sqlite.prepare('PRAGMA table_info(enquiries)').all().some(c=>c.name==='customer_approved_at'))sqlite.exec(readFileSync('migrations/0006_customer_approval.sql','utf8'));
+  if(!sqlite.prepare("SELECT name FROM sqlite_master WHERE name='customer_records'").get())sqlite.exec(readFileSync('migrations/0007_customer_records.sql','utf8'));
   function prepare(sql:string){let args:unknown[]=[];const statement={bind(...values:unknown[]){args=values;return statement},async first(){return sqlite.prepare(sql).get(...args as never[])||null},async all(){return {results:sqlite.prepare(sql).all(...args as never[])}},async run(){const result=sqlite.prepare(sql).run(...args as never[]);return {success:true,meta:{changes:result.changes}}}};return statement}
   return {sqlite,adapter:{prepare,async batch(statements:{run():Promise<unknown>}[]){sqlite.exec('BEGIN');try{const results=[];for(const statement of statements)results.push(await statement.run());sqlite.exec('COMMIT');return results}catch(error){sqlite.exec('ROLLBACK');throw error}}} as unknown as DashboardEnv['PROPOSALS_DB']};
 }

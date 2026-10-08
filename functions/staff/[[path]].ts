@@ -1,3 +1,4 @@
+import {customerRecordsGet,customerRecordsPost,openCustomerRecord} from '../_lib/customer-records';
 import {customerApprovedStatus,enquiryStatusSql,displayEnquiryStatus} from '../_lib/enquiry-status';
 import {tours} from '../../src/content/data';
 import {financeGet,financePost,financePermissions} from '../_lib/finance-api';
@@ -30,6 +31,7 @@ export async function onRequest({request,env}:Context):Promise<Response>{
   }catch(error){if(error instanceof Response)return error;if(error instanceof FlightError)return json({error:error.message},error.status);console.error('Dashboard operation failed');return json({error:'Operation could not be completed. Check configuration or retry.'},500)}
 }
 async function get(path:string,url:URL,env:DashboardEnv,staff:Staff):Promise<Response>{
+  const protectedRecord=await customerRecordsGet(path,env,staff);if(protectedRecord)return protectedRecord;
   const financial=await financeGet(path,url,env,staff);if(financial)return financial;
   const db=env.PROPOSALS_DB;
   if(path==='api/staff')return json((await db.prepare('SELECT email,name,COALESCE(access_role,role) role,enabled FROM staff_users ORDER BY name').all()).results);
@@ -65,8 +67,10 @@ async function get(path:string,url:URL,env:DashboardEnv,staff:Staff):Promise<Res
         db.prepare('SELECT p.* FROM enquiry_proposals p JOIN enquiries e ON e.id=p.enquiry_id WHERE e.client_id=? ORDER BY p.created_at').bind(enquiry.client_id).all(),
         db.prepare('SELECT t.* FROM attachments t JOIN activities a ON a.id=t.activity_id JOIN enquiries e ON e.id=a.enquiry_id WHERE e.client_id=?').bind(enquiry.client_id).all(),
       ]);
+      const protectedRows=await db.prepare('SELECT r.enquiry_id,r.ciphertext FROM customer_records r JOIN enquiries e ON e.id=r.enquiry_id WHERE e.client_id=?').bind(enquiry.client_id).all<{enquiry_id:string;ciphertext:string}>();
+      const protectedRecords=await Promise.all(protectedRows.results.map(async r=>({enquiryId:r.enquiry_id,record:await openCustomerRecord(env,r.enquiry_id,r.ciphertext)})));
       await audit(env,staff.email,'client.export',String(enquiry.client_id));
-      return json({client:{id:enquiry.client_id,name:enquiry.name,email:enquiry.email,phone:enquiry.phone},enquiries:enquiries.results,activities:activities.results,proposals:proposals.results,attachments:attachments.results});
+      return json({protectedRecords,client:{id:enquiry.client_id,name:enquiry.name,email:enquiry.email,phone:enquiry.phone},enquiries:enquiries.results,activities:activities.results,proposals:proposals.results,attachments:attachments.results});
     }
     const [activities,proposals,attachments,related]=await Promise.all([
       db.prepare('SELECT * FROM activities WHERE enquiry_id=? ORDER BY created_at,id').bind(match[1]).all(),
@@ -83,6 +87,7 @@ async function get(path:string,url:URL,env:DashboardEnv,staff:Staff):Promise<Res
   return json({error:'Not found'},404);
 }
 async function post(path:string,input:Record<string,unknown>,env:DashboardEnv,staff:Staff):Promise<Response>{
+  const protectedRecord=await customerRecordsPost(path,input,env,staff);if(protectedRecord)return protectedRecord;
   const financial=await financePost(path,input,env,staff);if(financial)return financial;
   const db=env.PROPOSALS_DB,now=new Date().toISOString();
   if(path==='api/staff'){
@@ -107,6 +112,7 @@ async function post(path:string,input:Record<string,unknown>,env:DashboardEnv,st
   if(!match)return json({error:'Not found'},404);
   const id=match[1],action=match[2];
   const enquiry=await db.prepare('SELECT e.*,c.email,c.name FROM enquiries e JOIN clients c ON c.id=e.client_id WHERE e.id=?').bind(id).first<Record<string,string>>();if(!enquiry)fail('Enquiry not found',404);
+  if(enquiry!.email.endsWith('@anonymized.invalid')&&['note','call','proposal','flights-search','flights-save','flights-remove'].includes(action||''))fail('Customer identity has been removed. Create a new enquiry before adding personal content.',409);
   if(action?.startsWith('flights-')){
     requireProposalEditor(staff);
     if(action==='flights-search')return json({offers:input.sample===true?[sampleFlight()]:await searchFlights(env.DUFFEL_TEST_TOKEN,input)});
@@ -150,6 +156,7 @@ async function post(path:string,input:Record<string,unknown>,env:DashboardEnv,st
     ]);return json({ok:true});
   }
   if(action==='send'){
+    if(enquiry!.email.endsWith('@anonymized.invalid'))fail('Customer identity has been removed. Email sending is disabled for this file.',409);
     if(env.EMAIL_SEND_ENABLED!=='true'||!env.RESEND_API_KEY||!env.REPLY_DOMAIN||!env.RESEND_WEBHOOK_SECRET||!env.RESEND_RECEIVING_API_KEY)fail('Email sending is disabled until preview verification and receiving-domain setup.',503);
     const subject=clean(input.subject,250),body=clean(input.body,20000),key=clean(input.key,80),reply=clean(input.replyTo,80);
     if(!subject||!body||!/^[-a-zA-Z0-9]{16,80}$/.test(key))fail('Subject, message and idempotency key required');
