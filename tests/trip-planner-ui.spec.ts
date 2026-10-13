@@ -194,6 +194,7 @@ for(const locale of ['es','it','fr','nl','hu','sv','da','no'])test(`${locale}: s
  const catalog=JSON.parse(fs.readFileSync(`src/content/editorial/${locale}.json`,'utf8'));
  const option={...suggestion.hotelStays[0].options[1],standard:'Comfort',whyFit:'Hotelbeds supplier option for these overnight dates. Room and availability require confirmation.',roomGuidance:'Superior Room · ROOM ONLY',reviewSignal:'No independently verified review score supplied.',supplierQuote:{provider:'Hotelbeds',mode:'sandbox',amount:156.32,currency:'DKK',checkin:'2027-03-10',checkout:'2027-03-14',board:'ROOM ONLY',basis:'Evaluation rate for the stated party in one room; Denmark source market assumed for testing.'}};
  await page.route('**/api/trip-suggestion',route=>route.fulfill({json:{suggestion:{...suggestion,hotelStays:[{place:'Bangkok',nights:4,options:[{...option,id:'supplier-a'},{...option,id:'supplier-b'}]}]}}}));
+ await page.setViewportSize({width:390,height:844});
  await page.goto(`/${locale}/trip-planner/`);
  await page.locator('astro-island').evaluate(async node=>{while(node.hasAttribute('ssr'))await new Promise(resolve=>setTimeout(resolve,25));});
  await page.locator('[name="travelStartDate"]').fill('2027-03-10');
@@ -208,4 +209,22 @@ for(const locale of ['es','it','fr','nl','hu','sv','da','no'])test(`${locale}: s
  await cards.first().locator('summary').click();
  await expect(cards.first()).toContainText(catalog[option.supplierQuote.basis]);
  await expect(cards.first()).not.toContainText('Subject to recheck; no reservation has been made.');
+ const sizes=await cards.first().evaluate(card=>[card.querySelector('p'),card.querySelector('dd'),card.querySelector('.hotel-demo-rate p')].map(element=>parseFloat(getComputedStyle(element!).fontSize)));
+ expect(sizes.every(size=>size>=16)).toBe(true);
+ const contrast=await page.locator('.handoff-story>.agent-mark').evaluate(element=>{
+  const channels=(color:string)=>(color.match(/[\d.]+/g)||[]).slice(0,3).map(Number).map(value=>{const channel=value/255;return channel<=.04045?channel/12.92:((channel+.055)/1.055)**2.4});
+  const luminance=(color:string)=>{const [r,g,b]=channels(color);return .2126*r+.7152*g+.0722*b};
+  const foreground=luminance(getComputedStyle(element).color),background=luminance(getComputedStyle(element.closest('.consultant-handoff')!).backgroundColor);
+  return (Math.max(foreground,background)+.05)/(Math.min(foreground,background)+.05);
+ });
+ expect(contrast).toBeGreaterThanOrEqual(4.5);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ if(locale==='da'){
+  await page.getByRole('button',{name:'Nej tak',exact:true}).click();
+  await page.getByRole('heading').first().click();
+  await cards.first().screenshot({path:'/tmp/waytoasia-readable-hotel-mobile.png'});
+  await page.locator('.day-choice').first().screenshot({path:'/tmp/waytoasia-readable-activities-mobile.png'});
+  await page.locator('.handoff-story').screenshot({path:'/tmp/waytoasia-readable-handoff-mobile.png'});
+ }
+
 });

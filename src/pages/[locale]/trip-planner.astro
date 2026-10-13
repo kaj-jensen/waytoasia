@@ -87,3 +87,33 @@ const translations=Object.fromEntries([...plannerStrings,...tours.map(tour=>tour
 <style is:global>
 .activity-photo{display:block;width:100%;max-height:200px;object-fit:cover;margin:.8rem 0;border-radius:4px}.supplier-note{font-size:.75rem;line-height:1.5;color:#536259;margin:.75rem 0}.hotelbeds-transfers{padding:clamp(1rem,3vw,2rem);background:#fbf8f1}.hotelbeds-transfers article{margin:1rem 0;border:1px solid #c9c0b1;padding:1rem}.hotelbeds-transfers article>div{margin:.75rem 0;overflow-wrap:anywhere}
 </style>
+<style is:global>
+/* Planner content uses one readable type scale, regardless of its provider. */
+.trip-result{--planner-text:#273d33;--planner-secondary:#46594f;--planner-label:#17382e}
+.trip-result :is(.hotel-card,.day-option,.hotelbeds-transfers,.planner-transfers,.planner-flights){font-family:var(--body);color:var(--planner-text);overflow-wrap:anywhere}
+.trip-result :is(.hotel-card>strong,.day-option strong,.transfer-option strong){font:600 18px/1.4 var(--body);letter-spacing:0}
+.trip-result :is(.hotel-card>p,.hotel-card dd,.day-option p,.day-option em,.hotel-supplier-note,.supplier-note,.transfer-option p,.hotelbeds-transfers p){font:400 16px/1.6 var(--body);color:var(--planner-text);letter-spacing:0;text-transform:none}
+.trip-result .day-option em{font-style:normal}
+.trip-result :is(.hotel-recommendation,.hotel-card>small,.day-option small,.hotel-card dt,.hotel-card>em,.option-sources span,.option-sources a,.transfer-option small,.hotelbeds-transfers small){font:500 14px/1.5 var(--body);color:var(--planner-secondary);letter-spacing:0;text-transform:none}
+.trip-result :is(.hotel-recommendation,.hotel-card dt,.hotel-card>em){font-weight:600;color:var(--planner-label)}
+.trip-result .option-sources a{color:var(--planner-label);text-decoration:underline;text-underline-offset:3px}
+.trip-result .hotel-demo-rate{background:#eee8db;border-left-color:#17382e;padding:16px}
+.trip-result .hotel-demo-rate>small{font:500 14px/1.5 var(--body);color:var(--planner-secondary);text-transform:none}
+.trip-result .hotel-demo-rate>strong{font:600 20px/1.4 var(--body);color:var(--planner-label)}
+.trip-result .hotel-demo-rate :is(strong span,p,summary){font:400 16px/1.6 var(--body);color:var(--planner-text)}
+.trip-result .hotel-demo-rate summary{cursor:pointer;padding-block:6px}
+.trip-result :is(.hotel-card,.day-option):has(input:checked){border-color:#17382e;box-shadow:inset 0 0 0 1px #17382e}
+.trip-result :is(.hotel-card,.day-option):has(input:checked) .selection-mark{border-color:#17382e;background:#17382e;color:#fff}
+.trip-result :is(.custom-choice,.day-alternatives>label:first-child){font:400 16px/1.5 var(--body);color:var(--planner-text)}
+.trip-result :is(.builder-heading p,.day-choice>legend small,.route-list p,.route-list ul,.result-grid ul,.traveller-research>p,.agent-refinement header p){font:400 16px/1.6 var(--body);color:var(--planner-secondary)}
+.trip-result :is(.stay-choice>legend span,.day-choice>legend>span,.route-list small,.traveller-research a,.builder-progress span){font:500 14px/1.5 var(--body);letter-spacing:0;text-transform:none;color:var(--planner-secondary)}
+.trip-result :is(.flight-source-note,.flight-compact-leg small,.flight-compact-leg span,.flight-details summary){font:400 14px/1.5 var(--body);color:var(--planner-secondary)}
+.trip-result .flight-compact-leg strong{font:600 16px/1.4 var(--body)}
+.trip-result .consultant-handoff .handoff-story>.agent-mark{font:600 14px/1.5 var(--body);color:#f2d795;letter-spacing:0;text-transform:none}
+.trip-result .consultant-handoff h3{font-size:clamp(24px,3vw,32px);line-height:1.2;color:#fffdf8}
+.trip-result .handoff-story>p,.trip-result .handoff-includes span,.trip-result .handoff-story li{font:400 16px/1.6 var(--body);color:#eff2ef}
+.trip-result .handoff-includes b{font:600 14px/1.5 var(--body);color:#f2d795;letter-spacing:0;text-transform:none}
+.trip-result .consultant-handoff label{font:500 14px/1.5 var(--body);letter-spacing:0;text-transform:none}
+.trip-result .consultant-handoff :is(input,textarea),.trip-result .agent-refinement textarea{font:400 16px/1.6 var(--body)}
+.trip-result .consultant-handoff .consent{font:400 16px/1.5 var(--body)}
+</style>
