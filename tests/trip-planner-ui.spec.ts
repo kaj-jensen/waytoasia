@@ -182,3 +182,23 @@ test('planner selects transfer preferences and saves them with the customer jour
  expect((submitted.builderChoices as {transfers:Record<string,string>}).transfers['transfer-0']).toBe('air');
  }
 });
+
+for(const locale of ['es','it','fr','nl','hu','sv','da','no'])test(`${locale}: supplier hotel cards translate after hydration`,async({page})=>{
+ const catalog=JSON.parse(fs.readFileSync(`src/content/editorial/${locale}.json`,'utf8'));
+ const option={...suggestion.hotelStays[0].options[1],standard:'Comfort',whyFit:'Hotelbeds supplier option for these overnight dates. Room and availability require confirmation.',roomGuidance:'Superior Room · ROOM ONLY',reviewSignal:'No independently verified review score supplied.',supplierQuote:{provider:'Hotelbeds',mode:'sandbox',amount:156.32,currency:'DKK',checkin:'2027-03-10',checkout:'2027-03-14',board:'ROOM ONLY',basis:'Evaluation rate for the stated party in one room; Denmark source market assumed for testing.'}};
+ await page.route('**/api/trip-suggestion',route=>route.fulfill({json:{suggestion:{...suggestion,hotelStays:[{place:'Bangkok',nights:4,options:[{...option,id:'supplier-a'},{...option,id:'supplier-b'}]}]}}}));
+ await page.goto(`/${locale}/trip-planner/`);
+ await page.locator('astro-island').evaluate(async node=>{while(node.hasAttribute('ssr'))await new Promise(resolve=>setTimeout(resolve,25));});
+ await page.locator('[name="travelStartDate"]').fill('2027-03-10');
+ await page.locator('[name="travelEndDate"]').fill('2027-03-21');
+ await page.locator('[name="departureAirport"]').fill('Copenhagen');
+ await page.locator('[name="interests"][value="food"]').check();
+ await page.locator('.trip-planner button[type="submit"]').click();
+ const cards=page.locator('.hotel-card');
+ await expect(cards.first()).toContainText(catalog['Our recommendation']);
+ await expect(cards.nth(1)).toContainText(catalog['Alternative stay']);
+ for(const key of ['Selected for your journey','Superior Room','ROOM ONLY','No independently verified review score supplied.','for the stay','Evaluation rate'])await expect(cards.first()).toContainText(catalog[key]);
+ await cards.first().locator('summary').click();
+ await expect(cards.first()).toContainText(catalog[option.supplierQuote.basis]);
+ await expect(cards.first()).not.toContainText('Subject to recheck; no reservation has been made.');
+});
