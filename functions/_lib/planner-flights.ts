@@ -41,7 +41,7 @@ export async function planFlights(serpKey:string|undefined,profile:{departureAir
   if(!out.length||!home.length)console.warn('Flight schedule search returned no complete journey',{searches:results.map(r=>r.status==='fulfilled'?{status:'complete',count:r.value.length}:{status:'failed'}),outboundMatches:out.length,homeboundMatches:home.length});
   const duration=(s:import('./duffel').FlightSegment[])=>s.reduce((n,v)=>n+Number(v.duration.match(/^PT(\d+)M$/)?.[1]||100000),0);
   out.sort((a,b)=>a.length-b.length||duration(a)-duration(b));home.sort((a,b)=>a.length-b.length||duration(a)-duration(b));
-  const offers:FlightItinerary[]=out.slice(0,3).flatMap((slice,i)=>home.length?[{source:'serpapi-google-flights' as const,offerId:`serpapi-${crypto.randomUUID()}`,retrievedAt:new Date().toISOString(),slices:[slice,home[Math.min(i,home.length-1)]],transfers}]:[]);
+  const offers:FlightItinerary[]=out.slice(0,2).flatMap((slice,i)=>home.length?[{source:'serpapi-google-flights' as const,offerId:`serpapi-${crypto.randomUUID()}`,retrievedAt:new Date().toISOString(),slices:[slice,home[Math.min(i,home.length-1)]],transfers}]:[]);
   return offers.length?{status:'search-results',provider:'serpapi',offers,transfers}:empty('unavailable');
  }
  return empty('unavailable');

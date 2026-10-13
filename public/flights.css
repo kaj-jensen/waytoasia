@@ -19,3 +19,18 @@
  .planner-flights .hotel-option>input{flex:0 0 18px;width:18px;height:18px;margin:3px 0 0}
  .planner-flights .hotel-option>div{flex:1;width:auto;overflow-wrap:anywhere}
 }
+
+.planner-flights .flight-choice{display:flex;align-items:center;gap:10px;cursor:pointer}
+.planner-flights .flight-choice input{flex:0 0 18px;width:18px;height:18px;margin:0}
+.planner-flights .flight-compact-summary,.planner-flights .flight-details summary{display:none}
+.planner-flights .flight-details>.flight-full-details{display:block}
+@media(max-width:700px){
+ .planner-flights .flight-compact-summary{display:grid;gap:10px;margin:12px 0}
+ .planner-flights .flight-compact-leg{display:grid;gap:3px;line-height:1.4}
+ .planner-flights .flight-compact-leg small,.planner-flights .flight-compact-leg span{font-size:12px;color:#5c6961}
+ .planner-flights .flight-compact-leg strong{font-size:14px}
+ .planner-flights .flight-details summary{display:list-item;cursor:pointer;font-size:13px;color:#17382e;padding:8px 0;min-height:36px}
+ .planner-flights .flight-details:not([open])>.flight-full-details{display:none}
+ .planner-flights .flight-collapse,.planner-flights .flight-details[open] .flight-expand{display:none}
+ .planner-flights .flight-details[open] .flight-collapse{display:inline}
+}

@@ -1,3 +1,4 @@
+import {useEffect,useState} from 'react';
 import {liveFlightNote,flightTable} from '../../functions/_lib/flight-display';
 import type {PlannerFlights as FlightPlan} from '../../functions/_lib/planner-flights';
 import type {FlightItinerary} from '../../functions/_lib/duffel';
@@ -21,7 +22,29 @@ es:["Datos necesarios", "Aeropuerto de salida", "Aeropuerto de llegada", "Aeropu
 it:["Dati necessari", "Aeroporto di partenza", "Aeroporto di arrivo", "Aeroporto di ritorno", "Date del viaggio", "Numero di passeggeri ed età dei bambini", "Trasferimento terrestre necessario tra", "e l’aeroporto"],
 nl:["Benodigde gegevens", "Vertrekluchthaven", "Aankomstluchthaven", "Luchthaven voor terugreis", "Reisdatums", "Aantal reizigers en leeftijden van kinderen", "Vervoer over land nodig tussen", "en luchthaven"],
 hu:["Szükséges adatok", "Indulási repülőtér", "Érkezési repülőtér", "Visszaúti repülőtér", "Utazási dátumok", "Utasok száma és gyermekek életkora", "Szárazföldi transzfer szükséges:", "és repülőtér"]};
+const compactCopy:Record<string,[string,string,string,string,string]>={
+ en:['Show flight details','Hide flight details','Outbound','Return','stops'],
+ da:['Vis flydetaljer','Skjul flydetaljer','Udrejse','Hjemrejse','stop'],
+ sv:['Visa flygdetaljer','Dölj flygdetaljer','Utresa','Hemresa','stopp'],
+ no:['Vis flydetaljer','Skjul flydetaljer','Utreise','Hjemreise','stopp'],
+ es:['Ver detalles de los vuelos','Ocultar detalles de los vuelos','Ida','Vuelta','escalas'],
+ it:['Mostra dettagli dei voli','Nascondi dettagli dei voli','Andata','Ritorno','scali'],
+ fr:['Afficher les détails des vols','Masquer les détails des vols','Aller','Retour','escales'],
+ nl:['Vluchtgegevens tonen','Vluchtgegevens verbergen','Heenreis','Terugreis','tussenstops'],
+ hu:['Repülési részletek megjelenítése','Repülési részletek elrejtése','Odaút','Visszaút','megálló']
+};
+function FlightSummary({flight,locale}:{flight:FlightItinerary;locale:string}){
+ const c=compactCopy[locale]||compactCopy.en;
+ return <div className="flight-compact-summary">{flight.slices.map((segments,index)=>{
+  const first=segments[0],last=segments.at(-1);if(!first||!last)return null;
+  const date=(value:string)=>new Intl.DateTimeFormat(locale==='en'?'en-GB':locale,{day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(value.slice(0,10)+'T12:00:00Z'));
+  const stops=segments.length-1+segments.reduce((total,segment)=>total+(segment.stops?.length||0),0);
+  return <div className="flight-compact-leg" key={index}><small>{c[index===0?2:3]} · {date(first.departure)}</small><strong>{first.origin} {first.departure.slice(11,16)} → {last.destination} {last.arrival.slice(11,16)}</strong><span>{[...new Set(segments.map(segment=>segment.airline))].join(' / ')} · {stops} {c[4]}{first.departure.slice(0,10)!==last.arrival.slice(0,10)?` · ${date(last.arrival)}`:''}</span></div>
+ })}</div>;
+}
 export default function PlannerFlights({plan,locale,selected,onSelect,step}:{step?:string;plan:FlightPlan;locale:string;selected?:FlightItinerary;onSelect:(flight?:FlightItinerary)=>void}){
- const c=copy[locale]||copy.en,d=detailCopy[locale]||detailCopy.en;const live=plan.status==='search-results';
- return <section className="traveller-research planner-flights"><link rel="stylesheet" href="/flights.css"/><div className="section-heading">{step&&<span>{step}</span>}<h3>{c[0]}</h3></div>{(live||plan.provider!=='serpapi')&&<p>{live?liveFlightNote(locale):c[1]}</p>}{plan.status!=='test-results'&&plan.status!=='search-results'?<div><p>{c[plan.status==='not-connected'?2:plan.status==='needs-details'?3:4]}</p>{plan.issues?.length&&<p>{d[0]}: {plan.issues.map(issue=>d[['departure','arrival','return','dates','party'].indexOf(issue)+1]).join(' · ')}</p>}</div>:<><div className="hotel-options">{plan.offers.map((f,i)=><label className="hotel-option" key={f.offerId}><input type="radio" name="planner-flight" checked={selected?.offerId===f.offerId} onChange={()=>onSelect(f)}/><div><strong>{c[5]} {i+1}</strong><div dangerouslySetInnerHTML={{__html:flightTable(f,locale)}}/></div></label>)}</div><label><input type="radio" name="planner-flight" checked={!selected} onChange={()=>onSelect()}/>{c[6]}</label></>}</section>;
+ const [wide,setWide]=useState(false);
+ useEffect(()=>{const media=window.matchMedia('(min-width:701px)');const update=()=>setWide(media.matches);update();media.addEventListener('change',update);return ()=>media.removeEventListener('change',update)},[]);
+ const c=copy[locale]||copy.en,d=detailCopy[locale]||detailCopy.en;const live=plan.status==='search-results';const compact=compactCopy[locale]||compactCopy.en;
+ return <section className="traveller-research planner-flights"><link rel="stylesheet" href="/flights.css"/><div className="section-heading">{step&&<span>{step}</span>}<h3>{c[0]}</h3></div>{(live||plan.provider!=='serpapi')&&<p>{live?liveFlightNote(locale):c[1]}</p>}{plan.status!=='test-results'&&plan.status!=='search-results'?<div><p>{c[plan.status==='not-connected'?2:plan.status==='needs-details'?3:4]}</p>{plan.issues?.length&&<p>{d[0]}: {plan.issues.map(issue=>d[['departure','arrival','return','dates','party'].indexOf(issue)+1]).join(' · ')}</p>}</div>:<><div className="hotel-options">{plan.offers.slice(0,2).map((f,i)=><article className="hotel-option" key={f.offerId}><div><label className="flight-choice"><input type="radio" name="planner-flight" checked={selected?.offerId===f.offerId} onChange={()=>onSelect(f)}/><strong>{c[5]} {i+1}</strong></label><FlightSummary flight={f} locale={locale}/><details className="flight-details" open={wide||undefined}><summary><span className="flight-expand">{compact[0]}</span><span className="flight-collapse">{compact[1]}</span></summary><div className="flight-full-details" dangerouslySetInnerHTML={{__html:flightTable(f,locale)}}/></details></div></article>)}</div><label><input type="radio" name="planner-flight" checked={!selected} onChange={()=>onSelect()}/>{c[6]}</label></>}</section>;
 }

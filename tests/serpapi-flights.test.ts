@@ -43,3 +43,13 @@ test('planner never falls back to another supplier when SerpApi is missing or un
  assert.equal((await planFlights(undefined,profile,route,fetcher)).status,'not-connected');assert.equal(calls,0);
  const result=await planFlights('synthetic-key',profile,route,fetcher);assert.equal(result.status,'unavailable');assert.equal(result.provider,'serpapi');assert.equal(calls,3);assert.deepEqual(result.offers,[]);
 });
+
+test('planner returns at most two complete flight options',async()=>{
+ const fetcher:typeof fetch=async(input)=>{
+  const url=new URL(String(input)),out=url.searchParams.get('departure_id')==='CPH',day=url.searchParams.get('outbound_date')!;
+  return Response.json({best_flights:Array.from({length:4},(_,index)=>({flights:[{...segment(out?'CPH':'BKK',out?'BKK':'CPH',day+' 14:00',(out?'2027-02-10':day)+' 20:00'),flight_number:`TEST ${index+1}`}]}))});
+ };
+ const plan=await planFlights('test-key',{departureAirport:'CPH',travelStartDate:'2027-02-10',travelEndDate:'2027-02-17',adults:2,children:0},[{place:'Bangkok'}],fetcher);
+ assert.equal(plan.offers.length,2);
+ assert.ok(plan.offers.every(offer=>offer.slices.length===2));
+});
