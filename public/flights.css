@@ -34,3 +34,5 @@
  .planner-flights .flight-collapse,.planner-flights .flight-details[open] .flight-expand{display:none}
  .planner-flights .flight-details[open] .flight-collapse{display:inline}
 }
+.planner-flights .flight-opt-out{padding:14px 16px;border:1px solid #cfc8ba;border-radius:8px;background:#fffdf8;margin:16px 0;font-size:14px;min-height:48px}
+.planner-flights .flight-opt-out:has(input:checked){border-color:#17382e;background:#edf2ed}
