@@ -6,7 +6,7 @@ The protected enquiry tab stores contact name, email, telephone, street address,
 This is a separate encrypted record. Existing clients, enquiries, email bodies and proposal snapshots predate the vault and remain in their existing storage format. Saving the protected contact does not change the email recipient or migrate old copies. The UI states this explicitly. Full application-level encryption of legacy personal content is a separate migration; do not describe this release as encrypting the entire CRM.
 
 ## Security boundaries
-- Cloudflare Access authentication and existing MFA policy precede application role checks.
+- Cloudflare Access authentication precedes application role checks. The dashboard uses normal restricted access without a separate MFA requirement.
 - Administrators, sales and back-office can access records, per owner instruction. Finance and viewers cannot read/write the endpoint. Only administrators can remove identity or export the full customer record.
 - AES-256-GCM, independent random 96-bit nonce per save, authentication tag, additional authenticated data bound to enquiry ID and format version. Ciphertext is the only personal content stored in customer_records.
 - CUSTOMER_RECORDS_KEY is a 32-byte base64 Worker secret, separate from D1. There is no plaintext fallback, client-side key, localStorage or browser cache for records.

@@ -11,7 +11,7 @@
     "PROPOSAL_ORIGIN": "https://proposal.waytoasia.com",
     "ACCESS_TEAM_DOMAIN": "fortalezakaj.cloudflareaccess.com",
     "ACCESS_AUD": "5691bfcb79f1088fc8a29470a7393a1e703bc23eeb2208aaacf1cb02ebac26ab",
-    "ACCESS_REQUIRE_MFA": "cloudflare",
+    "ACCESS_REQUIRE_MFA": "false",
     "DASHBOARD_CAPTURE": "true",
     "EMAIL_SEND_ENABLED": "true",
     "REPLY_DOMAIN": "venipxa.resend.app"
@@ -30,7 +30,7 @@
         "PROPOSAL_ORIGIN": "https://codex-control-panel.waytoasia.pages.dev",
         "ACCESS_TEAM_DOMAIN": "fortalezakaj.cloudflareaccess.com",
         "ACCESS_AUD": "5691bfcb79f1088fc8a29470a7393a1e703bc23eeb2208aaacf1cb02ebac26ab",
-        "ACCESS_REQUIRE_MFA": "cloudflare",
+        "ACCESS_REQUIRE_MFA": "false",
         "DASHBOARD_CAPTURE": "true",
         "EMAIL_SEND_ENABLED": "false"
       },

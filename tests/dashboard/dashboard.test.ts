@@ -145,12 +145,14 @@ test('Back-Office, Finance and View only permissions apply to direct API request
   }
 });
 
-test('dashboard alias uses the same signed identity, active staff and role checks',async()=>{
-  const {env,sqlite}=setup();env.ACCESS_REQUIRE_MFA='cloudflare';
+test('dashboard without separate MFA retains signed identity, active staff and role checks',async()=>{
+  const {env,sqlite}=setup();env.ACCESS_REQUIRE_MFA='false';
   const request=(token?:string)=>new Request('http://localhost:8788/dashboard/api/me',{headers:token?{'Cf-Access-Jwt-Assertion':token}:{}});
   assert.equal((await onRequest({env,request:request()})).status,401);
   assert.equal((await onRequest({env,request:request('forged')})).status,401);
   assert.equal((await onRequest({env,request:request(await auth.token(undefined,false,{aud:'wrong'}))})).status,401);
+  assert.equal((await onRequest({env,request:request(await auth.token(undefined,false,{expired:true}))})).status,401);
+  assert.equal((await onRequest({env,request:request(await auth.token('uninvited@example.invalid',false))})).status,403);
   assert.equal((await onRequest({env,request:request(await auth.token(undefined,false))})).status,200);
   sqlite.prepare('UPDATE staff_users SET enabled=0').run();
   assert.equal((await onRequest({env,request:request(await auth.token(undefined,false))})).status,403);
