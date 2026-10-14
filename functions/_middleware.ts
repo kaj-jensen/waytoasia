@@ -35,7 +35,9 @@ export const onRequest = async (context: PagesContext): Promise<Response> => {
 
   // The public proposal alias must not expose the private pre-launch website.
   const proposalRoute = requestUrl.pathname.startsWith('/proposal/')
-    || requestUrl.pathname.startsWith('/api/proposals/');
+    || requestUrl.pathname.startsWith('/api/proposals/')
+    // Resend authenticates this public callback with its signed event headers.
+    || requestUrl.pathname === '/api/webhooks/resend';
   const proposalAsset = requestUrl.pathname === '/proposal.css'
     || requestUrl.pathname === '/flights.css'
     || requestUrl.pathname === '/proposal.js'

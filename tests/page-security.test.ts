@@ -53,3 +53,15 @@ test('Pages default hostname redirects cannot change the destination host',async
  const response=await onRequest({request:new Request('https://waytoasia.pages.dev//external.invalid/?lang=en'),next:async()=>{throw new Error('Default host must redirect');}});
  assert.equal(response.status,308);assert.equal(response.headers.get('location'),'https://waytoasia.com//external.invalid/?lang=en');
 });
+
+test('proposal alias dispatches Resend callbacks while keeping other webhook paths private',async()=>{
+ const {onRequestPost}=await import('../functions/api/webhooks/resend');
+ const request=new Request('https://proposal.waytoasia.com/api/webhooks/resend',{method:'POST',body:'{}'});
+ const response=await onRequest({request,next:()=>onRequestPost({request,env:{RESEND_WEBHOOK_SECRET:'whsec_'+Buffer.from('test-secret').toString('base64'),RESEND_RECEIVING_API_KEY:'test-only'} as never})});
+ assert.equal(response.status,401);
+ assert.deepEqual(await response.json(),{error:'Invalid webhook signature'});
+ for(const path of ['/api/webhooks/other','/api/webhooks/resend/extra']){
+  const blocked=await onRequest({request:new Request(`https://proposal.waytoasia.com${path}`,{method:'POST',body:'{}'}),next:async()=>{throw Error('Unexpected webhook dispatch');}});
+  assert.equal(blocked.status,404);
+ }
+});
