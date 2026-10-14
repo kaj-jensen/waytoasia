@@ -33,3 +33,7 @@ The existing northern Vietnam route story now uses a geographically relevant Mu 
 Maya Chen sample profile: Dziana Hasanbekava / [Pexels photograph 7626623](https://www.pexels.com/photo/smiling-asian-woman-looking-at-camera-7626623/), free under the [Pexels License](https://www.pexels.com/license/). Stored at `public/images/team/maya-sample-portrait.jpg`. This remains a labelled demonstration profile, not a photograph of an actual employee.
 
 Sofia Lind sample profile: Maryia Plashchynskaya / [Pexels photograph 8539848](https://www.pexels.com/photo/woman-in-white-shirt-smiling-8539848/), free under the [Pexels License](https://www.pexels.com/license/). Stored at `public/images/team/sofia-sample-portrait.jpg`. Used only for this labelled demonstration profile.
+
+## Protected homepage reference: 14 October 2026
+
+`src/assets/homepage-arashiyama.webp`: Arashiyama boat under sunlit maple foliage. Source: https://www.gltjp.com/en/directory/item/17109/ . Commercial reuse permission has not been established. Owner explicitly requested use behind the existing access gate. Obtain permission or replace the asset before public launch; private access does not constitute a licence. Other candidates remain in `docs/homepage-image-candidates/`.
