@@ -40,8 +40,4 @@ Sofia Lind sample profile: Maryia Plashchynskaya / [Pexels photograph 8539848](h
 
 ## Natural styling homepage pilot — 20 October 2026
 
-- Homepage hero video and its first-frame poster: **Thailand Landscape**, Pexels video **17012994**, by **Trent Kloter**. Source: https://www.pexels.com/video/thailand-landscape-17012994/ . The source identifies Krabi, Thailand, 3840 × 2160, approximately nine seconds.
-- Licence checked on 20 October 2026: https://www.pexels.com/license/ permits website use and modification without required attribution. No endorsement is implied.
-- Local derivatives: `public/media/hero-krabi-1280.mp4`, `public/media/hero-krabi-720.mp4`, `src/assets/homepage-krabi.webp`. Silent H.264 derivatives at 24 fps; poster extracted from the same footage. The original source file is not committed.
-- Exclusive to the homepage hero across locale variants. Do not reuse the footage or poster in tour galleries, destination tiles or editorial stories.
-- Hosted locally; no Vimeo/YouTube iframe, third-party video tracking, or additional CSP hosts.
+The initial Krabi video (Trent Kloter, Pexels asset 17012994) and its derivatives were removed after owner feedback. The homepage again uses the original `homepage-arashiyama.webp` under the private-preview conditions above. The same photograph is gently animated with CSS; no new image or video is used.
