@@ -37,3 +37,7 @@ Sofia Lind sample profile: Maryia Plashchynskaya / [Pexels photograph 8539848](h
 ## Protected homepage reference: 14 October 2026
 
 `src/assets/homepage-arashiyama.webp`: Arashiyama boat under sunlit maple foliage. Source: https://www.gltjp.com/en/directory/item/17109/ . Commercial reuse permission has not been established. Owner explicitly requested use behind the existing access gate. Obtain permission or replace the asset before public launch; private access does not constitute a licence. Other candidates remain in `docs/homepage-image-candidates/`.
+
+## Natural styling homepage pilot — 20 October 2026
+
+The initial Krabi video (Trent Kloter, Pexels asset 17012994) and its derivatives were removed after owner feedback. The homepage again uses the original `homepage-arashiyama.webp` under the private-preview conditions above. The same photograph is gently animated with CSS; no new image or video is used.

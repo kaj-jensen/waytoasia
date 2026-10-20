@@ -14,24 +14,69 @@ const alt = {
  nl:'Een traditionele houten boot onder zonovergoten groene esdoornbladeren in Arashiyama, Japan',
  hu:'Hagyományos facsónak napsütötte zöld juharlevelek alatt Arashiyamában, Japánban',
 }[locale];
+
+const controls:Record<Locale,{play:string;pause:string;place:string}>={
+ en:{play:'Start image motion',pause:'Pause image motion',place:'Arashiyama, Japan'},
+ da:{play:'Start billedbevægelse',pause:'Sæt billedbevægelse på pause',place:'Arashiyama, Japan'},
+ sv:{play:'Starta bildrörelse',pause:'Pausa bildrörelse',place:'Arashiyama, Japan'},
+ no:{play:'Start bildebevegelse',pause:'Sett bildebevegelse på pause',place:'Arashiyama, Japan'},
+ es:{play:'Iniciar movimiento de imagen',pause:'Pausar movimiento de imagen',place:'Arashiyama, Japón'},
+ fr:{play:'Animer la photographie',pause:'Mettre l’animation en pause',place:'Arashiyama, Japon'},
+ it:{play:'Avvia animazione immagine',pause:'Metti in pausa l’animazione',place:'Arashiyama, Giappone'},
+ nl:{play:'Beeldbeweging starten',pause:'Beeldbeweging pauzeren',place:'Arashiyama, Japan'},
+ hu:{play:'Képmozgatás indítása',pause:'Képmozgatás szüneteltetése',place:'Arasijama, Japán'},
+};
+const labels=controls[locale];
 ---
-<div class="nature-hero">
- <Picture class="hero-image" src={arashiyama} widths={[480,800,1200,1600,2400]} sizes="100vw" width={2400} formats={['avif','webp']} quality={82} {alt} loading="eager" fetchpriority="high" />
+<div class="nature-hero" data-nature-hero>
+ <Picture class="hero-image" src={arashiyama} widths={[480,800,1200,1500]} sizes="100vw" width={1500} fallbackFormat="webp" formats={['avif','webp']} quality={60} {alt} loading="eager" fetchpriority="high" />
  <div class="hero-shade" aria-hidden="true"></div>
  <div class="hero-copy-slot"><slot /></div>
+ <div class="hero-caption"><span>{labels.place}</span><button type="button" class="motion-control" data-hero-toggle data-play={labels.play} data-pause={labels.pause} aria-label={labels.play} hidden><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path class="play-symbol" d="M4 2L13 8L4 14Z"/><path class="pause-symbol" d="M3 2H6V14H3ZM10 2H13V14H10Z"/></svg><span data-motion-label>{labels.play}</span></button></div>
 </div>
+<script>
+ document.querySelectorAll<HTMLElement>('[data-nature-hero]').forEach(hero=>{
+  const toggle=hero.querySelector<HTMLButtonElement>('[data-hero-toggle]')!;
+  const label=hero.querySelector<HTMLElement>('[data-motion-label]')!;
+  const image=hero.querySelector<HTMLImageElement>('img')!;
+  const motion=window.matchMedia('(prefers-reduced-motion: reduce)');
+  const connection=(navigator as Navigator & {connection?:{saveData?:boolean}}).connection;
+  let userPaused=false;
+  let inView=true;
+  let loaded=image.complete&&image.naturalWidth>0;
+  let explicitStart=false;
+  const sync=()=>{
+   const running=loaded&&!motion.matches&&(!connection?.saveData||explicitStart)&&!userPaused&&inView&&!document.hidden;
+   hero.classList.toggle('is-playing',running);
+   toggle.hidden=motion.matches||!loaded;
+   toggle.setAttribute('aria-label',(running?toggle.dataset.pause:toggle.dataset.play)!);
+   label.textContent=(running?toggle.dataset.pause:toggle.dataset.play)!;
+  };
+  toggle.addEventListener('click',()=>{
+   userPaused=hero.classList.contains('is-playing');
+   if(!userPaused)explicitStart=true;
+   sync();
+  });
+  image.addEventListener('load',()=>{loaded=true;sync();},{once:true});
+  motion.addEventListener('change',sync);
+  document.addEventListener('visibilitychange',sync);
+  new IntersectionObserver(entries=>{inView=entries[0].isIntersecting;sync();},{threshold:.05}).observe(hero);
+  sync();
+ });
+</script>
 <style>
- .nature-hero{position:relative;isolation:isolate;min-height:clamp(540px,64vw,700px);display:flex;align-items:flex-end;overflow:hidden;background:#10271f}
- .hero-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:58% 85%;z-index:-2}
- .nature-hero :global(picture){position:absolute;inset:0;z-index:-2}.nature-hero :global(.hero-image){position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:58% 85%;z-index:-2}
- .hero-shade{position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(5,22,17,.60) 0%,rgba(5,22,17,.38) 32%,rgba(5,22,17,.02) 66%,rgba(5,22,17,0) 100%),linear-gradient(0deg,rgba(5,22,17,.20),transparent 48%)}
- .hero-copy-slot{width:100%;padding:clamp(52px,7vw,92px) 0}
+ .nature-hero{position:relative;isolation:isolate;min-height:480px;display:flex;align-items:center;overflow:hidden;background:#303a32;color:#fff}
+ .nature-hero :global(picture){position:absolute;inset:0;z-index:-2;width:100%;height:100%;overflow:hidden}
+ .nature-hero :global(.hero-image){width:100%;height:100%;object-fit:cover;object-position:58% 85%;transform-origin:65% 75%;will-change:transform;animation:hero-drift 16s ease-in-out infinite alternate;animation-play-state:paused}
+ .is-playing :global(.hero-image){animation-play-state:running}
+ @keyframes hero-drift{from{transform:scale(1)}to{transform:scale(1.09) translate(-.7%,-.35%)}}
+ .hero-shade{position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(5,22,17,.64),rgba(5,22,17,.25) 40%,rgba(5,22,17,0) 75%),linear-gradient(0deg,rgba(5,22,17,.18),transparent 35%)}
+ .hero-copy-slot{width:100%;padding:56px 0 76px}
  .hero-copy-slot :global(.shell){width:var(--page);margin:auto}
- @media(max-width:800px){
-  .nature-hero{min-height:620px}
-  .nature-hero :global(.hero-image){object-position:65% 80%}
-  .hero-shade{background:linear-gradient(0deg,rgba(5,22,17,.70) 0%,rgba(5,22,17,.42) 45%,rgba(5,22,17,0) 78%),linear-gradient(90deg,rgba(5,22,17,.18),transparent 70%)}
-  .hero-copy-slot{padding:48px 0}
- }
- @media(max-width:560px){.nature-hero{min-height:560px}.nature-hero :global(.hero-image){object-position:65% 80%}.hero-copy-slot{padding:34px 0}}
+ .hero-caption{position:absolute;bottom:20px;right:max(20px,calc((100vw - 1180px)/2));left:max(20px,calc((100vw - 1180px)/2));display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:.65rem;letter-spacing:.04em}
+ .hero-caption>span{padding:5px 9px;background:#17231bb3}
+ .motion-control{display:flex;align-items:center;gap:8px;border:1px solid #ffffff90;background:#17231bcc;color:#fff;padding:9px 12px;font-size:.68rem;letter-spacing:0;max-width:65%}
+ .motion-control[hidden]{display:none}.motion-control svg{fill:currentColor;flex-shrink:0}.pause-symbol{display:none}.is-playing .pause-symbol{display:block}.is-playing .play-symbol{display:none}
+ @media(max-width:800px){.nature-hero{min-height:430px}.nature-hero :global(.hero-image){object-position:65% 80%}.hero-shade{background:linear-gradient(90deg,rgba(5,22,17,.5),rgba(5,22,17,.1)),linear-gradient(0deg,rgba(5,22,17,.35),transparent 60%)}.hero-copy-slot{padding:42px 0 80px}.hero-caption{bottom:16px;left:16px;right:16px}}
+ @media(prefers-reduced-motion:reduce){.nature-hero :global(.hero-image){animation:none;transform:none}.motion-control{display:none}}
 </style>
