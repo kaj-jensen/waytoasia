@@ -6,7 +6,7 @@ const displayCountries=localizeContent(locale,countries);const displayStyles=loc
 const plannerLabel:Record<Locale,string>={en:'Journey Designer',es:'Journey Designer',it:'Journey Designer',fr:'Journey Designer',nl:'Journey Designer',hu:'Journey Designer',sv:'Journey Designer',da:'Journey Designer',no:'Journey Designer'};
 ---
 <header class="header">
- <a class="brand" translate="no" href={localizedPath(locale)} aria-label="Way to Asia — WAY to ASIA home"><span>WAY</span><i>to</i><span>ASIA</span></a>
+ <a class="brand" translate="no" href={localizedPath(locale)} aria-label="Way to Asia — WAY to ASIA home"><span>WAY</span> <i>to</i> <span>ASIA</span></a>
  <nav aria-label={tr(locale,'Primary')}>
   <div class="nav-group"><button type="button" aria-expanded="false" data-nav-toggle>{t(locale,'navDestinations')} <span>⌄</span></button><div class="mega"><div><small>{tr(locale,'Explore by country')}</small>{displayCountries.map(c=><a href={localizedPath(locale,`/${c.slug}`)}><b>{c.code}</b><span>{c.name}<em>{c.nativeName}</em></span></a>)}</div><div><small>{tr(locale,'Find your way')}</small>{displayStyles.map(s=><a href={localizedPath(locale,`/tours#${s.slug}`)}><span>{s.label}<em>{s.eyebrow}</em></span></a>)}<a class="mega-all" href={localizedPath(locale,'/tours')}>{tr(locale,'View all journeys')} ↗</a></div></div></div>
   <a href={localizedPath(locale,'/tours')}>{t(locale,'navTours')}</a>

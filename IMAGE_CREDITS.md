@@ -37,3 +37,11 @@ Sofia Lind sample profile: Maryia Plashchynskaya / [Pexels photograph 8539848](h
 ## Protected homepage reference: 14 October 2026
 
 `src/assets/homepage-arashiyama.webp`: Arashiyama boat under sunlit maple foliage. Source: https://www.gltjp.com/en/directory/item/17109/ . Commercial reuse permission has not been established. Owner explicitly requested use behind the existing access gate. Obtain permission or replace the asset before public launch; private access does not constitute a licence. Other candidates remain in `docs/homepage-image-candidates/`.
+
+## Natural styling homepage pilot — 20 October 2026
+
+- Homepage hero video and its first-frame poster: **Thailand Landscape**, Pexels video **17012994**, by **Trent Kloter**. Source: https://www.pexels.com/video/thailand-landscape-17012994/ . The source identifies Krabi, Thailand, 3840 × 2160, approximately nine seconds.
+- Licence checked on 20 October 2026: https://www.pexels.com/license/ permits website use and modification without required attribution. No endorsement is implied.
+- Local derivatives: `public/media/hero-krabi-1280.mp4`, `public/media/hero-krabi-720.mp4`, `src/assets/homepage-krabi.webp`. Silent H.264 derivatives at 24 fps; poster extracted from the same footage. The original source file is not committed.
+- Exclusive to the homepage hero across locale variants. Do not reuse the footage or poster in tour galleries, destination tiles or editorial stories.
+- Hosted locally; no Vimeo/YouTube iframe, third-party video tracking, or additional CSP hosts.

@@ -1,37 +1,96 @@
 ---
 import {Picture} from 'astro:assets';
-import arashiyama from '../assets/homepage-arashiyama.webp';
+import krabi from '../assets/homepage-krabi.webp';
 import type {Locale} from '../i18n';
 const {locale} = Astro.props as {locale:Locale};
-const alt = {
- en:'A traditional wooden boat beneath sunlit green maple leaves in Arashiyama, Japan',
- da:'En traditionel træbåd under solbelyste grønne ahornblade i Arashiyama, Japan',
- sv:'En traditionell träbåt under solbelysta gröna lönnlöv i Arashiyama, Japan',
- no:'En tradisjonell trebåt under solbelyste grønne lønneblader i Arashiyama, Japan',
- es:'Una barca tradicional de madera bajo hojas verdes de arce iluminadas por el sol en Arashiyama, Japón',
- fr:'Un bateau traditionnel en bois sous des feuilles vertes d’érable éclairées par le soleil à Arashiyama, au Japon',
- it:'Una barca tradizionale in legno sotto foglie verdi di acero illuminate dal sole ad Arashiyama, in Giappone',
- nl:'Een traditionele houten boot onder zonovergoten groene esdoornbladeren in Arashiyama, Japan',
- hu:'Hagyományos facsónak napsütötte zöld juharlevelek alatt Arashiyamában, Japánban',
-}[locale];
+const copy:Record<Locale,{alt:string;play:string;pause:string;place:string}> = {
+ en:{alt:'Limestone mountains and calm water in Krabi, Thailand',play:'Play background video',pause:'Pause background video',place:'Krabi, Thailand'},
+ da:{alt:'Kalkstensbjerge og stille vand i Krabi, Thailand',play:'Afspil baggrundsvideo',pause:'Sæt baggrundsvideo på pause',place:'Krabi, Thailand'},
+ sv:{alt:'Kalkstensberg och lugnt vatten i Krabi, Thailand',play:'Spela bakgrundsvideo',pause:'Pausa bakgrundsvideo',place:'Krabi, Thailand'},
+ no:{alt:'Kalksteinsfjell og stille vann i Krabi, Thailand',play:'Spill av bakgrunnsvideo',pause:'Sett bakgrunnsvideo på pause',place:'Krabi, Thailand'},
+ es:{alt:'Montañas de piedra caliza y aguas tranquilas en Krabi, Tailandia',play:'Reproducir vídeo de fondo',pause:'Pausar vídeo de fondo',place:'Krabi, Tailandia'},
+ fr:{alt:'Montagnes calcaires et eaux calmes à Krabi, en Thaïlande',play:'Lire la vidéo d’arrière-plan',pause:'Mettre la vidéo d’arrière-plan en pause',place:'Krabi, Thaïlande'},
+ it:{alt:'Montagne calcaree e acque tranquille a Krabi, in Thailandia',play:'Riproduci il video di sfondo',pause:'Metti in pausa il video di sfondo',place:'Krabi, Thailandia'},
+ nl:{alt:'Kalksteenbergen en rustig water in Krabi, Thailand',play:'Achtergrondvideo afspelen',pause:'Achtergrondvideo pauzeren',place:'Krabi, Thailand'},
+ hu:{alt:'Mészkőhegyek és nyugodt víz a thaiföldi Krabiban',play:'Háttérvideó lejátszása',pause:'Háttérvideó szüneteltetése',place:'Krabi, Thaiföld'},
+};
+const labels=copy[locale];
 ---
-<div class="nature-hero">
- <Picture class="hero-image" src={arashiyama} widths={[480,800,1200,1600,2400]} sizes="100vw" width={2400} formats={['avif','webp']} quality={82} {alt} loading="eager" fetchpriority="high" />
+<div class="nature-hero" data-nature-hero>
+ <Picture class="hero-image" src={krabi} widths={[480,800,1200,1600,1920]} sizes="100vw" formats={['avif','webp']} quality={80} alt={labels.alt} loading="eager" fetchpriority="high" />
+ <video class="hero-video" muted loop playsinline preload="none" aria-hidden="true" tabindex="-1" disablepictureinpicture data-hero-video></video>
  <div class="hero-shade" aria-hidden="true"></div>
  <div class="hero-copy-slot"><slot /></div>
+ <div class="hero-caption"><span>{labels.place}</span><button type="button" class="motion-control" data-hero-toggle data-play={labels.play} data-pause={labels.pause} aria-label={labels.play} hidden><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path class="play-symbol" d="M4 2L13 8L4 14Z"/><path class="pause-symbol" d="M3 2H6V14H3ZM10 2H13V14H10Z"/></svg><span data-motion-label>{labels.play}</span></button></div>
 </div>
+<script>
+ document.querySelectorAll<HTMLElement>('[data-nature-hero]').forEach(hero=>{
+  const video=hero.querySelector<HTMLVideoElement>('[data-hero-video]')!;
+  const toggle=hero.querySelector<HTMLButtonElement>('[data-hero-toggle]')!;
+  const label=hero.querySelector<HTMLElement>('[data-motion-label]')!;
+  const image=hero.querySelector<HTMLImageElement>('img')!;
+  const motion=window.matchMedia('(prefers-reduced-motion: reduce)');
+  const connection=(navigator as Navigator & {connection?:{saveData?:boolean;effectiveType?:string}}).connection;
+  let userPaused=false;
+  let inView=true;
+  let failed=false;
+  const blocked=()=>motion.matches||connection?.saveData||['slow-2g','2g','3g'].includes(connection?.effectiveType??'');
+  const update=()=>{
+   const playing=!video.paused&&!video.ended;
+   hero.classList.toggle('is-playing',playing);
+   toggle.setAttribute('aria-label',(playing?toggle.dataset.pause:toggle.dataset.play)!);
+   label.textContent=(playing?toggle.dataset.pause:toggle.dataset.play)!;
+  };
+  const play=async()=>{
+   if(failed)return;
+   if(!video.getAttribute('src')){
+    video.muted=true;
+    video.src=window.matchMedia('(max-width: 800px)').matches?'/media/hero-krabi-720.mp4':'/media/hero-krabi-1280.mp4';
+   }
+   try {await video.play();} catch {update();}
+  };
+  const sync=()=>{
+   if(blocked()||userPaused||!inView||document.hidden){video.pause();return;}
+   void play();
+  };
+  video.addEventListener('playing',()=>{
+   // A queued play can complete after a preference or visibility change.
+   if(motion.matches||userPaused||!inView||document.hidden){video.pause();return;}
+   hero.classList.add('video-ready');update();
+  });
+  video.addEventListener('pause',update);
+  video.addEventListener('error',()=>{failed=true;hero.classList.remove('video-ready');toggle.hidden=true;});
+  toggle.hidden=motion.matches;
+  toggle.addEventListener('click',()=>{
+   if(video.paused){userPaused=false;void play();}
+   else {userPaused=true;video.pause();}
+  });
+  motion.addEventListener('change',()=>{
+   toggle.hidden=motion.matches||failed;
+   if(motion.matches)hero.classList.remove('video-ready');
+   sync();
+  });
+  document.addEventListener('visibilitychange',sync);
+  const observer=new IntersectionObserver(entries=>{inView=entries[0].isIntersecting;if(!inView)video.pause();else if(video.getAttribute('src'))sync();},{threshold:.05});
+  observer.observe(hero);
+  // The responsive poster is the first paint. Video never competes with it.
+  const start=()=>{window.setTimeout(sync,1200);};
+  if(image.complete)start();else image.addEventListener('load',start,{once:true});
+ });
+</script>
 <style>
- .nature-hero{position:relative;isolation:isolate;min-height:clamp(540px,64vw,700px);display:flex;align-items:flex-end;overflow:hidden;background:#10271f}
- .hero-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:58% 85%;z-index:-2}
- .nature-hero :global(picture){position:absolute;inset:0;z-index:-2}.nature-hero :global(.hero-image){position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:58% 85%;z-index:-2}
- .hero-shade{position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(5,22,17,.60) 0%,rgba(5,22,17,.38) 32%,rgba(5,22,17,.02) 66%,rgba(5,22,17,0) 100%),linear-gradient(0deg,rgba(5,22,17,.20),transparent 48%)}
- .hero-copy-slot{width:100%;padding:clamp(52px,7vw,92px) 0}
+ .nature-hero{position:relative;isolation:isolate;min-height:480px;display:flex;align-items:center;overflow:hidden;background:#303a32;color:#fff}
+ .nature-hero :global(picture),.hero-video{position:absolute;inset:0;z-index:-3;width:100%;height:100%}
+ .nature-hero :global(.hero-image){width:100%;height:100%;object-fit:cover;object-position:50% 52%}
+ .hero-video{object-fit:cover;object-position:50% 52%;opacity:0;transition:opacity .7s;z-index:-2;pointer-events:none}
+ .video-ready .hero-video{opacity:1}
+ .hero-shade{position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(15,28,23,.76),rgba(15,28,23,.38) 48%,rgba(15,28,23,.04)),linear-gradient(0deg,rgba(15,28,23,.3),transparent 35%)}
+ .hero-copy-slot{width:100%;padding:56px 0 76px}
  .hero-copy-slot :global(.shell){width:var(--page);margin:auto}
- @media(max-width:800px){
-  .nature-hero{min-height:620px}
-  .nature-hero :global(.hero-image){object-position:65% 80%}
-  .hero-shade{background:linear-gradient(0deg,rgba(5,22,17,.70) 0%,rgba(5,22,17,.42) 45%,rgba(5,22,17,0) 78%),linear-gradient(90deg,rgba(5,22,17,.18),transparent 70%)}
-  .hero-copy-slot{padding:48px 0}
- }
- @media(max-width:560px){.nature-hero{min-height:560px}.nature-hero :global(.hero-image){object-position:65% 80%}.hero-copy-slot{padding:34px 0}}
+ .hero-caption{position:absolute;bottom:20px;right:max(20px,calc((100vw - 1180px)/2));left:max(20px,calc((100vw - 1180px)/2));display:flex;justify-content:space-between;align-items:center;gap:16px;font-size:.65rem;letter-spacing:.04em}
+ .hero-caption>span{padding:5px 9px;background:#17231bb3}
+ .motion-control{display:flex;align-items:center;gap:8px;border:1px solid #ffffff90;background:#17231bcc;color:#fff;padding:9px 12px;font-size:.68rem;letter-spacing:0}
+ .motion-control[hidden]{display:none}.motion-control svg{fill:currentColor}.pause-symbol{display:none}.is-playing .pause-symbol{display:block}.is-playing .play-symbol{display:none}
+ @media(max-width:800px){.nature-hero{min-height:430px}.nature-hero :global(.hero-image),.hero-video{object-position:58% 50%}.hero-shade{background:linear-gradient(90deg,rgba(15,28,23,.78),rgba(15,28,23,.2)),linear-gradient(0deg,rgba(15,28,23,.4),transparent 60%)}.hero-copy-slot{padding:42px 0 80px}.hero-caption{bottom:16px;left:14px;right:14px}}
+ @media(prefers-reduced-motion:reduce){.hero-video{display:none;transition:none}.motion-control{display:none}}
 </style>
