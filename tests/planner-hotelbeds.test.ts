@@ -70,7 +70,8 @@ test('searches all four sandbox overnight bases before excursions and uses exact
  const planned={hotelStays:[{place:'Ayutthaya & Sukhothai',overnightBase:'Thailand: Ayutthaya',nights:2,options:[]},{place:'Sukhothai',overnightBase:'Thailand: Sukhotai',nights:2,options:[]},{place:'Chiang Mai',nights:2,options:[]},{place:'Chiang Rai',nights:1,options:[]}],dayPlans:[{day:2,place:'Ayutthaya & Sukhothai',options:[]}]} as unknown as TripSuggestion;
  const calls:Array<{path:string;body:{geolocation?:{latitude:number;longitude:number;radius:number};stay?:{checkIn:string}}}>=[];
  const result=await enrichWithHotelbeds(env,profile,planned,async(url,init)=>{calls.push({path:new URL(String(url)).pathname,body:JSON.parse(String(init?.body||'{}'))});return Response.json({hotels:{hotels:[]},activities:[]})});
- const hotels=calls.filter(c=>c.path==='/hotel-api/1.0/hotels');assert.equal(hotels.length,4);
+ // Requests in the first batch run concurrently; match each base by its stay date.
+ const hotels=calls.filter(c=>c.path==='/hotel-api/1.0/hotels').sort((a,b)=>a.body.stay!.checkIn.localeCompare(b.body.stay!.checkIn));assert.equal(hotels.length,4);
  assert.equal(hotels[0].body.geolocation!.latitude,14.357);
  assert.equal(hotels[1].body.geolocation!.longitude,99.823);assert.equal(hotels[1].body.geolocation!.radius,20);
  assert.equal(hotels[3].body.stay!.checkIn,'2027-02-16');
