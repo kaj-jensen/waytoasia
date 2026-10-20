@@ -29,7 +29,7 @@ const controls:Record<Locale,{play:string;pause:string;place:string}>={
 const labels=controls[locale];
 ---
 <div class="nature-hero" data-nature-hero>
- <Picture class="hero-image" src={arashiyama} widths={[480,800,1200,1600,2400]} sizes="100vw" width={2400} formats={['avif','webp']} quality={82} {alt} loading="eager" fetchpriority="high" />
+ <Picture class="hero-image" src={arashiyama} widths={[480,800,1200,1500]} sizes="100vw" width={1500} fallbackFormat="webp" formats={['avif','webp']} quality={60} {alt} loading="eager" fetchpriority="high" />
  <div class="hero-shade" aria-hidden="true"></div>
  <div class="hero-copy-slot"><slot /></div>
  <div class="hero-caption"><span>{labels.place}</span><button type="button" class="motion-control" data-hero-toggle data-play={labels.play} data-pause={labels.pause} aria-label={labels.play} hidden><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path class="play-symbol" d="M4 2L13 8L4 14Z"/><path class="pause-symbol" d="M3 2H6V14H3ZM10 2H13V14H10Z"/></svg><span data-motion-label>{labels.play}</span></button></div>
@@ -67,7 +67,7 @@ const labels=controls[locale];
 <style>
  .nature-hero{position:relative;isolation:isolate;min-height:480px;display:flex;align-items:center;overflow:hidden;background:#303a32;color:#fff}
  .nature-hero :global(picture){position:absolute;inset:0;z-index:-2;width:100%;height:100%;overflow:hidden}
- .nature-hero :global(.hero-image){width:100%;height:100%;object-fit:cover;object-position:58% 85%;transform-origin:65% 75%;animation:hero-drift 16s ease-in-out infinite alternate;animation-play-state:paused}
+ .nature-hero :global(.hero-image){width:100%;height:100%;object-fit:cover;object-position:58% 85%;transform-origin:65% 75%;will-change:transform;animation:hero-drift 16s ease-in-out infinite alternate;animation-play-state:paused}
  .is-playing :global(.hero-image){animation-play-state:running}
  @keyframes hero-drift{from{transform:scale(1)}to{transform:scale(1.09) translate(-.7%,-.35%)}}
  .hero-shade{position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(5,22,17,.64),rgba(5,22,17,.25) 40%,rgba(5,22,17,0) 75%),linear-gradient(0deg,rgba(5,22,17,.18),transparent 35%)}
