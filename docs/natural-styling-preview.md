@@ -12,14 +12,16 @@ The homepage uses a warm white header, olive calls to action, sand section backg
 
 The original Arashiyama photograph is restored following owner feedback. Its existing provenance and private-preview permission notes remain in `IMAGE_CREDITS.md`. The rejected Krabi clip and poster are removed.
 
-The photograph has a gentle 16-second pan-and-zoom animation. This is animated photography, not video, and its translated controls describe image motion. Reduced motion retains a still image; data-saving visitors can explicitly start animation. Motion pauses outside the viewport, in hidden tabs, or when the visitor pauses it. Responsive AVIF and WebP images use the original source dimensions without upscaling. The animated image has its own compositing layer to keep motion smooth. No extra media download or video autoplay is required.
+On 21 October the owner supplied local video clips and requested a real three-scene hero. The homepage now plays a silent 22.4-second sequence: mountain flyover, green waterfall, Vietnam riverfront. Soft 0.8-second crossfades include the final transition back to the opening. `scripts/prepare-hero-videos.py` produces 1280×720 desktop and separately cropped 576×648 mobile H.264 MP4 derivatives with fast-start metadata and bounded bitrates (approximately 3.5 MB and 1.5 MB). Audio tracks are removed.
+
+The original Arashiyama photograph remains visible while loading and if playback fails. Only the matching desktop or mobile video is requested, after the image and page load. Reduced motion and data saving retain the still photograph without requesting video; the visitor can explicitly press the translated play control. Playback pauses outside the viewport, in hidden tabs and on user request. The video caption describes a general glimpse of Asia; it does not mislabel the footage as Arashiyama. Existing private Access protection remains required.
 
 ## Validation
 
 - Lint, Astro diagnostics and the production build, including brand preservation, localized HTML and SEO checks.
 - Content, planner, dashboard, finance and proposal suites.
 - Full browser suite, including real map tiles under production CSP for all 20 tours, mobile map bounds, all nine locales and enquiry flows.
-- Hero checks cover actual photograph motion under CSP, pause/resume, dynamic reduced motion, data saving, no video download, and mobile layout.
+- Hero checks cover real video playback and looping under CSP, pause/resume, offscreen pause, dynamic reduced motion, data saving, mobile-only delivery, failed media fallback and all nine mobile layouts.
 - Mobile Lighthouse checks cover all three pilot pages. Results are local laboratory measurements, not production field data.
 
 The owner authorized deployment to the protected test website on 20 October 2026. Merging into `main` deploys through the existing Cloudflare Pages Git integration. The matching project is `waytoasia`, serving `waytoasia.com`, `www.waytoasia.com` and `proposal.waytoasia.com`. Production Access policies and account settings are not part of the styling change.

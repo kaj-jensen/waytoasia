@@ -41,3 +41,9 @@ Sofia Lind sample profile: Maryia Plashchynskaya / [Pexels photograph 8539848](h
 ## Natural styling homepage pilot — 20 October 2026
 
 The initial Krabi video (Trent Kloter, Pexels asset 17012994) and its derivatives were removed after owner feedback. The homepage again uses the original `homepage-arashiyama.webp` under the private-preview conditions above. The same photograph is gently animated with CSS; no new image or video is used.
+
+## Owner-supplied homepage video — 21 October 2026
+
+The owner supplied six clips in the Mac's `Documents/Way-to-Asia/Video` folder and explicitly requested a three-video moving homepage hero on the protected test site. Selected: `asia-mountian.mp4` (mountain flyover), `green-waterfall.mp4` (sunlit waterfall), and `vietnam.mp4` (riverfront). The filename spelling is retained for reproducibility. Photographer, original download URLs, precise filming locations and licence terms were not supplied; no new licence or location claim is made. Use remains within the existing private test website.
+
+`public/media/asia-hero-desktop.mp4` and `asia-hero-mobile.mp4` are silent, compressed derivatives used exclusively for the homepage hero. The original files are read only and are not committed. See `scripts/prepare-hero-videos.py` for crop, timing and encoding details. The original Arashiyama photograph remains the loading/error/reduced-motion/data-saving fallback under its existing conditions above.

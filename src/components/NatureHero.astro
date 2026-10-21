@@ -15,50 +15,73 @@ const alt = {
  hu:'Hagyományos facsónak napsütötte zöld juharlevelek alatt Arashiyamában, Japánban',
 }[locale];
 
-const controls:Record<Locale,{play:string;pause:string;place:string}>={
- en:{play:'Start image motion',pause:'Pause image motion',place:'Arashiyama, Japan'},
- da:{play:'Start billedbevægelse',pause:'Sæt billedbevægelse på pause',place:'Arashiyama, Japan'},
- sv:{play:'Starta bildrörelse',pause:'Pausa bildrörelse',place:'Arashiyama, Japan'},
- no:{play:'Start bildebevegelse',pause:'Sett bildebevegelse på pause',place:'Arashiyama, Japan'},
- es:{play:'Iniciar movimiento de imagen',pause:'Pausar movimiento de imagen',place:'Arashiyama, Japón'},
- fr:{play:'Animer la photographie',pause:'Mettre l’animation en pause',place:'Arashiyama, Japon'},
- it:{play:'Avvia animazione immagine',pause:'Metti in pausa l’animazione',place:'Arashiyama, Giappone'},
- nl:{play:'Beeldbeweging starten',pause:'Beeldbeweging pauzeren',place:'Arashiyama, Japan'},
- hu:{play:'Képmozgatás indítása',pause:'Képmozgatás szüneteltetése',place:'Arasijama, Japán'},
+const controls:Record<Locale,{play:string;pause:string;place:string;sequence:string}>={
+ en:{play:'Play hero video',pause:'Pause hero video',place:'Arashiyama, Japan',sequence:'A glimpse of Asia'},
+ da:{play:'Afspil baggrundsvideo',pause:'Sæt baggrundsvideo på pause',place:'Arashiyama, Japan',sequence:'Et glimt af Asien'},
+ sv:{play:'Spela bakgrundsvideo',pause:'Pausa bakgrundsvideo',place:'Arashiyama, Japan',sequence:'En glimt av Asien'},
+ no:{play:'Spill bakgrunnsvideo',pause:'Sett bakgrunnsvideo på pause',place:'Arashiyama, Japan',sequence:'Et glimt av Asia'},
+ es:{play:'Reproducir vídeo de fondo',pause:'Pausar vídeo de fondo',place:'Arashiyama, Japón',sequence:'Una mirada a Asia'},
+ fr:{play:'Lire la vidéo de fond',pause:'Mettre la vidéo de fond en pause',place:'Arashiyama, Japon',sequence:'Un aperçu de l’Asie'},
+ it:{play:'Riproduci video di sfondo',pause:'Metti in pausa il video di sfondo',place:'Arashiyama, Giappone',sequence:'Uno sguardo sull’Asia'},
+ nl:{play:'Achtergrondvideo afspelen',pause:'Achtergrondvideo pauzeren',place:'Arashiyama, Japan',sequence:'Een blik op Azië'},
+ hu:{play:'Háttérvideó lejátszása',pause:'Háttérvideó szüneteltetése',place:'Arasijama, Japán',sequence:'Pillantás Ázsiára'},
 };
 const labels=controls[locale];
 ---
 <div class="nature-hero" data-nature-hero>
  <Picture class="hero-image" src={arashiyama} widths={[480,800,1200,1500]} sizes="100vw" width={1500} fallbackFormat="webp" formats={['avif','webp']} quality={60} {alt} loading="eager" fetchpriority="high" />
+ <video class="hero-video" data-hero-video data-desktop="/media/asia-hero-desktop.mp4" data-mobile="/media/asia-hero-mobile.mp4" muted loop playsinline preload="none" aria-hidden="true" tabindex="-1" disablepictureinpicture></video>
  <div class="hero-shade" aria-hidden="true"></div>
  <div class="hero-copy-slot"><slot /></div>
- <div class="hero-caption"><span>{labels.place}</span><button type="button" class="motion-control" data-hero-toggle data-play={labels.play} data-pause={labels.pause} aria-label={labels.play} hidden><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path class="play-symbol" d="M4 2L13 8L4 14Z"/><path class="pause-symbol" d="M3 2H6V14H3ZM10 2H13V14H10Z"/></svg><span data-motion-label>{labels.play}</span></button></div>
+ <div class="hero-caption"><span><span class="still-caption">{labels.place}</span><span class="video-caption">{labels.sequence}</span></span><button type="button" class="motion-control" data-hero-toggle data-play={labels.play} data-pause={labels.pause} aria-label={labels.play} hidden><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path class="play-symbol" d="M4 2L13 8L4 14Z"/><path class="pause-symbol" d="M3 2H6V14H3ZM10 2H13V14H10Z"/></svg><span data-motion-label>{labels.play}</span></button></div>
 </div>
 <script>
  document.querySelectorAll<HTMLElement>('[data-nature-hero]').forEach(hero=>{
   const toggle=hero.querySelector<HTMLButtonElement>('[data-hero-toggle]')!;
   const label=hero.querySelector<HTMLElement>('[data-motion-label]')!;
   const image=hero.querySelector<HTMLImageElement>('img')!;
+  const video=hero.querySelector<HTMLVideoElement>('[data-hero-video]')!;
   const motion=window.matchMedia('(prefers-reduced-motion: reduce)');
-  const connection=(navigator as Navigator & {connection?:{saveData?:boolean}}).connection;
-  let userPaused=false;
-  let inView=true;
-  let loaded=image.complete&&image.naturalWidth>0;
-  let explicitStart=false;
-  const sync=()=>{
-   const running=loaded&&!motion.matches&&(!connection?.saveData||explicitStart)&&!userPaused&&inView&&!document.hidden;
+  const connection=(navigator as Navigator & {connection?:{saveData?:boolean;addEventListener?:(type:string,listener:()=>void)=>void}}).connection;
+  let userPaused=false,explicitStart=false,inView=false,failed=false,starting=false;
+  let imageReady=image.complete&&image.naturalWidth>0;
+  let pageReady=document.readyState==='complete';
+  const wantsPlayback=()=>imageReady&&pageReady&&inView&&!document.hidden&&!userPaused&&!failed&&(explicitStart||(!motion.matches&&!connection?.saveData));
+  const updateControl=()=>{
+   const running=!video.paused&&!failed;
    hero.classList.toggle('is-playing',running);
-   toggle.hidden=motion.matches||!loaded;
+   toggle.hidden=!imageReady;
    toggle.setAttribute('aria-label',(running?toggle.dataset.pause:toggle.dataset.play)!);
    label.textContent=(running?toggle.dataset.pause:toggle.dataset.play)!;
   };
+  const sync=()=>{
+   if(!wantsPlayback()){
+    video.pause();
+    if(failed||motion.matches&&!explicitStart)hero.classList.remove('has-video');
+    updateControl();return;
+   }
+   if(!video.getAttribute('src')){
+    video.muted=true;
+    video.src=(window.matchMedia('(max-width: 800px)').matches?video.dataset.mobile:video.dataset.desktop)!;
+   }
+   if(video.paused&&!starting){
+    starting=true;
+    video.play().catch(()=>{userPaused=true;hero.classList.remove('has-video');}).finally(()=>{starting=false;if(!wantsPlayback())video.pause();updateControl();});
+   }
+   updateControl();
+  };
   toggle.addEventListener('click',()=>{
-   userPaused=hero.classList.contains('is-playing');
-   if(!userPaused)explicitStart=true;
+   userPaused=!video.paused;
+   if(!userPaused){explicitStart=true;if(failed){failed=false;video.removeAttribute('src');video.load();}}
    sync();
   });
-  image.addEventListener('load',()=>{loaded=true;sync();},{once:true});
-  motion.addEventListener('change',sync);
+  video.addEventListener('playing',()=>{if(wantsPlayback())hero.classList.add('has-video');else video.pause();updateControl();});
+  video.addEventListener('pause',updateControl);
+  video.addEventListener('error',()=>{failed=true;sync();});
+  image.addEventListener('load',()=>{imageReady=true;sync();},{once:true});
+  window.addEventListener('load',()=>{pageReady=true;sync();},{once:true});
+  motion.addEventListener('change',()=>{explicitStart=false;sync();});
+  connection?.addEventListener?.('change',sync);
   document.addEventListener('visibilitychange',sync);
   new IntersectionObserver(entries=>{inView=entries[0].isIntersecting;sync();},{threshold:.05}).observe(hero);
   sync();
@@ -67,9 +90,10 @@ const labels=controls[locale];
 <style>
  .nature-hero{position:relative;isolation:isolate;min-height:480px;display:flex;align-items:center;overflow:hidden;background:#303a32;color:#fff}
  .nature-hero :global(picture){position:absolute;inset:0;z-index:-2;width:100%;height:100%;overflow:hidden}
- .nature-hero :global(.hero-image){width:100%;height:100%;object-fit:cover;object-position:58% 85%;transform-origin:65% 75%;will-change:transform;animation:hero-drift 16s ease-in-out infinite alternate;animation-play-state:paused}
- .is-playing :global(.hero-image){animation-play-state:running}
- @keyframes hero-drift{from{transform:scale(1)}to{transform:scale(1.09) translate(-.7%,-.35%)}}
+ .nature-hero :global(.hero-image){width:100%;height:100%;object-fit:cover;object-position:58% 85%}
+ .hero-video{position:absolute;inset:0;z-index:-2;width:100%;height:100%;object-fit:cover;object-position:50% 55%;opacity:0;transition:opacity .9s ease;pointer-events:none}
+ .has-video .hero-video{opacity:1}
+ .video-caption,.has-video .still-caption{display:none}.has-video .video-caption{display:inline}
  .hero-shade{position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(5,22,17,.64),rgba(5,22,17,.25) 40%,rgba(5,22,17,0) 75%),linear-gradient(0deg,rgba(5,22,17,.18),transparent 35%)}
  .hero-copy-slot{width:100%;padding:56px 0 76px}
  .hero-copy-slot :global(.shell){width:var(--page);margin:auto}
@@ -78,5 +102,5 @@ const labels=controls[locale];
  .motion-control{display:flex;align-items:center;gap:8px;border:1px solid #ffffff90;background:#17231bcc;color:#fff;padding:9px 12px;font-size:.68rem;letter-spacing:0;max-width:65%}
  .motion-control[hidden]{display:none}.motion-control svg{fill:currentColor;flex-shrink:0}.pause-symbol{display:none}.is-playing .pause-symbol{display:block}.is-playing .play-symbol{display:none}
  @media(max-width:800px){.nature-hero{min-height:430px}.nature-hero :global(.hero-image){object-position:65% 80%}.hero-shade{background:linear-gradient(90deg,rgba(5,22,17,.5),rgba(5,22,17,.1)),linear-gradient(0deg,rgba(5,22,17,.35),transparent 60%)}.hero-copy-slot{padding:42px 0 80px}.hero-caption{bottom:16px;left:16px;right:16px}}
- @media(prefers-reduced-motion:reduce){.nature-hero :global(.hero-image){animation:none;transform:none}.motion-control{display:none}}
+ @media(prefers-reduced-motion:reduce){.hero-video{transition:none}}
 </style>
