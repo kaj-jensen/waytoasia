@@ -22,7 +22,13 @@ export async function onRequestPost({request,env}:{request:Request;env:Dashboard
   if(!event.data||!/^[-a-zA-Z0-9]+$/.test(event.data.email_id))return json({error:'Invalid email event'},400);
   const db=env.PROPOSALS_DB;
   try{
-    if(await db.prepare('SELECT id FROM webhook_events WHERE id=?').bind(eventId).first())return json({ok:true,duplicate:true});
+    if(await db.prepare('SELECT id FROM webhook_events WHERE id=?').bind(eventId).first()){
+      // A previously acknowledged delivery may need to repair a stale local status.
+      // Only reconcile an existing outgoing message; never recreate messages or
+      // overwrite terminal failures/complaints when replaying an old event.
+      const staleDelivery=event.type==='email.delivered'&&await db.prepare("SELECT id FROM activities WHERE provider_id=? AND kind='outgoing' AND delivery IN ('pending','sent','delivery_delayed')").bind(event.data.email_id).first();
+      if(!staleDelivery)return json({ok:true,duplicate:true});
+    }
     const eventStatement=db.prepare('INSERT OR IGNORE INTO webhook_events VALUES (?,?)').bind(eventId,new Date().toISOString());
     if(await db.prepare('SELECT provider_id FROM message_tombstones WHERE provider_id=?').bind(event.data.email_id).first()){await eventStatement.run();return json({ok:true,suppressed:true})}
     if(event.type==='email.received'){

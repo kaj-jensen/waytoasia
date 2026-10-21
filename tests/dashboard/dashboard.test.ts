@@ -10,6 +10,29 @@ const auth=await identity();
 function setup(){const {adapter,sqlite}=database();const env:DashboardEnv={PROPOSALS_DB:adapter,ACCESS_TEAM_DOMAIN:'preview.invalid',ACCESS_AUD:'local-preview',LOCAL_ACCESS_JWK:JSON.stringify(auth.publicJwk),RESEND_WEBHOOK_SECRET:'whsec_'+Buffer.from('dashboard-test-secret').toString('base64'),RESEND_RECEIVING_API_KEY:'test-receiving',RESEND_API_KEY:'test-only',DASHBOARD_CAPTURE:'true'};sqlite.prepare('INSERT INTO staff_users (email,name,role,enabled,created_at) VALUES (?,?,?,?,?)').run('journeys@waytoasia.com','Preview administrator','admin',1,new Date().toISOString());sqlite.prepare('INSERT INTO staff_users (email,name,role,enabled,created_at) VALUES (?,?,?,?,?)').run('staff@example.invalid','Preview staff','staff',1,new Date().toISOString());return {env,sqlite}}
 async function call(env:DashboardEnv,path:string,body?:unknown,email='journeys@waytoasia.com',token?:string){const headers:Record<string,string>={'Cf-Access-Jwt-Assertion':token||await auth.token(email)};if(body!==undefined){headers['Content-Type']='application/json';headers.Origin='http://localhost:8788'}return onRequest({env,request:new Request(`http://localhost:8788/staff/${path}`,{method:body===undefined?'GET':'POST',headers,body:body===undefined?undefined:JSON.stringify(body)})})}
 const client={name:'Synthetic traveller',email:'client@example.invalid',phone:'123',source:'Test',message:'Private client request',requirements:{destinations:'Japan'}};
+test('signed delivery replay repairs acknowledged stale statuses without duplicating messages or replacing terminal outcomes',async()=>{
+ const {env,sqlite}=setup();const e=await captureEnquiry(env,client),now=new Date();
+ sqlite.prepare("INSERT INTO activities (id,enquiry_id,kind,actor,body,created_at,provider_id,delivery) VALUES (?,?,'outgoing','Test','hello',?,?,'sent')").run('stale-message',e.id,now.toISOString(),'stale-provider');
+ sqlite.prepare('INSERT INTO webhook_events VALUES (?,?)').run('acknowledged-delivery',now.toISOString());
+ const body=JSON.stringify({type:'email.delivered',data:{email_id:'stale-provider',message_id:'<delivered@example.invalid>'}});
+ const request=()=>new Request('https://preview.invalid/api/webhooks/resend',{method:'POST',body,headers:{'svix-id':'acknowledged-delivery','svix-timestamp':String(Math.floor(now.getTime()/1000)),'svix-signature':new Webhook(env.RESEND_WEBHOOK_SECRET!).sign('acknowledged-delivery',now,body)}});
+ const original=globalThis.fetch;let retrievals=0;globalThis.fetch=async()=>{retrievals++;return Response.json({message_id:'<delivered@example.invalid>'})};
+ try{
+  for(const status of ['pending','sent','delivery_delayed']){
+   sqlite.prepare('UPDATE activities SET delivery=? WHERE id=?').run(status,'stale-message');
+   assert.equal((await webhook({env,request:request()})).status,200);
+   assert.equal(sqlite.prepare('SELECT delivery FROM activities WHERE id=?').get('stale-message')!.delivery,'delivered');
+  }
+  const count=retrievals;
+  for(const status of ['delivered','bounced','failed','complained']){
+   sqlite.prepare('UPDATE activities SET delivery=? WHERE id=?').run(status,'stale-message');
+   assert.deepEqual(await(await webhook({env,request:request()})).json(),{ok:true,duplicate:true});
+   assert.equal(sqlite.prepare('SELECT delivery FROM activities WHERE id=?').get('stale-message')!.delivery,status);
+  }
+  assert.equal(retrievals,count);assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM activities WHERE kind='outgoing'").get()!.n,1);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM webhook_events').get()!.n,1);
+ }finally{globalThis.fetch=original}
+});
 test('pages, APIs and attachments reject missing, forged, expired, wrong-audience and non-MFA tokens',async()=>{
   const {env}=setup();for(const path of ['','api/enquiries','attachments/a'])assert.equal((await onRequest({env,request:new Request(`http://localhost/staff/${path}`)})).status,401);
   for(const token of ['forged',await auth.token(client.email),await auth.token(undefined,false),await auth.token(undefined,true,{aud:'wrong'}),await auth.token(undefined,true,{expired:true})])assert.ok([401,403].includes((await call(env,'api/enquiries',undefined,undefined,token)).status));
