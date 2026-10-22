@@ -1,3 +1,4 @@
+import {supplierText} from '../../src/lib/supplier-text';
 import {mapPlaces,type CountryKey} from '../../src/content/mapCoordinates';
 import {hotelOptionMatchesBudget,hotelStandardForBudget,tripPlannerCurrencyForLocale,type SuggestedHotelStay,type SuggestedHotelOption,type TripPlannerRequest} from '../../src/lib/tripPlanner';
 const codes:Record<string,string>={china:'CN','south-korea':'KR',thailand:'TH',vietnam:'VN',indonesia:'ID',japan:'JP',taiwan:'TW',laos:'LA',cambodia:'KH',malaysia:'MY',singapore:'SG',philippines:'PH',india:'IN','sri-lanka':'LK',nepal:'NP',bhutan:'BT'};
@@ -14,7 +15,7 @@ export function hotelLocation(place:string, destinations:string[]){
 type Obj=Record<string,unknown>;
 const obj=(v:unknown):Obj=>v&&typeof v==='object'&&!Array.isArray(v)?v as Obj:{};
 const arr=(v:unknown):unknown[]=>Array.isArray(v)?v:[];
-const text=(v:unknown)=>typeof v==='string'?v.replace(/<[^>]*>/g,'').trim().slice(0,350):'';
+const text=(v:unknown)=>supplierText(v,350);
 export function hotelPhoto(v:unknown){try{const u=new URL(text(v));return u.protocol==='https:'&&u.hostname==='static.cupid.travel'?u.href:undefined}catch{return undefined}}
 export function mapHotelRates(payload:unknown,profile:TripPlannerRequest,checkin:string,checkout:string):SuggestedHotelOption[]{
  const body=obj(payload),hotels=arr(body.hotels).map(obj),seen=new Set<string>();

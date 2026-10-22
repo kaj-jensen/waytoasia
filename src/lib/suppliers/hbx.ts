@@ -1,3 +1,4 @@
+import {supplierText} from '../supplier-text';
 import type {
   AccommodationSearch,
   ActivitySearch,
@@ -152,7 +153,7 @@ function activityOffers(raw:unknown,query:ActivitySearch):SupplierOffer[]{
           cancellation:cancellationTerms(rate.cancellationPolicies,asString(currency,query.currency)),retrievedAt:retrievedAt(),
           expiresAt:new Date(Date.now()+30*60*1000).toISOString(),recheckRequired:true,
           imageUrl:contentImage(content),
-          attributes:{contentFields:Object.keys(content).join(','),imageSources:asArray(asObject(content.media).images).flatMap(value=>asArray(asObject(value).urls).map(url=>{try{const u=new URL(asString(asObject(url).resource));return u.origin+u.pathname}catch{return ''}})).filter(Boolean).slice(0,3),modality:asString(modality.name),activityType:asString(activity.type),description:asString(content.description).replace(/<[^>]*>/g,'').slice(0,1200)},
+          attributes:{contentFields:Object.keys(content).join(','),imageSources:asArray(asObject(content.media).images).flatMap(value=>asArray(asObject(value).urls).map(url=>{try{const u=new URL(asString(asObject(url).resource));return u.origin+u.pathname}catch{return ''}})).filter(Boolean).slice(0,3),modality:asString(modality.name),activityType:asString(activity.type),description:supplierText(content.description,1200)},
         });
       }
     }
@@ -237,7 +238,7 @@ export function createHbxSandboxAdapter(options:HbxAdapterOptions):SupplierSearc
       const hotel=asObject(raw),id=String(hotel.code);if(!missing.includes(id))continue;
       const images=asArray(hotel.images).map(asObject).sort((a,b)=>(asNumber(a.visualOrder)??999)-(asNumber(b.visualOrder)??999));
       const image=images.find(i=>/^[a-z0-9/_-]+\.(jpg|jpeg|png)$/i.test(asString(i.path))&&!asString(i.path).includes('..'));
-      const content:HotelContent={status:image?200:'Supplier content has no supported image path',imageUrl:image?hbxImage(`https://photos.hotelbeds.com/giata/bigger/${image.path}`):undefined,address:asString(asObject(hotel.address).content),description:asString(asObject(hotel.description).content).replace(/<[^>]*>/g,'').slice(0,700)};
+      const content:HotelContent={status:image?200:'Supplier content has no supported image path',imageUrl:image?hbxImage(`https://photos.hotelbeds.com/giata/bigger/${image.path}`):undefined,address:asString(asObject(hotel.address).content),description:supplierText(asObject(hotel.description).content,700)};
       results.set(id,content);
       if(content.imageUrl)try{await cache?.put(cacheKey(id),Response.json(content,{headers:{'Cache-Control':'public, max-age=604800'}}))}catch{/* A valid image remains usable without cache. */}
     }

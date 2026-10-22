@@ -1,0 +1,4 @@
+# Reviewed false positives: public Access audience identifiers and documentation prose.
+b582b661d2895876ba28880dc69b13ecafbd068a:docs/PROPOSAL-PRESENTATION.md:generic-api-key:3
+27e9418b1ca53988f89ff2e43de6ab7586e8ac79:wrangler.jsonc:generic-api-key:13
+344c633685e9fb3d80111bea9817c2ffd7e335b0:wrangler.jsonc:generic-api-key:26

@@ -1,0 +1,18 @@
+{
+  "name": "waytoasia-request-guard",
+  "account_id": "d29f48cc069d51d0787fc306533039e1",
+  "main": "index.mjs",
+  "compatibility_date": "2026-10-22",
+  "workers_dev": false,
+  "preview_urls": false,
+  "ratelimits": [
+    {
+      "name": "REQUEST_LIMIT",
+      "namespace_id": "2026102204",
+      "simple": {
+        "limit": 10,
+        "period": 60
+      }
+    }
+  ]
+}
