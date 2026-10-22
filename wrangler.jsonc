@@ -40,7 +40,19 @@
           "database_name": "waytoasia-control-panel-preview",
           "database_id": "b7c0f01a-8ff0-4c7a-b9ba-330c40684502"
         }
+      ],
+      "services": [
+        {
+          "binding": "REQUEST_GUARD",
+          "service": "waytoasia-request-guard"
+        }
       ]
     }
-  }
+  },
+  "services": [
+    {
+      "binding": "REQUEST_GUARD",
+      "service": "waytoasia-request-guard"
+    }
+  ]
 }

@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {parse} from 'parse5';
+import {parse,serialize} from 'parse5';
 import catalog from '../src/content/translations.generated.json' with {type:'json'};
 
 for(const locale of Object.keys(catalog)){
@@ -17,13 +17,6 @@ for(const file of files){
   const locale=relative.split(path.sep)[0];
   if(locale==='en'||!catalog[locale])continue;
   let html=await fs.readFile(file,'utf8');
-  // Protect the complete wordmark, including text split by italic/span tags.
-  const protectedNames=[];
-  html=html.replace(/<([a-z][\w-]*)\b(?=[^>]*\btranslate="no")[^>]*>[\s\S]*?<\/\1>/gi,block=>{
-    const token=`__WTA_PROTECTED_${protectedNames.length}__`;
-    protectedNames.push(block);
-    return token;
-  });
   const entries=Object.entries(catalog[locale]).sort(([a],[b])=>b.length-a.length);
   // Match complete words, and translate once so translated text is not processed again.
   const replacements=new Map();
@@ -49,9 +42,20 @@ for(const file of files){
   const sources=[...replacements.keys()].sort((a,b)=>b.length-a.length).map(escapeRegex);
   const pattern=new RegExp(`(?<![\\p{L}\\p{N}_])(?:${sources.join('|')})(?![\\p{L}\\p{N}_])`,'gu');
   const translate=value=>value.replace(pattern,match=>replacements.get(match));
-  html=html.replace(/(<script\b[\s\S]*?<\/script>|<style\b[\s\S]*?<\/style>)|>([^<]+)</gi,(_match,protectedBlock,text)=>protectedBlock??`>${translate(text)}<`);
-  html=html.replace(/\b(aria-label|title|placeholder|alt|content)=("[^"]*"|'[^']*')/gi,(_match,name,quoted)=>name==='content'&&/^https?:\/\//.test(quoted.slice(1,-1))?`${name}=${quoted}`:`${name}=${quoted[0]}${translate(quoted.slice(1,-1))}${quoted[0]}`);
-  protectedNames.forEach((block,index)=>{html=html.replace(`__WTA_PROTECTED_${index}__`,block)});
+  const document=parse(html);
+  function localize(node, inherited=false){
+    const protectedNode=inherited||['script','style','template','noscript'].includes(node.tagName)||node.attrs?.some(attr=>attr.name==='translate'&&attr.value==='no');
+    if(protectedNode)return;
+    if(node.nodeName==='#text')node.value=translate(node.value);
+    for(const attr of node.attrs??[]){
+      if(!['aria-label','title','placeholder','alt','content'].includes(attr.name))continue;
+      if(attr.name==='content'&&/^https?:\/\//.test(attr.value))continue;
+      attr.value=translate(attr.value);
+    }
+    for(const child of node.childNodes??[])localize(child,protectedNode);
+  }
+  localize(document);
+  html=serialize(document);
   // Structured page metadata must describe the final reviewed, translated HTML.
   // Update only human-facing fields; identifiers, URLs and schema keys stay intact.
   let title='',description='',heading='';

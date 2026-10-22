@@ -22,7 +22,9 @@
     "preview:dashboard": "mkdir -p .wrangler && node --import tsx scripts/dashboard-preview.ts",
     "test:content": "node --import tsx --test tests/content-identifiers.test.ts tests/page-security.test.ts",
     "test:finance": "node --import tsx --test tests/dashboard/finance.test.ts tests/enquiry-services.test.ts tests/enquiry-tour-price.test.ts",
-    "test:finance-ui": "playwright test --config=playwright.finance.config.ts"
+    "test:finance-ui": "playwright test --config=playwright.finance.config.ts",
+    "check:lighthouse": "node scripts/check-lighthouse.mjs",
+    "test:request-security": "node --experimental-strip-types --test tests/request-guard.test.ts tests/supplier-text.test.ts tests/request-guard-worker.test.mjs"
   },
   "dependencies": {
     "@astrojs/react": "latest",
@@ -40,13 +42,13 @@
     "react-dom": "latest",
     "svix": "^2.6.1",
     "topojson-client": "^3.1.0",
-    "world-atlas": "^2.0.2"
+    "world-atlas": "^2.0.2",
+    "parse5": "^7.3.0"
   },
   "devDependencies": {
     "@astrojs/check": "latest",
     "@cloudflare/workers-types": "^5.20261004.1",
     "@eslint/js": "latest",
-    "@lhci/cli": "latest",
     "@playwright/test": "latest",
     "@types/d3-geo": "^3.1.1",
     "@types/d3-shape": "^3.2.0",
@@ -58,18 +60,16 @@
     "eslint": "latest",
     "eslint-plugin-astro": "latest",
     "globals": "latest",
-    "parse5": "^7.3.0",
     "tsx": "^4.20.6",
     "typescript": "latest",
     "typescript-eslint": "latest",
-    "wrangler": "latest"
+    "wrangler": "latest",
+    "lighthouse": "13.5.0",
+    "chrome-launcher": "1.2.1"
   },
   "overrides": {
     "sharp": "0.35.5",
     "tmp": "0.2.7",
-    "basic-ftp": "6.2.2",
-    "@lhci/cli": {
-      "uuid": "11.1.1"
-    }
+    "basic-ftp": "6.2.2"
   }
 }

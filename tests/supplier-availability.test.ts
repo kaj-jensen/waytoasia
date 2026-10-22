@@ -40,7 +40,7 @@ test('orchestrates three read-only HBX checks and strips rate keys from the resp
     const serialized=JSON.stringify(body);
     assert.doesNotMatch(serialized,/secret-(?:hotel|activity|transfer)-rate/);
     assert.match(serialized,/Bangkok Test Hotel/);
-    assert.match(serialized,/photos.hotelbeds.com/);
+    assert.match(serialized,/photos\.hotelbeds\.com/);
     assert.match(serialized,/Bangkok food walk/);
   }finally{globalThis.fetch=originalFetch}
 });

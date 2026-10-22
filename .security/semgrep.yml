@@ -1,0 +1,29 @@
+rules:
+  - id: javascript-no-eval
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Avoid dynamic code execution; validate data instead.
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+  - id: javascript-no-disabled-tls
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: TLS certificate verification must stay enabled.
+    pattern-either:
+      - pattern: process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"
+      - pattern: "{rejectUnauthorized: false, ...}"
+  - id: javascript-no-shell-exec-interpolation
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Pass arguments without a shell instead of interpolating a command.
+    pattern-either:
+      - pattern: exec(`...${...}...`, ...)
+      - pattern: execSync(`...${...}...`, ...)
+  - id: python-no-shell-true
+    languages: [python]
+    severity: ERROR
+    message: Avoid shell=True for commands; pass an argument list.
+    pattern-either:
+      - pattern: subprocess.run(..., shell=True, ...)
+      - pattern: subprocess.call(..., shell=True, ...)
