@@ -114,3 +114,11 @@ test('adding figures to a service before import does not duplicate its price',as
  response=await call(env,'/'+e.id+'/import',{revision:1});assert.equal(response.status,200);const d=await response.json();
  assert.equal(d.items.filter((i:FinanceItem)=>i.travel_item_id===service.key).length,1);assert.equal(d.actual.revenue,108500);assert.equal(d.items.length,2);
 });
+
+test('unexpected finance failures never echo internal exception details',async()=>{
+ const {env}=setup(),e=await enquiry(env);
+ const secretDetail='internal-host-and-database-diagnostic';
+ env.PROPOSALS_DB.batch=async()=>{throw new Error(secretDetail)};
+ const response=await call(env,'/'+e.id+'/item',{revision:0,description:'Test hotel',product_type:'Hotels',status:'Quoted',quote:components,actual:null});
+ assert.equal(response.status,500);const text=await response.text();assert.doesNotMatch(text,new RegExp(secretDetail));assert.match(text,/Operation could not be completed/);
+});

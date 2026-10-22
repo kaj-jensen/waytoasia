@@ -1,7 +1,7 @@
 import {enquiryServices} from './enquiry-services';
 import {json,privateHeaders,auditStatement,type DashboardEnv,type Staff} from './dashboard';
 import {clean} from './proposals';
-import {currencyCode,minor,rate,convert,normalizeComponents,summarize,paymentSummary,productTypes,financeStatuses,paymentKinds,csvCell,digits,type FinanceItem,type Payment} from './finance-calculations';
+import {FinanceInputError,currencyCode,minor,rate,convert,normalizeComponents,summarize,paymentSummary,productTypes,financeStatuses,paymentKinds,csvCell,digits,type FinanceItem,type Payment} from './finance-calculations';
 import type {D1PreparedStatement} from '@cloudflare/workers-types';
 export function financePermissions(staff:Staff){return {read:['admin','staff','finance','backoffice'].includes(staff.role),write:['admin','staff','finance'].includes(staff.role)}}
 interface File {enquiry_id:string;currency:string;status:string;revision:number;is_demo:number;updated_at:string;last_write:string}
@@ -109,7 +109,7 @@ export async function financePost(path:string,input:Record<string,unknown>,env:D
  db.prepare(`INSERT INTO audit_log SELECT ?,?,?,?,? WHERE ${guard}`).bind(crypto.randomUUID(),staff.email,`finance.${action}`,id,now,id,write)];
  const result=await db.batch(statements);if(result[1].meta.changes!==1)bad('Another user saved first. Reload financials before saving.',409);
  return json({...await load(env,id),permissions:financePermissions(staff)});
- }catch(error){if(error instanceof Response)throw error;if(error instanceof Error&& !/SQL|D1|constraint/i.test(error.message))bad(error.message);throw error}
+ }catch(error){if(error instanceof Response)throw error;if(error instanceof FinanceInputError)bad(error.publicMessage);throw error}
 }
 async function createDemo(env:DashboardEnv,staff:Staff){
  const existing=await env.PROPOSALS_DB.prepare('SELECT enquiry_id FROM finance_files WHERE is_demo=1 LIMIT 1').first<{enquiry_id:string}>();if(existing)return json({id:existing.enquiry_id});

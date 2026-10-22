@@ -29,7 +29,7 @@ export async function onRequest({request,env}:Context):Promise<Response>{
     const text=new TextDecoder().decode(await readBytes(request,100000));
     let input:Record<string,unknown>;try{input=JSON.parse(text);if(!input||typeof input!=='object'||Array.isArray(input))throw 0}catch{return json({error:'Invalid JSON'},400)}
     return await post(path,input,env,staff);
-  }catch(error){if(error instanceof Response)return error;if(error instanceof FlightError)return json({error:error.message},error.status);console.error('Dashboard operation failed');return json({error:'Operation could not be completed. Check configuration or retry.'},500)}
+  }catch(error){if(error instanceof Response)return error;if(error instanceof FlightError)return json({error:error.publicMessage},error.status);console.error('Dashboard operation failed');return json({error:'Operation could not be completed. Check configuration or retry.'},500)}
 }
 async function get(path:string,url:URL,env:DashboardEnv,staff:Staff):Promise<Response>{
   const protectedRecord=await customerRecordsGet(path,env,staff);if(protectedRecord)return protectedRecord;
