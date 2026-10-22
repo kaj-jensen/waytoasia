@@ -1,7 +1,7 @@
 import {liveFlightNote,flightTable} from './flight-display';
 export interface FlightSegment {origin:string;destination:string;departure:string;arrival:string;airline:string;flightNumber:string;duration:string;connectionDuration?:string;originCity?:string;originName?:string;destinationCity?:string;destinationName?:string;cabin?:string;operatingAirline?:string;originTimeZone?:string;destinationTimeZone?:string;stops?:Array<{airport:string;city:string;name:string;arrival:string;departure:string;duration:string}>}
 export interface FlightItinerary {source:'duffel-test'|'sample'|'serpapi-google-flights';offerId:string;retrievedAt:string;totalAmount?:string;totalCurrency?:string;slices:FlightSegment[][];transfers?:Array<{place:string;airport:string;airportName?:string}>}
-export class FlightError extends Error {constructor(message:string,public status=400){super(message)}}
+export class FlightError extends Error {publicMessage:string;constructor(message:string,public status=400){super(message);this.publicMessage=message}}
 const record=(v:unknown):Record<string,unknown>=>v&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:{};
 const text=(v:unknown)=>typeof v==='string'?v.slice(0,160):'';
 export function normaliseOffer(value:unknown):FlightItinerary {
