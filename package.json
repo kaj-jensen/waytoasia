@@ -38,12 +38,12 @@
     "d3-shape": "^3.2.0",
     "jose": "^6.2.12",
     "maplibre-gl": "^6.9.0",
+    "parse5": "^7.3.0",
     "react": "latest",
     "react-dom": "latest",
     "svix": "^2.6.1",
     "topojson-client": "^3.1.0",
-    "world-atlas": "^2.0.2",
-    "parse5": "^7.3.0"
+    "world-atlas": "^2.0.2"
   },
   "devDependencies": {
     "@astrojs/check": "latest",
@@ -57,19 +57,22 @@
     "@types/react-dom": "latest",
     "@types/topojson-client": "^3.1.5",
     "@types/topojson-specification": "^1.0.5",
+    "chrome-launcher": "1.2.1",
     "eslint": "latest",
     "eslint-plugin-astro": "latest",
     "globals": "latest",
+    "lighthouse": "13.5.0",
     "tsx": "^4.20.6",
     "typescript": "latest",
     "typescript-eslint": "latest",
-    "wrangler": "latest",
-    "lighthouse": "13.5.0",
-    "chrome-launcher": "1.2.1"
+    "wrangler": "latest"
   },
   "overrides": {
     "sharp": "0.35.5",
     "tmp": "0.2.7",
-    "basic-ftp": "6.2.2"
+    "basic-ftp": "6.2.2",
+    "miniflare": {
+      "undici": "7.30.1"
+    }
   }
 }
