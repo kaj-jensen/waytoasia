@@ -1,9 +1,16 @@
 name: Free source security checks
 on:
+  push:
+    branches: [main]
   pull_request:
+  schedule:
+    - cron: "17 6 * * 1"
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: source-security-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   scan:
     runs-on: ubuntu-latest
