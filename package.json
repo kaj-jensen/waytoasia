@@ -24,7 +24,8 @@
     "test:finance": "node --import tsx --test tests/dashboard/finance.test.ts tests/enquiry-services.test.ts tests/enquiry-tour-price.test.ts",
     "test:finance-ui": "playwright test --config=playwright.finance.config.ts",
     "check:lighthouse": "node scripts/check-lighthouse.mjs",
-    "test:request-security": "node --experimental-strip-types --test tests/request-guard.test.ts tests/supplier-text.test.ts tests/request-guard-worker.test.mjs"
+    "test:request-security": "node --experimental-strip-types --test tests/request-guard.test.ts tests/supplier-text.test.ts tests/request-guard-worker.test.mjs",
+    "prebuild": "node scripts/check-framework-policy.mjs"
   },
   "dependencies": {
     "@astrojs/react": "latest",
