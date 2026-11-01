@@ -7,3 +7,7 @@
 - Keep page introductions compact and product-led. Do not use oversized solid-colour banners, huge slogan text or excessive empty spacing unless explicitly requested. Bring relevant product photography and useful content into the first screen; do not add video unless requested.
 
 - Tour maps must use a detailed interactive geographic basemap beside the itinerary, numbered non-overlapping stops, transport-specific lines and legend, itinerary-linked focus, overview and fullscreen controls. Check every tour with real tiles under production CSP, including mobile bounds; a mocked blank map is not sufficient acceptance evidence. Retain honest indicative-route labels when exact tracks are unavailable.
+
+# Framework policy
+
+Vinext (`vinext` and `@vinext/*`) is prohibited in all work for Kaj Jensen. Do not introduce it through a dependency, starter, plugin or old branch. Preserve this repository’s existing conventional framework and do not bypass `scripts/check-framework-policy.mjs`. Historical backups and commits do not authorize reuse.
