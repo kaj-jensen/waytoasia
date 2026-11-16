@@ -1,3 +1,4 @@
+import {fileURLToPath} from 'node:url';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {parse,serialize} from 'parse5';
@@ -10,10 +11,10 @@ for(const locale of Object.keys(catalog)){
 const dist=new URL('../dist/',import.meta.url);
 const files=[];
 async function walk(directory){for(const entry of await fs.readdir(directory,{withFileTypes:true})){const target=path.join(directory,entry.name);if(entry.isDirectory())await walk(target);else if(entry.name.endsWith('.html'))files.push(target)}}
-await walk(dist.pathname);
+await walk(fileURLToPath(dist));
 const escapeHtml=value=>value.replaceAll('&','&amp;').replaceAll('—','&mdash;').replaceAll('–','&ndash;').replaceAll('“','&ldquo;').replaceAll('”','&rdquo;').replaceAll('’','&rsquo;');
 for(const file of files){
-  const relative=path.relative(dist.pathname,file);
+  const relative=path.relative(fileURLToPath(dist),file);
   const locale=relative.split(path.sep)[0];
   if(locale==='en'||!catalog[locale])continue;
   let html=await fs.readFile(file,'utf8');
